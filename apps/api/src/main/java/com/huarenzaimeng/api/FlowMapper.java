@@ -13,6 +13,57 @@ import java.util.Map;
 
 @Mapper
 interface FlowMapper {
+    @Select("SELECT CURRENT_TIMESTAMP(3)")
+    Timestamp selectDatabaseNow();
+
+    @Insert("""
+            INSERT INTO hz_task
+              (task_key, task_type, task_state, payload_json, available_at, fencing_token,
+               attempt_count, created_at, updated_at)
+            VALUES (#{taskKey}, #{taskType}, 'AVAILABLE', CAST(#{payloadJson} AS JSON), #{availableAt},
+                    0, 0, #{now}, #{now})
+            """)
+    int insertTask(@Param("taskKey") String taskKey, @Param("taskType") String taskType,
+                   @Param("payloadJson") String payloadJson, @Param("availableAt") Timestamp availableAt,
+                   @Param("now") Timestamp now);
+
+    @Select("""
+            SELECT task_key, lease_owner, lease_until, fencing_token, available_at
+            FROM hz_task WHERE task_key=#{taskKey} FOR UPDATE
+            """)
+    Map<String, Object> selectTaskForUpdate(@Param("taskKey") String taskKey);
+
+    @Update("""
+            UPDATE hz_task
+            SET task_state='LEASED', lease_owner=#{owner}, lease_until=#{leaseUntil},
+                fencing_token=#{nextToken}, attempt_count=attempt_count+1, updated_at=#{now}
+            WHERE task_key=#{taskKey} AND fencing_token=#{expectedToken}
+              AND available_at <= #{now}
+              AND (lease_owner IS NULL OR lease_until IS NULL OR lease_until <= #{now})
+            """)
+    int claimTask(@Param("taskKey") String taskKey, @Param("owner") String owner,
+                  @Param("nextToken") long nextToken, @Param("leaseUntil") Timestamp leaseUntil,
+                  @Param("expectedToken") long expectedToken, @Param("now") Timestamp now);
+
+    @Update("""
+            UPDATE hz_task SET lease_until=#{leaseUntil}, updated_at=#{now}
+            WHERE task_key=#{taskKey} AND task_state='LEASED' AND lease_owner=#{owner}
+              AND fencing_token=#{token} AND lease_until > #{now}
+            """)
+    int renewTask(@Param("taskKey") String taskKey, @Param("owner") String owner,
+                  @Param("token") long token, @Param("now") Timestamp now,
+                  @Param("leaseUntil") Timestamp leaseUntil);
+
+    @Update("""
+            UPDATE hz_task
+            SET task_state='AVAILABLE', lease_owner=NULL, lease_until=NULL, updated_at=#{updatedAt}
+            WHERE task_key=#{taskKey} AND task_state='LEASED' AND lease_owner=#{owner}
+              AND fencing_token=#{token} AND lease_until > #{now}
+            """)
+    int releaseTask(@Param("taskKey") String taskKey, @Param("owner") String owner,
+                    @Param("token") long token, @Param("now") Timestamp now,
+                    @Param("updatedAt") Timestamp updatedAt);
+
     @Insert("""
             INSERT INTO hz_quote
               (project_subject_ref, quote_ref, phone_masked, operator_code, product_code, mnp_state,
