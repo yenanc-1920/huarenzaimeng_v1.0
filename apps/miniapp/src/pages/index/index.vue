@@ -1,26 +1,2 @@
-<script setup lang="ts">
-import { ref } from 'vue'
-
-const phone = ref('')
-const state = ref<'READY'|'QUOTE_MOCK'>('READY')
-const quote = () => { state.value = 'QUOTE_MOCK' }
-</script>
-
-<template>
-  <view class="page">
-    <view class="brand"><image src="/static/logo.png" mode="aspectFill"/><view><text class="title">华人在孟</text><text class="sub">孟加拉生活与充值服务</text></view></view>
-    <view class="warning">当前为合成数据Mock，不会发起支付或真实充值。</view>
-    <view class="card">
-      <text class="label">孟加拉手机号</text>
-      <input v-model="phone" placeholder="请输入测试号码" maxlength="14" />
-      <button @click="quote">获取Mock报价</button>
-    </view>
-    <view v-if="state==='QUOTE_MOCK'" class="card result">
-      <text>测试套餐</text><text class="price">充值总价 ¥10.00</text><text>已包含成本、服务费与利润</text>
-    </view>
-  </view>
-</template>
-
-<style scoped>
-.page{padding:32rpx}.brand{display:flex;align-items:center;gap:20rpx}.brand image{width:96rpx;height:96rpx;border-radius:24rpx}.title,.sub{display:block}.title{font-size:40rpx;font-weight:700}.sub{color:#667085}.warning,.card{margin-top:28rpx;padding:28rpx;border-radius:24rpx;background:#fff}.warning{background:#fff1d6;color:#8a5400}.label{display:block;margin-bottom:16rpx;font-weight:600}input{padding:22rpx;background:#f6f7fb;border-radius:16rpx}button{margin-top:24rpx;background:#e84b2c;color:#fff}.result text{display:block;margin-bottom:12rpx}.price{font-size:34rpx;font-weight:700}
-</style>
+<script setup lang="ts">import AppHeader from'../../components/AppHeader.vue';const go=(url:string)=>uni.navigateTo({url})</script>
+<template><view class="page"><AppHeader right="帮助"/><view class="content"><text class="kicker">首页 / UX-P001</text><view class="heading" role="heading" aria-level="1">充值与在孟信息，清楚地放在一起</view><text class="desc">先核对号码、商品与总价；离开后仍可回到原订单查看最新状态。</text><view class="hero"><text class="pill">孟加拉号码充值</text><view class="hero-title" role="heading" aria-level="2">为手机号码充值</view><text class="hero-copy">无法确认号码适用性时不会收款。</text><button class="hero-button" @click="go('/pages/recharge/select')">开始充值　→</button></view><view class="grid"><button class="card nav" @click="go('/pages/order/list')"><text class="card-title">查看订单</text><text class="copy">查看付款、充值和退款的已确认事实。</text></button><button class="card nav" @click="go('/pages/order/recovery')"><text class="card-title">恢复订单</text><text class="copy">重新建立访问，返回同一订单。</text></button></view><button class="card nav full" @click="go('/pages/directory/list')"><text class="card-title">在孟信息与黄页</text><text class="copy">仅展示登记范围内核验的自营静态信息，不代表平台担保或持续有效。</text></button><view class="mock">当前为合成数据 Mock，不会发起真实支付或充值。</view></view></view></template><style src="../../styles/shared.css"></style><style scoped>.hero{margin-top:30rpx;padding:38rpx;border-radius:30rpx;color:#fff;background:linear-gradient(145deg,var(--brand),var(--brand-strong))}.pill{font-size:21rpx}.hero-title{font-size:36rpx;font-weight:900;margin-top:20rpx}.hero-copy{display:block;margin-top:10rpx}.hero-button{margin-top:30rpx;background:#fff;color:var(--brand-strong);text-align:left}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18rpx}.nav{margin-top:24rpx;text-align:left;line-height:1.4}.full{width:100%}.mock{margin-top:24rpx;padding:18rpx;border-radius:18rpx;background:#fff7e8;color:#744500;font-size:22rpx}</style>

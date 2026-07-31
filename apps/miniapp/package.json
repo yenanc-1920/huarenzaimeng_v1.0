@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build:mp-weixin": "uni build -p mp-weixin"
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "test:frontend-contracts": "node scripts/assert-frontend-contracts.mjs"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-alpha-5020320260731001",

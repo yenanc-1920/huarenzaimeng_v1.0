@@ -1,22 +1,8 @@
 spring:
   application:
     name: huarenzaimeng-api-mock
-  datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    hikari:
-      maximum-pool-size: 5
-      minimum-idle: 0
-      connection-timeout: 10000
-  flyway:
-    enabled: true
-    user: ${SPRING_FLYWAY_USER}
-    password: ${SPRING_FLYWAY_PASSWORD}
-    locations: classpath:db/migration
-    connect-retries: 6
-    validate-on-migrate: true
-    baseline-on-migrate: false
+  profiles:
+    default: mock
   main:
     banner-mode: "off"
 server:
@@ -32,3 +18,8 @@ management:
 hz-mock:
   external-network: DENY_ALL
   real-adapters-enabled: false
+hz:
+  persistence:
+    mode: in-memory
+  worker:
+    task-leasing-status: NOT_IMPLEMENTED

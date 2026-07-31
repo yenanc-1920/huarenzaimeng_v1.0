@@ -13,7 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration"
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration",
+        "hz.persistence.mode=in-memory"
 })
 @AutoConfigureMockMvc
 class MockFlowControllerTest {
@@ -22,6 +23,7 @@ class MockFlowControllerTest {
     @Test
     void prepaymentUnknownIsRejectedWithoutCreatingPaymentEligibility() throws Exception {
         mvc.perform(post("/api/v1/quotes")
+                        .header("X-Project-Subject-Ref", "SUBJECT-CONTROLLER")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"phone":"8801700000000","operatorCode":"SYN-OP","productCode":"SYN-PRODUCT","mnpState":"UNKNOWN"}
@@ -29,6 +31,7 @@ class MockFlowControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(header().string("X-HZM-Mock-Only", "true"))
                 .andExpect(jsonPath("$.status").value("REJECTED"))
-                .andExpect(jsonPath("$.code").value("PREPAY_MNP_NOT_CONFIRMED"));
+                .andExpect(jsonPath("$.projectCode").value("PREPAY_MNP_NOT_CONFIRMED"))
+                .andExpect(jsonPath("$.data").doesNotExist());
     }
 }

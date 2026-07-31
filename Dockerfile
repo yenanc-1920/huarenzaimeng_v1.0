@@ -12,7 +12,8 @@ RUN mvn -B -ntp -pl apps/api -am dependency:go-offline
 COPY modules/core/src modules/core/src
 COPY apps/api/src apps/api/src
 
-RUN mvn -B -ntp -pl apps/api -am clean package -DskipTests
+RUN mvn -B -ntp -pl apps/api -am clean test
+RUN mvn -B -ntp -pl apps/api -am package -DskipTests
 
 FROM eclipse-temurin:17-jre-jammy
 
@@ -20,6 +21,7 @@ WORKDIR /app
 COPY --from=build /workspace/apps/api/target/api-*.jar app.jar
 
 ENV SERVER_PORT=8080
+ENV SPRING_PROFILES_ACTIVE=mock
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

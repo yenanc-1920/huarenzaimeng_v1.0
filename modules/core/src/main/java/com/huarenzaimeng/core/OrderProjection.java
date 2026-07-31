@@ -11,5 +11,6 @@ public record OrderProjection(
         long totalAmountMinor,
         String currency,
         long projectionVersion,
+        long aggregateVersion,
         String nextAction
 ) {}
