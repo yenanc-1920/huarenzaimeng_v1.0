@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: huarenzaimeng-api-mock
+  main:
+    banner-mode: "off"
+server:
+  port: 8080
+hz-mock:
+  external-network: DENY_ALL
+  real-adapters-enabled: false

@@ -1,0 +1,9 @@
+{
+  "name": "华人在孟",
+  "appid": "__UNI__HZM_MOCK__",
+  "description": "仅本地Mock骨架",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "mp-weixin": {"appid":"","setting":{"urlCheck":false}},
+  "uniStatistics": {"enable": false}
+}

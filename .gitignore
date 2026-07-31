@@ -1,0 +1,50 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Java
+target/
+*.class
+.mvn/timing.properties
+
+# Node / uni-app / Vue
+node_modules/
+dist/
+unpackage/
+.vite/
+coverage/
+
+# IDE / OS
+.idea/
+.vscode/
+.qoder/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Logs and temporary evidence
+*.log
+tmp/
+.tmp/
+.cache/
+
+# Local databases and runtime data
+*.db
+*.sqlite
+data/
+
+# Governance: project documents and original research inputs stay local and must not enter a future remote code repository.
+/项目管理/
+/项目调研/
+/团队治理/
+/角色定义/
+/项目说明.md
+/华人在孟 V1.0 产品设计规范.md
+/sprint-plan-v3.md
+/reloadly_api.yaml
