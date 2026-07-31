@@ -64,3 +64,26 @@ CREATE TABLE hz_task (
     UNIQUE KEY uk_hz_task_key (task_key),
     KEY idx_hz_task_claim (task_state, available_at, task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE hz_task_domain_result (
+    result_key VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    task_key VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    lease_owner VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    fencing_token BIGINT UNSIGNED NOT NULL,
+    aggregate_ref VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    canonical_fingerprint CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    payload_json JSON NOT NULL,
+    created_at DATETIME(3) NOT NULL,
+    PRIMARY KEY (result_key),
+    KEY idx_hz_task_domain_result_task (task_key, fencing_token)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE hz_task_ledger_marker (
+    marker_key VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    result_key VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    task_key VARCHAR(192) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    fencing_token BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME(3) NOT NULL,
+    PRIMARY KEY (marker_key),
+    UNIQUE KEY uk_hz_task_ledger_marker_result (result_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

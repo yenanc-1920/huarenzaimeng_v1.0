@@ -63,6 +63,11 @@ class InMemoryTaskLeaseStore implements TaskLeaseStore {
         }
     }
 
+    synchronized void assertCurrentLease(String taskKey, String owner, long token, Instant now) {
+        TaskLeaseInputs.release(taskKey, owner, now);
+        assertCurrent(requireTask(taskKey), owner, token, now);
+    }
+
     private TaskRecord requireTask(String taskKey) {
         TaskRecord task = tasks.get(taskKey);
         if (task == null) throw new TaskLeaseRejectedException("TASK_NOT_FOUND");

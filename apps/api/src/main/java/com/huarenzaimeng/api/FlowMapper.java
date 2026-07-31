@@ -13,6 +13,47 @@ import java.util.Map;
 
 @Mapper
 interface FlowMapper {
+    @Select("""
+            SELECT result_key, task_key, fencing_token, aggregate_ref, canonical_fingerprint,
+                   CAST(payload_json AS CHAR) AS payload_json
+            FROM hz_task_domain_result WHERE result_key=#{resultKey} FOR UPDATE
+            """)
+    Map<String, Object> selectFencedResultForUpdate(@Param("resultKey") String resultKey);
+
+    @Insert("""
+            INSERT INTO hz_task_domain_result
+              (result_key, task_key, lease_owner, fencing_token, aggregate_ref,
+               canonical_fingerprint, payload_json, created_at)
+            VALUES (#{resultKey}, #{taskKey}, #{owner}, #{token}, #{aggregateRef},
+                    #{fingerprint}, CAST(#{payloadJson} AS JSON), #{createdAt})
+            """)
+    int insertFencedDomainResult(@Param("resultKey") String resultKey, @Param("taskKey") String taskKey,
+                                 @Param("owner") String owner, @Param("token") long token,
+                                 @Param("aggregateRef") String aggregateRef,
+                                 @Param("fingerprint") String fingerprint,
+                                 @Param("payloadJson") String payloadJson,
+                                 @Param("createdAt") Timestamp createdAt);
+
+    @Insert("""
+            INSERT INTO hz_task_ledger_marker
+              (marker_key, result_key, task_key, fencing_token, created_at)
+            VALUES (#{markerKey}, #{resultKey}, #{taskKey}, #{token}, #{createdAt})
+            """)
+    int insertFencedLedgerMarker(@Param("markerKey") String markerKey, @Param("resultKey") String resultKey,
+                                 @Param("taskKey") String taskKey, @Param("token") long token,
+                                 @Param("createdAt") Timestamp createdAt);
+
+    @Insert("""
+            INSERT INTO hz_outbox
+              (event_key, aggregate_ref, event_type, payload_json, event_state, created_at)
+            VALUES (#{eventKey}, #{aggregateRef}, 'FENCED_MOCK_RESULT',
+                    JSON_OBJECT('resultKey', #{resultKey}, 'fencingToken', #{token}),
+                    'PENDING', #{createdAt})
+            """)
+    int insertFencedOutbox(@Param("eventKey") String eventKey, @Param("aggregateRef") String aggregateRef,
+                           @Param("resultKey") String resultKey, @Param("token") long token,
+                           @Param("createdAt") Timestamp createdAt);
+
     @Select("SELECT CURRENT_TIMESTAMP(3)")
     Timestamp selectDatabaseNow();
 
