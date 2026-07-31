@@ -1,0 +1,24 @@
+.git
+.github
+.idea
+.vscode
+node_modules
+dist
+unpackage
+target
+coverage
+*.log
+.env
+.env.*
+secrets
+data
+
+# Local governance and discovery materials are not part of the deploy context.
+项目管理
+项目调研
+团队治理
+角色定义
+项目说明.md
+华人在孟 V1.0 产品设计规范.md
+sprint-plan-v3.md
+reloadly_api.yaml

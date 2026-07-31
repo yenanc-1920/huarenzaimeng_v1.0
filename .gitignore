@@ -12,6 +12,7 @@ secrets/
 target/
 *.class
 .mvn/timing.properties
+.m2-local/
 
 # Node / uni-app / Vue
 node_modules/
