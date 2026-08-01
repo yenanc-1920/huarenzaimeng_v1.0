@@ -4,16 +4,16 @@
 
 <style>
 page {
-  --brand: #2457a6;
-  --brand-strong: #173f7c;
+  --brand: #2357a5;
+  --brand-strong: #173e79;
   --surface: #ffffff;
-  --background: #f3f6fa;
-  --text: #182333;
-  --muted: #5f6b7a;
-  --line: #d8e0ea;
-  --success: #237a57;
-  --unknown: #a86400;
-  --risk: #b23a3a;
+  --background: #f4f6f9;
+  --text: #172033;
+  --muted: #697487;
+  --line: #e5eaf0;
+  --success: #17875b;
+  --unknown: #a76500;
+  --risk: #bd4242;
   min-height: 100%;
   background: var(--background);
   color: var(--text);
