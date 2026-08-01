@@ -47,6 +47,26 @@ class TaskLeaseSqlCandidateContractTest {
     }
 
     @Test
+    void leaseRowsAcceptLocalDateTimeReturnedByMyBatis() {
+        Instant databaseNow = Instant.parse("2026-08-01T00:00:00Z");
+        FlowMapper mapper = mock(FlowMapper.class);
+        TransactionTemplate transactions = immediateTransactions();
+        Map<String, Object> before = taskRow(null, null, 0, databaseNow.minusSeconds(1));
+        Map<String, Object> after = taskRow("WORKER-A", databaseNow.plusSeconds(30), 1,
+                databaseNow.minusSeconds(1));
+        after.put("lease_until", java.time.LocalDateTime.of(2026, 8, 1, 0, 0, 30));
+        after.put("available_at", java.time.LocalDateTime.of(2026, 7, 31, 23, 59, 59));
+        when(mapper.selectDatabaseNow()).thenReturn(Timestamp.from(databaseNow));
+        when(mapper.selectTaskForUpdate("TASK-LOCAL-DATETIME")).thenReturn(before, after);
+        when(mapper.claimTask(anyString(), anyString(), anyLong(), any(), anyLong(), any())).thenReturn(1);
+
+        TaskLease lease = new MyBatisTaskLeaseStore(mapper, transactions).claim("TASK-LOCAL-DATETIME", "WORKER-A",
+                Instant.EPOCH, Duration.ofSeconds(30));
+
+        assertThat(lease.leaseUntil()).isEqualTo(Timestamp.valueOf("2026-08-01 00:00:30").toInstant());
+    }
+
+    @Test
     void invalidMysqlCandidateInputFailsBeforeTransactionOrSql() {
         FlowMapper mapper = mock(FlowMapper.class);
         TransactionTemplate transactions = mock(TransactionTemplate.class);

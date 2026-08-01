@@ -55,7 +55,7 @@ class MyBatisFencedResultStore implements FencedResultStore {
         String owner = row.get("lease_owner") == null ? null : String.valueOf(row.get("lease_owner"));
         long token = ((Number) row.get("fencing_token")).longValue();
         Instant leaseUntil = row.get("lease_until") == null ? null
-                : ((Timestamp) row.get("lease_until")).toInstant();
+                : MyBatisFlowStore.timestamp(row, "lease_until").toInstant();
         if (!command.owner().equals(owner) || command.fencingToken() != token) {
             throw new TaskLeaseRejectedException("STALE_FENCING_TOKEN");
         }

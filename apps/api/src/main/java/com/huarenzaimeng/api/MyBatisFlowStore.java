@@ -11,6 +11,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -139,7 +140,15 @@ class MyBatisFlowStore implements FlowStore {
 
     private static String string(Map<String, Object> row, String key) { return String.valueOf(row.get(key)); }
     private static long number(Map<String, Object> row, String key) { return ((Number) row.get(key)).longValue(); }
-    private static Timestamp timestamp(Map<String, Object> row, String key) { return (Timestamp) row.get(key); }
+    static Timestamp timestamp(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        if (value instanceof Timestamp timestamp) return timestamp;
+        if (value instanceof LocalDateTime localDateTime) return Timestamp.valueOf(localDateTime);
+        if (value instanceof Instant instant) return Timestamp.from(instant);
+        if (value == null) throw new IllegalStateException("missing timestamp column: " + key);
+        throw new IllegalStateException("unsupported timestamp type for " + key + ": "
+                + value.getClass().getName());
+    }
 
     private record CommandRow(String commandId, String idempotencyKey, String endpointScope,
                               String resourceScope, String semanticActionKey, String fingerprint,

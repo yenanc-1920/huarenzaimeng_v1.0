@@ -73,9 +73,9 @@ class MyBatisTaskLeaseStore implements TaskLeaseStore {
     private static TaskRow requireRow(Map<String, Object> row) {
         if (row == null) throw new TaskLeaseRejectedException("TASK_NOT_FOUND");
         return new TaskRow(String.valueOf(row.get("task_key")), nullable(row.get("lease_owner")),
-                row.get("lease_until") == null ? null : ((Timestamp) row.get("lease_until")).toInstant(),
+                row.get("lease_until") == null ? null : MyBatisFlowStore.timestamp(row, "lease_until").toInstant(),
                 ((Number) row.get("fencing_token")).longValue(),
-                ((Timestamp) row.get("available_at")).toInstant());
+                MyBatisFlowStore.timestamp(row, "available_at").toInstant());
     }
 
     private static String nullable(Object value) { return value == null ? null : String.valueOf(value); }
