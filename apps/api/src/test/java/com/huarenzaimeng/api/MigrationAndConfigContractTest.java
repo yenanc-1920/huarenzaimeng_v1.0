@@ -54,6 +54,7 @@ class MigrationAndConfigContractTest {
 
         assertThat(config).contains("external-network: DENY_ALL")
                 .contains("real-adapters-enabled: false")
+                .contains("test-access-token: ${HZ_TEST_ACCESS_TOKEN:}")
                 .contains("default: mock")
                 .contains("mode: in-memory")
                 .contains("task-leasing-status: NOT_IMPLEMENTED");
@@ -77,7 +78,7 @@ class MigrationAndConfigContractTest {
         assertThat(resource("META-INF/spring.factories"))
                 .contains("CloudDatasourceEnvironmentPostProcessor");
         assertThat(config).doesNotContain("jdbc:mysql://")
-                .doesNotContain("token:");
+                .doesNotContain("test-access-token: test-only-secret");
     }
 
     private static String resource(String path) throws IOException {

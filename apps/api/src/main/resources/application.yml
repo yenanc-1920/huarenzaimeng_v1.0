@@ -19,6 +19,7 @@ hz-mock:
   external-network: DENY_ALL
   real-adapters-enabled: false
 hz:
+  test-access-token: ${HZ_TEST_ACCESS_TOKEN:}
   persistence:
     mode: in-memory
   worker:
