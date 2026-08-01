@@ -65,6 +65,10 @@ class MigrationAndConfigContractTest {
                 .contains("${SPRING_DATASOURCE_PASSWORD}")
                 .contains("${SPRING_FLYWAY_PASSWORD}")
                 .contains("enabled: true");
+        String explicitDataSource = source("src/main/java/com/huarenzaimeng/api/config/ReleaseMysqlDataSourceConfig.java");
+        assertThat(explicitDataSource).contains("@Profile(\"release-mysql\")")
+                .contains("@Value(\"${HZ_DATASOURCE_URL}\")")
+                .contains("setJdbcUrl(jdbcUrl.strip())");
         assertThat(config).doesNotContain("jdbc:mysql://")
                 .doesNotContain("token:");
     }
@@ -74,5 +78,9 @@ class MigrationAndConfigContractTest {
             if (stream == null) throw new IOException("missing test resource: " + path);
             return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    private static String source(String path) throws IOException {
+        return java.nio.file.Files.readString(java.nio.file.Path.of(path), StandardCharsets.UTF_8);
     }
 }

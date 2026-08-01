@@ -11,6 +11,7 @@ spring:
       connection-timeout: 10000
   flyway:
     enabled: true
+    url: ${HZ_DATASOURCE_URL}
     user: ${SPRING_FLYWAY_USER}
     password: ${SPRING_FLYWAY_PASSWORD}
     locations: classpath:db/migration
