@@ -14,6 +14,107 @@ import java.util.Map;
 @Mapper
 interface FlowMapper {
     @Select("""
+            SELECT content_ref, title, summary, category, ownership_mode, source_category, source_ref,
+                   verification_scope, verified_by, verified_at, valid_until, aggregate_version,
+                   content_state, complaint_pending, updated_at
+            FROM hz_content_item
+            WHERE content_state='PUBLISHED' AND complaint_pending=0
+            ORDER BY content_ref
+            """)
+    List<Map<String, Object>> selectPublicContent();
+
+    @Select("""
+            SELECT content_ref, title, summary, category, ownership_mode, source_category, source_ref,
+                   verification_scope, verified_by, verified_at, valid_until, aggregate_version,
+                   content_state, complaint_pending, updated_at
+            FROM hz_content_item WHERE content_ref=#{contentRef}
+            """)
+    Map<String, Object> selectContent(@Param("contentRef") String contentRef);
+
+    @Select("""
+            SELECT content_ref, title, summary, category, ownership_mode, source_category, source_ref,
+                   verification_scope, verified_by, verified_at, valid_until, aggregate_version,
+                   content_state, complaint_pending, updated_at
+            FROM hz_content_item WHERE content_ref=#{contentRef} FOR UPDATE
+            """)
+    Map<String, Object> selectContentForUpdate(@Param("contentRef") String contentRef);
+
+    @Select("""
+            SELECT content_ref, title, summary, category, ownership_mode, source_category, source_ref,
+                   verification_scope, verified_by, verified_at, valid_until, aggregate_version,
+                   content_state, complaint_pending, updated_at
+            FROM hz_content_item ORDER BY content_ref
+            """)
+    List<Map<String, Object>> selectAllContent();
+
+    @Select("""
+            SELECT audit_id, action_type, actor_ref, reason, before_version, after_version, occurred_at,
+                   scope, authorization_ref, result, evidence_ref
+            FROM hz_content_audit WHERE content_ref=#{contentRef} ORDER BY audit_id
+            """)
+    List<Map<String, Object>> selectContentAudit(@Param("contentRef") String contentRef);
+
+    @Insert("""
+            INSERT INTO hz_content_item
+              (content_ref, title, summary, category, ownership_mode, aggregate_version,
+               content_state, complaint_pending, created_at, updated_at)
+            VALUES (#{contentRef}, #{title}, #{summary}, #{category}, 'SELF_OPERATED_CHINA_COMPANY',
+                    1, 'DRAFT', 0, #{now}, #{now})
+            """)
+    int insertContent(@Param("contentRef") String contentRef, @Param("title") String title,
+                      @Param("summary") String summary, @Param("category") String category,
+                      @Param("now") Timestamp now);
+
+    @Select("""
+            SELECT command_id, idempotency_key, canonical_fingerprint, content_ref
+            FROM hz_content_command
+            WHERE command_id=#{commandId} OR idempotency_key=#{idempotencyKey}
+            FOR UPDATE
+            """)
+    List<Map<String, Object>> selectContentCommandsForUpdate(@Param("commandId") String commandId,
+                                                             @Param("idempotencyKey") String idempotencyKey);
+
+    @Insert("""
+            INSERT INTO hz_content_command
+              (command_id, idempotency_key, canonical_fingerprint, content_ref, created_at)
+            VALUES (#{commandId}, #{idempotencyKey}, #{fingerprint}, #{contentRef}, #{now})
+            """)
+    int insertContentCommand(@Param("commandId") String commandId,
+                             @Param("idempotencyKey") String idempotencyKey,
+                             @Param("fingerprint") String fingerprint,
+                             @Param("contentRef") String contentRef, @Param("now") Timestamp now);
+
+    @Update("""
+            UPDATE hz_content_item
+            SET source_category=#{sourceCategory}, source_ref=#{sourceRef},
+                verification_scope=#{verificationScope}, verified_by=#{verifiedBy},
+                verified_at=#{verifiedAt}, valid_until=#{validUntil}, content_state=#{state},
+                complaint_pending=#{complaintPending}, aggregate_version=#{nextVersion}, updated_at=#{now}
+            WHERE content_ref=#{contentRef} AND aggregate_version=#{expectedVersion}
+            """)
+    int updateContent(@Param("contentRef") String contentRef,
+                      @Param("sourceCategory") String sourceCategory, @Param("sourceRef") String sourceRef,
+                      @Param("verificationScope") String verificationScope, @Param("verifiedBy") String verifiedBy,
+                      @Param("verifiedAt") Timestamp verifiedAt, @Param("validUntil") Timestamp validUntil,
+                      @Param("state") String state, @Param("complaintPending") boolean complaintPending,
+                      @Param("nextVersion") long nextVersion, @Param("expectedVersion") long expectedVersion,
+                      @Param("now") Timestamp now);
+
+    @Insert("""
+            INSERT INTO hz_content_audit
+              (content_ref, action_type, actor_ref, reason, before_version, after_version, occurred_at,
+               scope, authorization_ref, result, evidence_ref)
+            VALUES (#{contentRef}, #{action}, #{actorRef}, #{reason}, #{beforeVersion}, #{afterVersion}, #{now},
+                    #{scope}, #{authorizationRef}, #{result}, #{evidenceRef})
+            """)
+    int insertContentAudit(@Param("contentRef") String contentRef, @Param("action") String action,
+                           @Param("actorRef") String actorRef, @Param("reason") String reason,
+                           @Param("beforeVersion") long beforeVersion, @Param("afterVersion") long afterVersion,
+                           @Param("now") Timestamp now, @Param("scope") String scope,
+                           @Param("authorizationRef") String authorizationRef, @Param("result") String result,
+                           @Param("evidenceRef") String evidenceRef);
+
+    @Select("""
             SELECT result_key, task_key, fencing_token, aggregate_ref, canonical_fingerprint,
                    CAST(payload_json AS CHAR) AS payload_json
             FROM hz_task_domain_result WHERE result_key=#{resultKey} FOR UPDATE
