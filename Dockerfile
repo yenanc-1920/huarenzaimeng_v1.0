@@ -2,6 +2,7 @@ FROM maven:3.9.11-eclipse-temurin-17 AS build
 
 WORKDIR /workspace
 
+COPY Dockerfile Dockerfile
 COPY pom.xml ./
 COPY modules/core/pom.xml modules/core/pom.xml
 COPY apps/api/pom.xml apps/api/pom.xml
