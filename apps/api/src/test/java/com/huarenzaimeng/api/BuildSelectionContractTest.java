@@ -28,6 +28,8 @@ class BuildSelectionContractTest {
         int packaging = dockerfile.indexOf("package -DskipTests");
         assertThat(test).isGreaterThanOrEqualTo(0);
         assertThat(packaging).isGreaterThan(test);
-        assertThat(dockerfile).contains("SPRING_PROFILES_ACTIVE=mock");
+        assertThat(dockerfile).contains("SPRING_PROFILES_ACTIVE=mock")
+                .contains("USER 10001:10001")
+                .contains("--chown=10001:10001");
     }
 }

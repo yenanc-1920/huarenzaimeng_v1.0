@@ -19,10 +19,18 @@ RUN mvn -B -ntp -pl apps/api -am package -DskipTests
 FROM eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
-COPY --from=build /workspace/apps/api/target/api-*.jar app.jar
+
+# The API does not need operating-system privileges. Keep a stable numeric
+# identity so the same least-privilege boundary is preserved by CloudBase and
+# other container runtimes.
+RUN groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app --no-create-home app
+
+COPY --from=build --chown=10001:10001 /workspace/apps/api/target/api-*.jar app.jar
 
 ENV SERVER_PORT=8080
 ENV SPRING_PROFILES_ACTIVE=mock
 EXPOSE 8080
 
+USER 10001:10001
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
