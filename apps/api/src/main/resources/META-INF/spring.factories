@@ -1,0 +1,2 @@
+org.springframework.boot.env.EnvironmentPostProcessor=\
+com.huarenzaimeng.api.config.CloudDatasourceEnvironmentPostProcessor

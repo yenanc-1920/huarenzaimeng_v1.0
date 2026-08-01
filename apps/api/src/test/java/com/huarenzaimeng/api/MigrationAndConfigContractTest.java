@@ -69,6 +69,13 @@ class MigrationAndConfigContractTest {
         assertThat(explicitDataSource).contains("@Profile(\"release-mysql\")")
                 .contains("@Value(\"${HZ_DATASOURCE_URL}\")")
                 .contains("setJdbcUrl(jdbcUrl.strip())");
+        String postProcessor = source("src/main/java/com/huarenzaimeng/api/config/CloudDatasourceEnvironmentPostProcessor.java");
+        assertThat(postProcessor).contains("addFirst(new MapPropertySource")
+                .contains("spring.datasource.url")
+                .contains("spring.flyway.url")
+                .contains("value omitted");
+        assertThat(resource("META-INF/spring.factories"))
+                .contains("CloudDatasourceEnvironmentPostProcessor");
         assertThat(config).doesNotContain("jdbc:mysql://")
                 .doesNotContain("token:");
     }
