@@ -3,6 +3,8 @@
 <template><slot /></template>
 
 <style>
+@import "./styles/shared.css";
+
 page {
   --brand: #2357a5;
   --brand-strong: #173e79;

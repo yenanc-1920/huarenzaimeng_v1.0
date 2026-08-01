@@ -62,9 +62,16 @@ export interface QuoteSnapshot {
 }
 
 export type EligibilityResult =
-  | { outcome: 'ELIGIBLE'; maskedPhone: string; caseKey: string }
+  | { outcome: 'ELIGIBLE'; maskedPhone: string; operatorName: string; caseKey: string }
   | { outcome: 'UNKNOWN'; maskedPhone: string; caseKey: string; projectCode: 'PREPAY_MNP_UNKNOWN' }
 
 export interface OrderSummary { orderRef: string; maskedPhone: string; total: Money; stateCode: string; projectionVersion: number; updatedAt: string }
 export interface SupportCase { supportRef: string; confirmed: string; unknown: string; responsibility: string; nextReviewAt: string | null }
-export interface DirectoryItem { contentRef: string; title: string; category: string; verificationScope: string; sourceType: string; verifiedAt: string; updatedAt: string; publicationState: 'ELIGIBLE' | 'REVIEW' | 'REMOVED' }
+export type DirectoryPublicationState = 'ELIGIBLE' | 'EXPIRED' | 'COMPLAINT_PENDING' | 'REVIEW' | 'REMOVED' | 'UNKNOWN'
+export interface DirectorySummary { contentRef: string; contentVersion: number; title: string; summary: string; category: string; validUntil: string; updatedAt: string; publicationState: 'ELIGIBLE' }
+export interface DirectoryItem { contentRef: string; contentVersion: number; title: string; summary: string; category: string; sourceCategory: 'SELF_RESEARCH'; sourceType: '自营调研来源'; verificationScope: 'NAME_AND_PUBLIC_CONTACT_CHANNELS'; verifiedAt: string; validUntil: string; updatedAt: string; disclaimer: string; publicationState: DirectoryPublicationState }
+export type DirectoryDetailResult =
+  | { outcome: 'READY'; item: DirectoryItem & { publicationState: 'ELIGIBLE' } }
+  | { outcome: 'EMPTY' | 'EXPIRED' | 'COMPLAINT_PENDING' | 'REVIEW' | 'REMOVED' | 'UNKNOWN' }
+export interface ContentErrorReportCommand { commandId: string; idempotencyKey: string; contentVersion: number; expectedAggregateVersion: number; reason: string }
+export interface ContentErrorReportResult { outcome: 'CONTENT_ERROR_REPORTED'; supportRef: string; reviewTarget: 'A120' }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance } from 'vue'
-defineProps<{ left?: string; right?: string }>()
+defineProps<{ left?: string; right?: string; title?: string }>()
 const emit = defineEmits<{ left: []; right: [] }>()
 const instance = getCurrentInstance()
 const hasLeftHandler = computed(() => !!instance?.vnode.props?.onLeft)
@@ -19,12 +19,13 @@ const rowStyle = `height:${navigationHeight}px`
 <template>
   <view class="header" :style="safeStyle"><view class="header-row" :style="rowStyle">
     <button v-if="left && hasLeftHandler" class="side" :aria-label="left" @click="emit('left')">{{ left }}</button><view v-else class="side spacer" />
-    <view class="brand"><image src="/static/logo.png" mode="aspectFill" /><text>华人在孟</text></view>
+    <view v-if="title" class="page-title">{{ title }}</view>
+    <view v-else class="brand"><image src="/static/logo.png" mode="aspectFill" /><text>华人在孟</text></view>
     <button v-if="right && hasRightHandler" class="side right" :aria-label="right" @click="emit('right')">{{ right }}</button><view v-else class="side spacer" />
   </view>
   </view>
 </template>
 
 <style scoped>
-.header{width:100%;padding-left:30rpx;padding-right:30rpx;background:#fff;border-bottom:1rpx solid var(--line)}.header-row{display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;color:var(--brand-strong);font-weight:800}.brand image{width:46rpx;height:46rpx;margin-right:12rpx;border-radius:12rpx}.side{width:108rpx;padding:10rpx 0;margin:0;background:transparent;font-size:24rpx;line-height:1.4;color:var(--muted);text-align:left}.right{text-align:right}.spacer{height:1rpx}
+.header{width:100%;padding-left:30rpx;padding-right:30rpx;background:#fff;border-bottom:1rpx solid var(--line)}.header-row{display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;color:var(--brand-strong);font-weight:800}.brand image{width:46rpx;height:46rpx;margin-right:12rpx;border-radius:12rpx}.page-title{font-size:32rpx;font-weight:800;color:var(--text)}.side{width:108rpx;padding:10rpx 0;margin:0;background:transparent;font-size:24rpx;line-height:1.4;color:var(--muted);text-align:left}.right{text-align:right}.spacer{height:1rpx}
 </style>
