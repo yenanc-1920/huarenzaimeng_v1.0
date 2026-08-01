@@ -61,6 +61,7 @@ class MigrationAndConfigContractTest {
                 .contains("MybatisAutoConfiguration")
                 .contains("enabled: false");
         assertThat(release).contains("mode: mysql")
+                .contains("${HZ_DATASOURCE_URL}")
                 .contains("${SPRING_DATASOURCE_PASSWORD}")
                 .contains("${SPRING_FLYWAY_PASSWORD}")
                 .contains("enabled: true");

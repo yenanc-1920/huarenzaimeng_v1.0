@@ -1,6 +1,8 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
+    # Use a project-scoped variable so the hosting platform cannot pre-bind or
+    # rewrite Spring Boot's conventional SPRING_DATASOURCE_URL property.
+    url: ${HZ_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
