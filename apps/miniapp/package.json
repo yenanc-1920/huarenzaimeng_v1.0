@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build:mp-weixin": "uni build -p mp-weixin",
+    "build:mp-weixin": "node scripts/clean-mp-weixin-output.mjs && uni build -p mp-weixin && node scripts/verify-mp-weixin-output.mjs",
     "test:frontend-contracts": "node scripts/assert-frontend-contracts.mjs"
   },
   "dependencies": {

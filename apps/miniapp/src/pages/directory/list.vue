@@ -31,7 +31,7 @@ onMounted(load)
 </script>
 
 <template>
-  <view class="page">
+  <view class="page" data-page-root="directory-list" :data-visible-state="loading?'LOADING':error?'ERROR':items.length?'READY':'EMPTY'">
     <AppHeader title="实用信息" left="首页" @left="uni.reLaunch({url:'/pages/index/index'})" />
     <view class="content">
       <view class="heading" role="heading" aria-level="1">在孟实用信息</view>
