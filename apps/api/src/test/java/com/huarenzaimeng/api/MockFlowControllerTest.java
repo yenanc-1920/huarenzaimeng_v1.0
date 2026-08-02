@@ -26,7 +26,7 @@ class MockFlowControllerTest {
                         .header("X-Project-Subject-Ref", "SUBJECT-CONTROLLER")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"phone":"8801700000000","operatorCode":"SYN-OP","productCode":"SYN-PRODUCT","mnpState":"UNKNOWN"}
+                                {"phone":"8801700000000","operatorCode":"SYN-OP","productRef":"SYN-PRODUCT","denominationRef":"SYN-DENOM-1000","supportedOperatorSetVersion":1,"catalogVersion":1,"commandId":"CMD-QUOTE-UNKNOWN","idempotencyKey":"IDEM-QUOTE-UNKNOWN","mnpState":"UNKNOWN"}
                                 """))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(header().string("X-HZM-Mock-Only", "true"))

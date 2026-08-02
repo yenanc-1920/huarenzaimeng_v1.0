@@ -7,6 +7,9 @@ public record Quote(
         String maskedPhone,
         String operatorCode,
         String productCode,
+        String denominationRef,
+        long supportedOperatorSetVersion,
+        long catalogVersion,
         long totalAmountMinor,
         String currency,
         Instant expiresAt

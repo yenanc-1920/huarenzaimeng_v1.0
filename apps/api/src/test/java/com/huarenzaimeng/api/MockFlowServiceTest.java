@@ -52,11 +52,12 @@ class MockFlowServiceTest {
     }
 
     @Test
-    void sameIdempotencyKeyWithDifferentCommandIsRejected() {
+    void sameBusinessKeyAndFingerprintWithDifferentCommandReplaysOriginal() {
         var quote = service.createQuote(SUBJECT, "8801700000000", "SYN-OP", "SYN-PRODUCT", MnpState.CONFIRMED);
-        service.createOrder(SUBJECT, quote.quoteRef(), "CMD-A", "IDEM-CONFLICT");
-        assertThatThrownBy(() -> service.createOrder(SUBJECT, quote.quoteRef(), "CMD-B", "IDEM-CONFLICT"))
-                .hasMessage("IDEMPOTENCY_CONFLICT");
+        var first = service.createOrder(SUBJECT, quote.quoteRef(), "CMD-A", "IDEM-A");
+        var replay = service.createOrder(SUBJECT, quote.quoteRef(), "CMD-B", "IDEM-B");
+        assertThat(replay.orderRef()).isEqualTo(first.orderRef());
+        assertThat(replay.aggregateVersion()).isEqualTo(1);
     }
 
     @Test

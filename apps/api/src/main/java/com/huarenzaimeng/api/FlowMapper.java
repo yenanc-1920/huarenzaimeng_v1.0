@@ -208,24 +208,35 @@ interface FlowMapper {
 
     @Insert("""
             INSERT INTO hz_quote
-              (project_subject_ref, quote_ref, phone_masked, operator_code, product_code, mnp_state,
+              (project_subject_ref, quote_ref, phone_masked, operator_code, product_code, denomination_ref,
+               supported_operator_set_version, catalog_version, mnp_state,
                total_amount, total_amount_minor, total_currency, price_snapshot, expires_at, created_at)
-            VALUES (#{subject}, #{quoteRef}, #{phone}, #{operatorCode}, #{productCode}, 'CONFIRMED',
+            VALUES (#{subject}, #{quoteRef}, #{phone}, #{operatorCode}, #{productCode}, #{denominationRef},
+                    #{supportedOperatorSetVersion}, #{catalogVersion}, 'CONFIRMED',
                     #{displayAmount}, #{amountMinor}, #{currency},
-                    JSON_OBJECT('amountMinor', #{amountMinor}, 'currency', #{currency}), #{expiresAt}, #{createdAt})
+                    JSON_OBJECT('amountMinor', #{amountMinor}, 'currency', #{currency},
+                                'denominationRef', #{denominationRef},
+                                'supportedOperatorSetVersion', #{supportedOperatorSetVersion},
+                                'catalogVersion', #{catalogVersion}), #{expiresAt}, #{createdAt})
             """)
     int insertQuote(@Param("subject") String subject, @Param("quoteRef") String quoteRef,
                     @Param("phone") String phone, @Param("operatorCode") String operatorCode,
-                    @Param("productCode") String productCode, @Param("displayAmount") BigDecimal displayAmount,
+                    @Param("productCode") String productCode, @Param("denominationRef") String denominationRef,
+                    @Param("supportedOperatorSetVersion") long supportedOperatorSetVersion,
+                    @Param("catalogVersion") long catalogVersion, @Param("displayAmount") BigDecimal displayAmount,
                     @Param("amountMinor") long amountMinor, @Param("currency") String currency,
                     @Param("expiresAt") Timestamp expiresAt, @Param("createdAt") Timestamp createdAt);
 
     @Select("""
-            SELECT quote_ref, phone_masked, operator_code, product_code,
+            SELECT quote_ref, phone_masked, operator_code, product_code, denomination_ref,
+                   supported_operator_set_version, catalog_version,
                    total_amount_minor, total_currency, expires_at
             FROM hz_quote WHERE project_subject_ref=#{subject} AND quote_ref=#{quoteRef}
             """)
     Map<String, Object> selectQuote(@Param("subject") String subject, @Param("quoteRef") String quoteRef);
+
+    @Select("SELECT COUNT(*) FROM hz_quote WHERE project_subject_ref=#{subject}")
+    long countQuotes(@Param("subject") String subject);
 
     @Insert("""
             INSERT INTO hz_order
@@ -234,7 +245,7 @@ interface FlowMapper {
                allowed_action, created_at, updated_at)
             VALUES (#{subject}, #{orderRef}, #{quoteRef}, 'AWAITING_PAYMENT', 'ABSENT_CONFIRMED',
                     'ABSENT_CONFIRMED', 'ABSENT_CONFIRMED', 'ABSENT_CONFIRMED', 1, 1,
-                    'REQUEST_MOCK_PAYMENT', #{now}, #{now})
+                    'CREATE_LOCAL_SYNTHETIC_PAYMENT_INTENT', #{now}, #{now})
             """)
     int insertOrder(@Param("subject") String subject, @Param("orderRef") String orderRef,
                     @Param("quoteRef") String quoteRef, @Param("now") Timestamp now);
@@ -249,6 +260,90 @@ interface FlowMapper {
             WHERE o.project_subject_ref=#{subject} AND o.order_ref=#{orderRef}
             """)
     Map<String, Object> selectOrder(@Param("subject") String subject, @Param("orderRef") String orderRef);
+
+    @Select("""
+            SELECT o.order_ref, o.quote_ref, o.order_state, o.payment_state,
+                   o.upstream_debit_state, o.delivery_state, o.refund_state,
+                   q.total_amount_minor, q.total_currency, o.projection_version,
+                   o.aggregate_version, o.allowed_action
+            FROM hz_order o JOIN hz_quote q
+              ON q.project_subject_ref=o.project_subject_ref AND q.quote_ref=o.quote_ref
+            WHERE o.project_subject_ref=#{subject} AND o.order_ref=#{orderRef}
+            FOR UPDATE
+            """)
+    Map<String, Object> selectOrderForUpdate(@Param("subject") String subject,
+                                             @Param("orderRef") String orderRef);
+
+    @Insert("""
+            INSERT INTO hz_semantic_action
+              (semantic_action_key, case_key, action_kind, approved_branch,
+               action_state, created_at, updated_at)
+            VALUES (#{semanticActionKey}, #{caseKey}, #{actionKind}, #{approvedBranch},
+                    'INTENT_RECORDED', #{now}, #{now})
+            """)
+    int insertSemanticAction(@Param("semanticActionKey") String semanticActionKey,
+                             @Param("caseKey") String caseKey,
+                             @Param("actionKind") String actionKind,
+                             @Param("approvedBranch") String approvedBranch,
+                             @Param("now") Timestamp now);
+
+    @Insert("""
+            INSERT INTO hz_payment_intent
+              (payment_intent_ref, environment, project_subject_ref, order_ref, business_key,
+               semantic_action_key, request_fingerprint, price_snapshot_digest,
+               payment_eligibility_decision_ref, intent_scope, created_at)
+            VALUES (#{paymentIntentRef}, #{environment}, #{subject}, #{orderRef}, #{businessKey},
+                    #{semanticActionKey}, #{requestFingerprint}, #{priceSnapshotDigest},
+                    #{paymentEligibilityDecisionRef}, #{intentScope}, #{now})
+            """)
+    int insertPaymentIntent(@Param("paymentIntentRef") String paymentIntentRef,
+                            @Param("environment") String environment,
+                            @Param("subject") String subject,
+                            @Param("orderRef") String orderRef,
+                            @Param("businessKey") String businessKey,
+                            @Param("semanticActionKey") String semanticActionKey,
+                            @Param("requestFingerprint") String requestFingerprint,
+                            @Param("priceSnapshotDigest") String priceSnapshotDigest,
+                            @Param("paymentEligibilityDecisionRef") String paymentEligibilityDecisionRef,
+                            @Param("intentScope") String intentScope,
+                            @Param("now") Timestamp now);
+
+    @Select("""
+            SELECT pi.payment_intent_ref, pi.environment, pi.project_subject_ref, pi.order_ref,
+                   pi.business_key, pi.semantic_action_key, pi.request_fingerprint,
+                   pi.price_snapshot_digest, pi.payment_eligibility_decision_ref,
+                   pi.intent_scope, pi.created_at,
+                   q.quote_ref, q.phone_masked, q.operator_code, q.product_code, q.denomination_ref,
+                   q.supported_operator_set_version, q.catalog_version,
+                   q.total_amount_minor, q.total_currency, q.expires_at
+            FROM hz_payment_intent pi
+            JOIN hz_order o ON o.project_subject_ref=pi.project_subject_ref AND o.order_ref=pi.order_ref
+            JOIN hz_quote q ON q.project_subject_ref=o.project_subject_ref AND q.quote_ref=o.quote_ref
+            WHERE pi.project_subject_ref=#{subject} AND pi.payment_intent_ref=#{paymentIntentRef}
+            """)
+    Map<String, Object> selectPaymentIntent(@Param("subject") String subject,
+                                            @Param("paymentIntentRef") String paymentIntentRef);
+
+    @Select("""
+            SELECT c.command_id, c.idempotency_key,
+                   c.canonical_fingerprint AS command_canonical_fingerprint,
+                   c.semantic_action_key AS command_semantic_action_key,
+                   pi.payment_intent_ref, pi.environment, pi.project_subject_ref, pi.order_ref,
+                   pi.business_key AS payment_intent_business_key,
+                   pi.semantic_action_key AS payment_intent_semantic_action_key,
+                   pi.request_fingerprint AS payment_intent_request_fingerprint
+            FROM hz_command c
+            JOIN hz_payment_intent pi
+              ON pi.project_subject_ref=c.project_subject_ref AND pi.payment_intent_ref=c.resource_ref
+            WHERE c.project_subject_ref=#{subject}
+              AND c.command_id=#{commandId}
+              AND c.idempotency_key=#{idempotencyKey}
+              AND c.endpoint_scope='POST:/api/v1/orders/{orderRef}/payment-intents'
+              AND c.resource_scope=#{orderRef}
+            """)
+    Map<String, Object> selectPaymentIntentResultByOriginalKeys(
+            @Param("subject") String subject, @Param("orderRef") String orderRef,
+            @Param("commandId") String commandId, @Param("idempotencyKey") String idempotencyKey);
 
     @Update("""
             UPDATE hz_order
@@ -299,6 +394,35 @@ interface FlowMapper {
             @Param("subject") String subject, @Param("commandId") String commandId,
             @Param("endpointScope") String endpointScope, @Param("resourceScope") String resourceScope,
             @Param("idempotencyKey") String idempotencyKey, @Param("semanticActionKey") String semanticActionKey);
+
+    @Select("""
+            SELECT project_subject_ref, command_id, idempotency_key, endpoint_scope, resource_scope,
+                   semantic_action_key, canonical_fingerprint, resource_ref
+            FROM hz_command
+            WHERE project_subject_ref=#{subject}
+              AND (command_id=#{commandId}
+                   OR (endpoint_scope=#{endpointScope} AND idempotency_key=#{idempotencyKey})
+                   OR semantic_action_key=#{semanticActionKey})
+            FOR UPDATE
+            """)
+    List<Map<String, Object>> selectOrderCommandsForUpdate(
+            @Param("subject") String subject, @Param("commandId") String commandId,
+            @Param("endpointScope") String endpointScope, @Param("idempotencyKey") String idempotencyKey,
+            @Param("semanticActionKey") String semanticActionKey);
+
+    @Select("""
+            SELECT project_subject_ref, command_id, idempotency_key, endpoint_scope, resource_scope,
+                   semantic_action_key, canonical_fingerprint, resource_ref
+            FROM hz_command
+            WHERE project_subject_ref=#{subject}
+              AND (command_id=#{commandId}
+                   OR (endpoint_scope=#{endpointScope} AND idempotency_key=#{idempotencyKey})
+                   OR semantic_action_key=#{semanticActionKey})
+            """)
+    List<Map<String, Object>> selectOrderCommands(
+            @Param("subject") String subject, @Param("commandId") String commandId,
+            @Param("endpointScope") String endpointScope, @Param("idempotencyKey") String idempotencyKey,
+            @Param("semanticActionKey") String semanticActionKey);
 
     @Insert("""
             INSERT INTO hz_command
