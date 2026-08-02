@@ -20,6 +20,8 @@ hz-mock:
   real-adapters-enabled: false
 hz:
   test-access-token: ${HZ_TEST_ACCESS_TOKEN:}
+  life-content:
+    mode: disabled
   persistence:
     mode: in-memory
   worker:
