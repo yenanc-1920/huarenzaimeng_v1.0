@@ -7,5 +7,7 @@ spring:
   flyway:
     enabled: false
 hz:
+  temporal-overview:
+    mode: local-synthetic
   persistence:
     mode: in-memory

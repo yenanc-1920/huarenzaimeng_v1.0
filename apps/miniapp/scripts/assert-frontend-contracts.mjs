@@ -6,7 +6,7 @@ import { samePriceSnapshot } from '../src/domain/price-snapshot.ts'
 import { isAllowedProjectionAction, isWhitelistedNavigation } from '../src/domain/actions.ts'
 import { freezeOrderSnapshot, validateOrderSnapshot } from '../src/domain/snapshot-flow.ts'
 import { parseProjectProjection, parseProjectQuote } from '../src/api/project-contract.ts'
-import { mockCatalog, mockCreatePaymentIntent, mockDirectory, mockDirectoryDetail, mockEligibility, mockLifeContentDetailDto, mockLifeContentListDto, mockOrders, mockQueryPaymentIntent, mockQuote, mockRecovery, mockRecoveryCase, mockReportDirectoryError } from '../src/api/mock.ts'
+import { mockCatalog, mockCreatePaymentIntent, mockDirectory, mockDirectoryDetail, mockEligibility, mockLifeContentDetailDto, mockLifeContentListDto, mockOrders, mockQueryPaymentIntent, mockQuote, mockRecovery, mockRecoveryCase, mockReportDirectoryError, mockTemporalOverviewDto } from '../src/api/mock.ts'
 import { buildContentErrorReport, mapContentProjectCode, parseContentErrorReportReceipt, parsePublicContentPage, parsePublicContentProjection } from '../src/api/content-contract.ts'
 import { canRetryLifeContentRead, parseLifeContentDetailResponse, parseLifeContentListResponse } from '../src/api/life-content-contract.ts'
 import { LIFE_CONTENT_COUNTER_NAMES, LIFE_CONTENT_EVIDENCE_DENOMINATOR, LIFE_CONTENT_EVIDENCE_PARAMETER_PLAN, LIFE_CONTENT_FIXED_INPUTS } from '../src/api/life-content-evidence.ts'
@@ -20,6 +20,7 @@ import { createOrderCreationNavigationLedger, executeOrderCreationAttempt } from
 import { P013_PAYMENT_SUMMARY_MISSING_FIELDS, buildP013PaymentSummary, buildPaymentIntentCommand, buildPaymentIntentQueryRequest, canCreateLocalSyntheticPaymentIntent, parsePaymentIntentQueryResult, parsePaymentIntentResult, readPaymentIntentWriteIdentity, storePaymentIntentWriteIdentity, validatePaymentIntentQueryResult, validatePaymentIntentResult } from '../src/api/payment-intent-contract.ts'
 import { buildP013AcceptedPageProjection, buildP013MissingWriteIdentityPageProjection, buildP013QueryErrorPageProjection, buildP013QueryPageProjection, buildP013RejectedPageProjection, createPaymentIntentWriteLatch, executePaymentIntentAttempt, executePaymentIntentReadOnlyQuery } from '../src/domain/payment-intent-flow.ts'
 import { executeLifeContentDetailRead } from '../src/domain/life-content-page-executor.ts'
+import { executeTemporalOverviewRead, parseTemporalOverview } from '../src/domain/temporal-overview-flow.ts'
 import {
   buildLifeContentEvidenceRunnerManifest,
   LIFE_CONTENT_EVIDENCE_OUTPUT_DIRECTORY,
@@ -60,6 +61,8 @@ const lifeContentRunner = read('scripts/run-life-content-evidence.mjs')
 const lifeContentCoordinator = read('scripts/coordinate-life-content-evidence.mjs')
 const header = read('src/components/AppHeader.vue')
 const detailPage = read('src/pages/order/detail.vue')
+const temporalContract = read('src/api/temporal-overview-contract.ts')
+const temporalFlow = read('src/domain/temporal-overview-flow.ts')
 
 assert.match(cache, /Map<string, OrderProjection>/, 'projection cache must be partitioned by orderRef')
 assert.match(cache, /candidate\.orderRef !== orderRef/, 'candidate orderRef must match requested orderRef')
@@ -1013,5 +1016,85 @@ assert.doesNotMatch(lifeContentList,/console\.|analytics|trackEvent|setStorageSy
 assert.doesNotMatch(lifeContentDetail,/console\.|analytics|trackEvent|setStorageSync/,'P043 must not log, analyze or persist public content fields')
 const lifeVisibleTemplates=[lifeContentList,lifeContentDetail].map((source)=>source.match(/<template>([\s\S]*?)<\/template>/)?.[1]||'').join('\n')
 assert.doesNotMatch(lifeVisibleTemplates,/>[^<]*(?:LOCAL_SYNTHETIC|LIFE_CONTENT_|ContentRef|ContentVersion|Evidence|Fixture|READY|STALE|UNDER_REVIEW|EXPIRED|REMOVED|UNKNOWN|ERROR)[^<]*</,'P042/P043 visible copy must not expose machine states, versions, evidence IDs or engineering terms')
+
+const readyTemporalDto=await mockTemporalOverviewDto()
+const readyTemporal=parseTemporalOverview(readyTemporalDto)
+assert.equal(Object.keys(readyTemporalDto).length,12,'P001 temporal overview must expose the strict twelve-field envelope')
+assert.deepEqual(Object.keys(readyTemporalDto.clocks).sort(),['beijing','dhaka'],'P001 temporal overview must expose exactly two fixed clocks')
+assert.deepEqual(Object.keys(readyTemporalDto.holidays).sort(),['bangladesh','china'],'P001 temporal overview must expose exactly two fixed holiday projections')
+assert.equal(Object.keys(readyTemporalDto.clocks.dhaka).length,6,'P001 clock projection must expose six strict fields')
+assert.equal(Object.keys(readyTemporalDto.holidays.china).length,11,'P001 holiday projection must expose eleven strict fields')
+assert.equal(readyTemporal.clocks.dhaka.localDate,readyTemporal.holidays.bangladesh.localDate,'Dhaka clock and Bangladesh holiday must share the same reference-derived local date')
+assert.equal(readyTemporal.clocks.beijing.localDate,readyTemporal.holidays.china.localDate,'Beijing clock and China holiday must share the same reference-derived local date')
+const temporalClone=(value)=>JSON.parse(JSON.stringify(value))
+assert.throws(()=>parseTemporalOverview({...readyTemporalDto,deviceTimeZone:'Asia/Tokyo'}),/INVALID_TEMPORAL_OVERVIEW_DTO/,'P001 unknown/device fields must fail closed')
+const temporalMissing=temporalClone(readyTemporalDto);delete temporalMissing.referenceInstant
+assert.throws(()=>parseTemporalOverview(temporalMissing),/INVALID_TEMPORAL_OVERVIEW_DTO/,'P001 missing reference instant must fail closed')
+const temporalUnknownState=temporalClone(readyTemporalDto);temporalUnknownState.clockState='UNKNOWN'
+assert.throws(()=>parseTemporalOverview(temporalUnknownState),/INVALID_TEMPORAL_OVERVIEW_DTO/,'P001 unknown clock state must fail closed')
+const temporalSeconds=temporalClone(readyTemporalDto);temporalSeconds.clocks.dhaka.localTime='12:00:00'
+assert.throws(()=>parseTemporalOverview(temporalSeconds),/INVALID_TEMPORAL_CLOCK_AVAILABILITY_DTO/,'P001 local time must be HH:mm without seconds')
+const temporalWrongBeijingDate=temporalClone(readyTemporalDto);temporalWrongBeijingDate.clocks.beijing.localDate='2026-08-03'
+assert.throws(()=>parseTemporalOverview(temporalWrongBeijingDate),/TEMPORAL_CHINA_DATE_MISMATCH/,'P001 available Beijing date must remain bound to the China holiday local date from the same server reference instant')
+const temporalUnavailableLeak=temporalClone(readyTemporalDto);temporalUnavailableLeak.clockState='DHAKA_UNAVAILABLE';temporalUnavailableLeak.clocks.dhaka.availabilityState='UNAVAILABLE'
+assert.throws(()=>parseTemporalOverview(temporalUnavailableLeak),/INVALID_TEMPORAL_CLOCK_AVAILABILITY_DTO/,'P001 unavailable side must not retain an old current value')
+const temporalStaleAge=temporalClone(readyTemporalDto);temporalStaleAge.generatedAt='2026-08-02T06:05:01Z'
+assert.throws(()=>parseTemporalOverview(temporalStaleAge),/INVALID_TEMPORAL_CLOCK_STALENESS_DTO/,'P001 clock age beyond the explicit threshold must not remain available')
+const temporalValidStale=temporalClone(temporalStaleAge);temporalValidStale.clockState='STALE';for(const clock of Object.values(temporalValidStale.clocks)){clock.availabilityState='UNAVAILABLE';clock.localDate=null;clock.localTime=null}
+assert.equal(parseTemporalOverview(temporalValidStale).clockState,'STALE','P001 must consume an over-threshold response only after both current clock values are revoked')
+const temporalStaleAvailable=temporalClone(readyTemporalDto);temporalStaleAvailable.clockState='STALE'
+assert.throws(()=>parseTemporalOverview(temporalStaleAvailable),/INVALID_TEMPORAL_CLOCK_STALENESS_DTO/,'P001 STALE must revoke both current clock values')
+const temporalCoverageMismatch=temporalClone(readyTemporalDto);temporalCoverageMismatch.holidays.china.sourceCoverageDate='2026-08-01'
+assert.throws(()=>parseTemporalOverview(temporalCoverageMismatch),/TEMPORAL_HOLIDAY_COVERAGE_DATE_MISMATCH/,'P001 no-holiday conclusion must cover the same local date')
+const temporalInvertedPeriod=temporalClone(readyTemporalDto);temporalInvertedPeriod.holidays.china.effectiveFrom='2026-08-02T07:00:00Z';temporalInvertedPeriod.holidays.china.effectiveTo='2026-08-02T05:00:00Z'
+assert.throws(()=>parseTemporalOverview(temporalInvertedPeriod),/INVALID_TEMPORAL_HOLIDAY_PERIOD_ORDER/,'P001 determinate holiday period must be ordered')
+const temporalOutsidePeriod=temporalClone(readyTemporalDto);temporalOutsidePeriod.holidays.china.effectiveFrom='2026-08-02T07:00:00Z';temporalOutsidePeriod.holidays.china.effectiveTo='2026-08-02T08:00:00Z'
+assert.throws(()=>parseTemporalOverview(temporalOutsidePeriod),/INVALID_TEMPORAL_HOLIDAY_SOURCE_DTO/,'P001 determinate holiday period must contain the shared reference instant')
+const temporalExtraHoliday=temporalClone(readyTemporalDto);temporalExtraHoliday.holidays.china.evidenceRef='SECRET'
+assert.throws(()=>parseTemporalOverview(temporalExtraHoliday),/INVALID_TEMPORAL_HOLIDAY_DTO/,'P001 holiday evidence/identity fields must fail closed')
+const revokeHoliday=(holiday,state)=>({...holiday,state,holidayId:null,name:null,note:null,sourceType:null,sourceCoverageDate:null,effectiveFrom:null,effectiveTo:null,version:null})
+const temporalReadError=temporalClone(readyTemporalDto);temporalReadError.holidays.china=revokeHoliday(temporalReadError.holidays.china,'READ_ERROR')
+assert.equal(parseTemporalOverview(temporalReadError).holidays.china.state,'READ_ERROR','P001 must consume the backend READ_ERROR shape with all conclusion/source metadata revoked')
+const temporalReadErrorLeak=temporalClone(temporalReadError);temporalReadErrorLeak.holidays.china.sourceType='LOCAL_SYNTHETIC_CALENDAR'
+assert.throws(()=>parseTemporalOverview(temporalReadErrorLeak),/INVALID_TEMPORAL_READ_ERROR_METADATA_DTO/,'P001 READ_ERROR must reject retained source metadata')
+const temporalStaleHoliday=temporalClone(readyTemporalDto);temporalStaleHoliday.holidays.china={...temporalStaleHoliday.holidays.china,state:'STALE_OR_EXPIRED',holidayId:null,name:null,note:null}
+assert.equal(parseTemporalOverview(temporalStaleHoliday).holidays.china.state,'STALE_OR_EXPIRED','P001 must consume non-current metadata while revoking stale conclusion fields')
+const temporalStaleConclusionLeak=temporalClone(temporalStaleHoliday);temporalStaleConclusionLeak.holidays.china.name='Old conclusion'
+assert.throws(()=>parseTemporalOverview(temporalStaleConclusionLeak),/INVALID_TEMPORAL_NON_CURRENT_HOLIDAY_DTO/,'P001 stale/unpublished states must revoke conclusion fields')
+const temporalUnpublished=temporalClone(readyTemporalDto);temporalUnpublished.holidays.bangladesh={...temporalUnpublished.holidays.bangladesh,state:'UNPUBLISHED',holidayId:null,name:null,note:null}
+assert.equal(parseTemporalOverview(temporalUnpublished).holidays.bangladesh.state,'UNPUBLISHED','P001 must consume the backend UNPUBLISHED shape with conclusion fields revoked')
+const temporalUnknown=temporalClone(readyTemporalDto);temporalUnknown.projectCode='TEMPORAL_OVERVIEW_UNKNOWN';temporalUnknown.clockState='STALE';temporalUnknown.retryClass='USER_INITIATED_READ_ONLY';for(const clock of Object.values(temporalUnknown.clocks)){clock.availabilityState='UNAVAILABLE';clock.localDate=null;clock.localTime=null};temporalUnknown.holidays.china=revokeHoliday(temporalUnknown.holidays.china,'READ_ERROR');temporalUnknown.holidays.bangladesh=revokeHoliday(temporalUnknown.holidays.bangladesh,'READ_ERROR')
+assert.equal(Object.keys(parseTemporalOverview(temporalUnknown)).length,12,'P001 UNKNOWN fail-closed response must remain consumable as the same strict twelve-field envelope')
+
+const makeTemporalState=()=>({viewState:'LOADING',overview:null,readGeneration:0,lastAuthorityState:null,lastReferenceInstant:null})
+const recoveredState=makeTemporalState()
+const degraded=temporalClone(readyTemporal);degraded.clockState='DHAKA_UNAVAILABLE';degraded.clocks.dhaka.availabilityState='UNAVAILABLE';degraded.clocks.dhaka.localDate=null;degraded.clocks.dhaka.localTime=null
+await executeTemporalOverviewRead(recoveredState,{getOverview:async()=>degraded},'FIRST_SHOW')
+assert.equal(recoveredState.viewState,'DHAKA_UNAVAILABLE','P001 must preserve the healthy clock when one side is unavailable')
+const refreshed=temporalClone(readyTemporal);refreshed.referenceInstant='2026-08-02T06:01:00Z';refreshed.generatedAt='2026-08-02T06:01:01Z'
+assert.equal((await executeTemporalOverviewRead(recoveredState,{getOverview:async()=>refreshed},'FOREGROUND_SHOW')).recoveredOnce,true,'P001 must surface RECOVERED once after a new reference instant restores both clocks')
+assert.equal(recoveredState.viewState,'RECOVERED','P001 recovered transition must be observable once')
+assert.equal((await executeTemporalOverviewRead(recoveredState,{getOverview:async()=>refreshed},'FOREGROUND_SHOW')).recoveredOnce,false,'P001 must not loop RECOVERED for the same authority state/reference')
+assert.equal(recoveredState.viewState,'BOTH_AVAILABLE','P001 must settle to BOTH_AVAILABLE after the one-time recovery')
+
+assert.match(client,/requestAnonymousRead\('\/home\/temporal-overview'\)/,'P001 must consume the frozen anonymous GET path without body or query')
+const temporalClient=client.slice(client.indexOf('async getTemporalOverview'),client.indexOf('\n  },',client.indexOf('async getTemporalOverview'))+5)
+assert.doesNotMatch(temporalClient,/projectSubjectRef|openid|device|timeZone|referenceInstant|header:|data:/i,'P001 read must not submit identity, device timezone or client time fields')
+assert.ok(home.indexOf('class="hero"')<home.indexOf('class="temporal-card"'),'P001 recharge hero must remain before the temporal read-only card')
+assert.match(home,/onShow\(\(\)=>\{[\s\S]*FOREGROUND_SHOW[\s\S]*loadTemporal\(trigger\)/,'P001 must reread once on first and foreground show')
+assert.match(home,/@click="loadTemporal\('USER_REFRESH'\)"/,'P001 must expose a user-initiated read-only refresh')
+assert.doesNotMatch(`${home}\n${temporalFlow}\n${temporalContract}`,/setInterval|uni\.requestSubscribeMessage|requestPayment|Notification|Reminder|setStorageSync|getSystemInfo|getTimezoneOffset|Intl\.DateTimeFormat|Date\.now\(/,'P001 must not poll, notify, pay, persist, use device time/timezone, or reimplement the server JDK timezone conversion')
+for(const stateName of ['LOADING','BOTH_AVAILABLE','DHAKA_UNAVAILABLE','BEIJING_UNAVAILABLE','BOTH_UNAVAILABLE','STALE','RECOVERED'])assert.match(home,new RegExp(`${stateName}:'[^']+'`),`P001 must provide ordinary Chinese copy for clock state ${stateName}`)
+for(const copy of ['正在读取今日节假日','今日无已登记节假日','今日有已登记节假日','待官方确认','节假日信息读取失败','信息已过期，当前结论不可用','内容已下架'])assert.match(home,new RegExp(copy),`P001 must provide the approved holiday copy: ${copy}`)
+assert.match(home,/RECOVERED:'时间已恢复'/,'P001 recovered state must use the approved ordinary Chinese copy')
+assert.match(home,/同一基准，不使用设备时区/,'P001 must explain the shared reference instant without exposing an internal timezone identifier')
+const temporalTemplate=home.slice(home.indexOf('<view class="temporal-card"'),home.indexOf('<view class="entries">'))
+assert.doesNotMatch(temporalTemplate,/LOCAL_SYNTHETIC|ReferenceInstant|Fixture|Evidence|Authorization|提醒我|订阅|通知/,'P001 visible temporal card must not expose engineering terms or reminder/notification actions')
+assert.doesNotMatch(temporalContract,/\b(?:const|function)\s+|export function|parseTemporalOverview/,'P001 contract module must remain type-only')
+assert.match(temporalFlow,/exactKeys\(value,ROOT_KEYS\)/,'P001 flow must reject unknown root fields')
+assert.match(temporalFlow,/exactKeys\(value,CLOCK_KEYS\)/,'P001 flow must reject unknown clock fields')
+assert.match(temporalFlow,/exactKeys\(value,HOLIDAY_KEYS\)/,'P001 flow must reject unknown holiday fields')
+assert.match(temporalFlow,/parseClock\(value\.clocks\.dhaka,'DHAKA','Asia\/Dhaka'\)/,'P001 strict DTO must bind the server-declared Dhaka zone identifier')
+assert.match(temporalFlow,/parseClock\(value\.clocks\.beijing,'BEIJING','Asia\/Shanghai'\)/,'P001 strict DTO must bind the server-declared Beijing zone identifier')
 
 console.log('frontend contract assertions: PASS (DEV-INT + negative cases)')

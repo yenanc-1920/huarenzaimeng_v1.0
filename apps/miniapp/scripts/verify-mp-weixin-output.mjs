@@ -10,10 +10,15 @@ const requiredArtifacts = [
   'api/client.js',
   'api/mock.js',
   'api/payment-intent-contract.js',
+  'pages/index/index.js',
+  'pages/index/index.wxml',
   'pages/recharge/select.js',
   'pages/recharge/select.wxml',
+  'pages/order/list.js',
   'pages/order/list.wxml',
+  'pages/directory/list.js',
   'pages/directory/list.wxml',
+  'pages/life-content/list.js',
   'pages/life-content/list.wxml',
 ]
 
@@ -53,6 +58,7 @@ for (const file of collectJavaScript(outputRoot)) {
 }
 
 for (const [page, root] of [
+  ['pages/index/index.wxml', 'data-page-root="home"'],
   ['pages/recharge/select.wxml', 'data-page-root="recharge-select"'],
   ['pages/order/list.wxml', 'data-page-root="order-list"'],
   ['pages/directory/list.wxml', 'data-page-root="directory-list"'],
@@ -69,6 +75,10 @@ if (/require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonClient)
   || /require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonMock)) {
   throw new Error('MP_WEIXIN_COMMON_ENTRY_PAYMENT_INTENT_DEPENDENCY_NOT_ISOLATED')
 }
+if (/require\(["']\.\/temporal-overview-contract\.js["']\)/.test(commonClient)
+  || /require\(["']\.\/temporal-overview-contract\.js["']\)/.test(commonMock)) {
+  throw new Error('MP_WEIXIN_COMMON_ENTRY_TEMPORAL_CONTRACT_DEPENDENCY_NOT_ISOLATED')
+}
 
 const systemInfo = { statusBarHeight:20, windowWidth:375, pixelRatio:2, platform:'devtools', system:'Windows', language:'zh_CN',
   version:'1', SDKVersion:'3', brand:'devtools', model:'devtools', screenHeight:800, safeArea:{top:20,left:0,right:375,bottom:800} }
@@ -79,10 +89,18 @@ globalThis.wx = {
   getLaunchOptionsSync:()=>({}),getStorageSync:()=>undefined,setStorage:()=>undefined,
   createApp:()=>undefined,createPage:()=>undefined,createComponent:()=>undefined,
 }
-try {
-  createRequire(import.meta.url)(resolve(outputRoot, 'pages/recharge/select.js'))
-} catch (error) {
-  throw new Error(`MP_WEIXIN_RECHARGE_APPSERVICE_LOAD_FAILED:${error instanceof Error ? error.message : String(error)}`)
+for (const entry of [
+  'pages/index/index.js',
+  'pages/recharge/select.js',
+  'pages/order/list.js',
+  'pages/directory/list.js',
+  'pages/life-content/list.js',
+]) {
+  try {
+    createRequire(import.meta.url)(resolve(outputRoot, entry))
+  } catch (error) {
+    throw new Error(`MP_WEIXIN_APPSERVICE_LOAD_FAILED:${entry}:${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
-console.log(`mp-weixin appservice load: PASS (recharge entry; ${staticRequireCount} relative static requires)`)
+console.log(`mp-weixin appservice load: PASS (home + four entries; ${staticRequireCount} relative static requires)`)

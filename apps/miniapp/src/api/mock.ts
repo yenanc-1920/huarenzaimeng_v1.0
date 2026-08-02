@@ -1,6 +1,7 @@
 import type { CatalogItem, CatalogProjection, ContentErrorReportCommand, ContentErrorReportResult, DirectoryDetailResult, DirectoryItem, DirectorySummary, EligibilityResult, LifeContentDetailState, LifeContentReadState, OrderProjection, OrderSummary, ProjectSessionProjection, QuoteSnapshot, RechargeSelection, RecoveryResult, SupportCase } from '../domain/types'
 import type { OrderCreationProjection } from './order-creation-contract'
 import type { PaymentIntentCommand, PaymentIntentProjection, PaymentIntentQueryRequest, PaymentIntentQueryResult, PaymentIntentResult } from './payment-intent-contract.ts'
+import type { TemporalOverview } from './temporal-overview-contract'
 
 const wait = (ms = 180) => new Promise((resolve) => setTimeout(resolve, ms))
 const MOCK_PAYMENT_INTENT_CREATION_PRECONDITION = 'PAYMENT_INTENT_MUST_NOT_EXIST' as const
@@ -252,4 +253,26 @@ export async function mockLifeContentDetailDto(contentRef:string,contentVersion:
   return {requestRef:`SYN-LIFE-DETAIL-${viewState}`,viewState,projectCode:lifeDetailProjectCodes[viewState],schemaVersion:'LIFE_CONTENT_READ_V1',
     visibilityRuleVersion:'SYN-VISIBILITY-V1',contentRef,contentVersion,item:viewState==='READY'?fixture:null,
     retryClass:viewState==='UNKNOWN'||viewState==='ERROR'?'USER_INITIATED_READ_ONLY':'NONE',nextReadAt:null}
+}
+
+export async function mockTemporalOverviewDto():Promise<TemporalOverview> {
+  await wait()
+  const referenceInstant='2026-08-02T06:00:00Z'
+  return {
+    requestRef:'SYN-TEMPORAL-OVERVIEW-001',projectCode:'TEMPORAL_OVERVIEW_READY',schemaVersion:'TEMPORAL_OVERVIEW_V1',
+    referenceInstant,generatedAt:'2026-08-02T06:00:01Z',timeZoneRuleVersion:'SYN-IANA-2026A',clockStaleAfterSeconds:300,
+    clockState:'BOTH_AVAILABLE',
+    clocks:{
+      dhaka:{cityCode:'DHAKA',displayName:'达卡',zoneId:'Asia/Dhaka',localDate:'2026-08-02',localTime:'12:00',availabilityState:'AVAILABLE'},
+      beijing:{cityCode:'BEIJING',displayName:'北京',zoneId:'Asia/Shanghai',localDate:'2026-08-02',localTime:'14:00',availabilityState:'AVAILABLE'},
+    },
+    holidayRuleVersion:'SYN-HOLIDAY-RULE-V1',
+    holidays:{
+      china:{countryCode:'CN',localDate:'2026-08-02',state:'NO_HOLIDAY_CONFIRMED',holidayId:null,name:null,note:null,
+        sourceType:'LOCAL_SYNTHETIC_CALENDAR',sourceCoverageDate:'2026-08-02',effectiveFrom:'2026-08-02T00:00:00Z',effectiveTo:'2026-08-02T23:59:59Z',version:'SYN-CN-20260802'},
+      bangladesh:{countryCode:'BD',localDate:'2026-08-02',state:'NO_HOLIDAY_CONFIRMED',holidayId:null,name:null,note:null,
+        sourceType:'LOCAL_SYNTHETIC_CALENDAR',sourceCoverageDate:'2026-08-02',effectiveFrom:'2026-08-02T00:00:00Z',effectiveTo:'2026-08-02T23:59:59Z',version:'SYN-BD-20260802'},
+    },
+    retryClass:'NONE',
+  }
 }

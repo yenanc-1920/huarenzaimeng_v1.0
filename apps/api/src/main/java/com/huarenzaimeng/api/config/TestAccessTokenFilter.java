@@ -39,6 +39,9 @@ public final class TestAccessTokenFilter extends OncePerRequestFilter {
             return true;
         }
         String path = request.getRequestURI().substring(request.getContextPath().length());
+        if ("GET".equals(request.getMethod()) && path.equals("/api/v1/home/temporal-overview")) {
+            return true;
+        }
         return !(path.equals("/api/v1") || path.startsWith("/api/v1/"));
     }
 

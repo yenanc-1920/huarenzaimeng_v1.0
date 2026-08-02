@@ -1,4 +1,4 @@
-import { mockCatalog, mockDirectory, mockDirectoryDetail, mockEligibility, mockLifeContentDetailDto, mockLifeContentListDto, mockOrders, mockProjection, mockQuote, mockRecovery, mockRecoveryCase, mockReportDirectoryError, mockSupport } from './mock'
+import { mockCatalog, mockDirectory, mockDirectoryDetail, mockEligibility, mockLifeContentDetailDto, mockLifeContentListDto, mockOrders, mockProjection, mockQuote, mockRecovery, mockRecoveryCase, mockReportDirectoryError, mockSupport, mockTemporalOverviewDto } from './mock'
 import { buildContentErrorReport, mapContentProjectCode, parseContentErrorReportReceipt, parsePublicContentPage, parsePublicContentProjection } from './content-contract'
 import { parseLifeContentDetailResponse, parseLifeContentListResponse } from './life-content-contract'
 import { parseProjectProjection, parseProjectQuote, toOrderProjection, toQuoteSnapshot, type ProjectProjection } from './project-contract'
@@ -153,6 +153,9 @@ export const api = {
       ?await mockLifeContentDetailDto(contentRef,contentVersion)
       :await requestAnonymousRead(`/content/life-items/${encodeURIComponent(contentRef)}?contentVersion=${encodeURIComponent(contentVersion)}`)
     return parseLifeContentDetailResponse(body,contentRef,contentVersion)
+  },
+  async getTemporalOverview() {
+    return !useProjectMockApi ? mockTemporalOverviewDto() : requestAnonymousRead('/home/temporal-overview')
   },
 }
 
