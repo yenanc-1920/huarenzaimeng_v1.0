@@ -28,10 +28,16 @@ try {
 
     $catalog = Invoke-RestMethod -Method Get -Uri "$base/api/v1/catalog?operatorCode=SYN-VNEXT-OP" `
         -Headers $headers
+    $observedItemCount = if ($null -eq $catalog.data.items) { -1 } else { @($catalog.data.items).Count }
     if ($catalog.status -ne 'ACCEPTED' -or $catalog.data.operatorQualification -ne 'SUPPORTED' -or
         [long]$catalog.data.supportedOperatorSetVersion -ne 8602001 -or
-        [long]$catalog.data.catalogVersion -ne 8602001 -or $catalog.data.items.Count -ne 1) {
-        throw 'E3 catalog fixture is not the active MySQL projection'
+        [long]$catalog.data.catalogVersion -ne 8602001 -or $observedItemCount -ne 1) {
+        $catalogDiagnostic = ("E3 catalog is not active: status={0}; qualification={1}; " +
+            "setVersion={2}; catalogVersion={3}; itemCount={4}; semantics={5}") -f
+            $catalog.status, $catalog.data.operatorQualification,
+            $catalog.data.supportedOperatorSetVersion, $catalog.data.catalogVersion,
+            $observedItemCount, $catalog.data.evidenceSemantics
+        throw $catalogDiagnostic
     }
 
     $request = [ordered]@{
@@ -58,7 +64,10 @@ try {
         throw 'exact replay returned a different quoteRef'
     }
 
-    $conflictRequest = $request.Clone()
+    $conflictRequest = [ordered]@{}
+    foreach ($key in $request.Keys) {
+        $conflictRequest[$key] = $request[$key]
+    }
     $conflictRequest.phone = '8801700000999'
     $conflictStatus = $null
     $conflictCode = $null
@@ -80,42 +89,47 @@ try {
 
     $contentHeaders = @{ 'X-HZM-Test-Access-Token' = $contentToken }
     $contentRef = 'SYN-CONTENT-VNEXT-E3-20260802'
-    $verifiedAt = [DateTime]::UtcNow.AddMinutes(-1).ToString('o')
-    $validUntil = [DateTime]::UtcNow.AddDays(1).ToString('o')
-    $reviewBody = [ordered]@{
-        commandId = 'CMD-E3-VNEXT-CONTENT-REVIEW-20260802'
-        idempotencyKey = 'IDEM-E3-VNEXT-CONTENT-REVIEW-20260802'
-        expectedAggregateVersion = 1
-        action = 'RECORD_REVIEW'
-        reason = 'E3_SYNTHETIC_REVIEW_ONLY'
-        sourceCategory = 'SELF_RESEARCH'
-        sourceRef = 'SYN-SOURCE-VNEXT-20260802'
-        verificationScope = 'NAME_AND_PUBLIC_CONTACT_CHANNELS'
-        verifiedBy = 'SYN-REVIEWER-VNEXT'
-        verifiedAt = $verifiedAt
-        validUntil = $validUntil
-    } | ConvertTo-Json -Compress
-    $reviewed = Invoke-RestMethod -Method Post `
-        -Uri "$base/project-api/v1/internal/content/items/$contentRef/transitions" `
-        -Headers $contentHeaders -ContentType 'application/json' -Body $reviewBody
-    if ($reviewed.status -ne 'ACCEPTED' -or $reviewed.data.state -ne 'VERIFIED' -or
-        [long]$reviewed.data.version -ne 2) { throw 'content review transition failed' }
+    $internalContent = Invoke-RestMethod -Method Get `
+        -Uri "$base/project-api/v1/internal/content/items/$contentRef" -Headers $contentHeaders
+    if ($internalContent.status -ne 'ACCEPTED') { throw 'synthetic content was not readable internally' }
 
-    $publishBody = [ordered]@{
-        commandId = 'CMD-E3-VNEXT-CONTENT-PUBLISH-20260802'
-        idempotencyKey = 'IDEM-E3-VNEXT-CONTENT-PUBLISH-20260802'
-        expectedAggregateVersion = 2
-        action = 'PUBLISH'
-        reason = 'E3_SYNTHETIC_PUBLIC_READ_SMOKE_ONLY'
-    } | ConvertTo-Json -Compress
-    $published = Invoke-RestMethod -Method Post `
-        -Uri "$base/project-api/v1/internal/content/items/$contentRef/transitions" `
-        -Headers $contentHeaders -ContentType 'application/json' -Body $publishBody
-    if ($published.status -ne 'ACCEPTED' -or $published.data.state -ne 'PUBLISHED' -or
-        [long]$published.data.version -ne 3) { throw 'content publish transition failed' }
+    if ($internalContent.data.state -eq 'DRAFT' -and [long]$internalContent.data.version -eq 1) {
+        $verifiedAt = [DateTime]::UtcNow.AddMinutes(-1).ToString('o')
+        $validUntil = [DateTime]::UtcNow.AddDays(1).ToString('o')
+        $reviewBody = [ordered]@{
+            commandId = 'CMD-E3-VNEXT-CONTENT-REVIEW-20260802'
+            idempotencyKey = 'IDEM-E3-VNEXT-CONTENT-REVIEW-20260802'
+            expectedAggregateVersion = 1
+            action = 'RECORD_REVIEW'
+            reason = 'E3_SYNTHETIC_REVIEW_ONLY'
+            sourceCategory = 'SELF_RESEARCH'
+            sourceRef = 'SYN-SOURCE-VNEXT-20260802'
+            verificationScope = 'NAME_AND_PUBLIC_CONTACT_CHANNELS'
+            verifiedBy = 'SYN-REVIEWER-VNEXT'
+            verifiedAt = $verifiedAt
+            validUntil = $validUntil
+        } | ConvertTo-Json -Compress
+        $internalContent = Invoke-RestMethod -Method Post `
+            -Uri "$base/project-api/v1/internal/content/items/$contentRef/transitions" `
+            -Headers $contentHeaders -ContentType 'application/json' -Body $reviewBody
+    }
+    if ($internalContent.data.state -eq 'VERIFIED' -and [long]$internalContent.data.version -eq 2) {
+        $publishBody = [ordered]@{
+            commandId = 'CMD-E3-VNEXT-CONTENT-PUBLISH-20260802'
+            idempotencyKey = 'IDEM-E3-VNEXT-CONTENT-PUBLISH-20260802'
+            expectedAggregateVersion = 2
+            action = 'PUBLISH'
+            reason = 'E3_SYNTHETIC_PUBLIC_READ_SMOKE_ONLY'
+        } | ConvertTo-Json -Compress
+        $internalContent = Invoke-RestMethod -Method Post `
+            -Uri "$base/project-api/v1/internal/content/items/$contentRef/transitions" `
+            -Headers $contentHeaders -ContentType 'application/json' -Body $publishBody
+    }
+    if ($internalContent.status -ne 'ACCEPTED' -or $internalContent.data.state -ne 'PUBLISHED' -or
+        [long]$internalContent.data.version -ne 3) { throw 'content did not converge to PUBLISHED version 3' }
 
     $publicContent = Invoke-RestMethod -Method Get `
-        -Uri "$base/project-api/v1/content/items/$contentRef?contentVersion=3"
+        -Uri "$base/project-api/v1/content/items/${contentRef}?contentVersion=3"
     if ($publicContent.status -ne 'ACCEPTED' -or $publicContent.data.contentRef -ne $contentRef) {
         throw 'published synthetic content was not readable'
     }
