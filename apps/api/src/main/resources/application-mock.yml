@@ -7,6 +7,11 @@ spring:
   flyway:
     enabled: false
 hz:
+  p014:
+    mode: local-synthetic
+    fixture-mode: no-default
+  a110:
+    mode: local-synthetic
   temporal-overview:
     mode: local-synthetic
   persistence:

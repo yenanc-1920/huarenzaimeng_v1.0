@@ -26,11 +26,11 @@ class TestAccessTokenFilterTest {
 
     @Test
     void missingAndIncorrectTokensReturnTheSameUnauthorizedResponseForApiReads() throws Exception {
-        String missing = mvc.perform(get("/api/v1/orders/ORDER/projection"))
+        String missing = mvc.perform(get("/api/v1/orders/ORDER"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andReturn().getResponse().getContentAsString();
-        String incorrect = mvc.perform(get("/api/v1/orders/ORDER/projection")
+        String incorrect = mvc.perform(get("/api/v1/orders/ORDER")
                         .header(TestAccessTokenFilter.HEADER_NAME, "incorrect"))
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();

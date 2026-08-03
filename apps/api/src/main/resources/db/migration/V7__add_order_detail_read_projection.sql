@@ -1,0 +1,22 @@
+CREATE TABLE hz_order_detail_projection (
+    order_ref VARCHAR(128) NOT NULL,
+    quote_ref VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    project_subject_ref VARCHAR(128) NOT NULL,
+    session_ref VARCHAR(128) NOT NULL,
+    session_version BIGINT NOT NULL,
+    authorization_set_ref VARCHAR(128) NOT NULL,
+    authorization_evidence_version VARCHAR(128) NOT NULL,
+    authorized_order_refs JSON NOT NULL,
+    price_snapshot_digest CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    quote_snapshot_digest CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    projection_json JSON NOT NULL,
+    projection_version BIGINT NOT NULL,
+    updated_at TIMESTAMP(3) NOT NULL,
+    revoked TINYINT(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (order_ref),
+    KEY ix_hz_order_detail_projection_subject (project_subject_ref, session_ref, order_ref),
+    CONSTRAINT ck_hz_order_detail_projection_session_version CHECK (session_version > 0),
+    CONSTRAINT ck_hz_order_detail_projection_version CHECK (projection_version > 0),
+    CONSTRAINT fk_hz_order_detail_projection_order FOREIGN KEY (order_ref) REFERENCES hz_order (order_ref),
+    CONSTRAINT fk_hz_order_detail_projection_quote FOREIGN KEY (quote_ref) REFERENCES hz_quote (quote_ref)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

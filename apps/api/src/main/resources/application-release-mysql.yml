@@ -24,6 +24,13 @@ hz:
   test-access-token: ${HZ_TEST_ACCESS_TOKEN}
   project-auth:
     content-token: ${HZ_CONTENT_ADMIN_TOKEN}
+  p014:
+    mode: disabled
+    fixture-mode: no-default
+  p021:
+    # Enable only for the isolated huarenzaimeng_it_vnext integration deployment.
+    mode: ${HZ_P021_MODE:disabled}
+    fixture-mode: no-default
   temporal-overview:
     mode: disabled
   persistence:

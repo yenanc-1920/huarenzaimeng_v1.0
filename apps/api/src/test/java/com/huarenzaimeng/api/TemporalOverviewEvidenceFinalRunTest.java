@@ -52,14 +52,16 @@ class TemporalOverviewEvidenceFinalRunTest {
     private static final String REQUIRED_TEST_SELECTOR = "TemporalOverviewEvidenceFinalRunTest";
     private static final String GENERATOR_PATH =
             "apps/api/src/test/java/com/huarenzaimeng/api/TemporalOverviewEvidenceFinalRunTest.java";
-    private static final String D1_SHA = "F2CA50A6C8EAD6463753E33B50A819EE51DA69117D7EDDCE9A54EC4A8F785538";
+    private static final String D1_SHA = "364F73B28E2BC1C4D3827D5B9332C1CEB6D93C928859A226CD8842FF283D9BD8";
     private static final String D2_SHA = "A87E8D7BFE6D8AF421BF87421849D6065DE96EB160A37F2DCCD2AF2EA59A8E82";
-    private static final String D3_REGISTRY_SHA = "492D687679228FFA2107C4BC407C156820EED05DF3A6E4950C7599E2AC0BAF87";
-    private static final String D3_03_SHA = "4976103492A1E0B906BEDEB44B86C15BA8B5ED5586735389D237CC630CCD5339";
-    private static final String D3_04_SHA = "1590FA192D2FA2B71B40AAF80794F5D6BED7E5CBE1A6B0497C816EBAFA384015";
-    private static final String D3_05_SHA = "328F45D54215DA54C601CAA0F8FD1A24B3B1D63E16BA60D19A571FFF08DF850E";
+    private static final String D3_REGISTRY_SHA = "70E86A27027A0B5F84FD49C9CDF20617208781F3F0A66099C68D78ECCC7E7485";
+    private static final String D3_03_SHA = "8B0FED4AF8F5D2AE39329813254550494EA727C5D9A917F4D413872D6DAADC34";
+    private static final String D3_04_SHA = "DFB94D1348E90A5F794664D3B3E1FEF99B5E7075AC13819C49C4C38C019816EB";
+    private static final String D3_05_SHA = "AB8E200F00E9A6B0BA9205E3B40365E82AD2A44358246895E0642C25DA4C2CE9";
     private static final String FRONTEND_IMPLEMENTATION_AGGREGATE_SHA =
-            "FAD7562EFAA9A44BC634FA3778A1C4D384DFDB9837F54DB7737CCEBA5AF840DC";
+            "4064FC45FA77D48756AEC04C8C97379677462C5BC3479BA78762B8945509FF16";
+    private static final String CROSS_STACK_IMPLEMENTATION_AGGREGATE_SHA =
+            "2BC515547194BF039B113A8C9DAE64619CB380A8955561E75D8B7DB2F5C37B57";
     private static final Instant NORMAL = Instant.parse("2026-08-02T10:00:00Z");
     private static final List<String> FIXED_SCENARIO_IDS = List.of(
             "P001-TEMP-001-NORMAL-DAY", "P001-TEMP-002-CROSS-DATE",
@@ -89,7 +91,6 @@ class TemporalOverviewEvidenceFinalRunTest {
             "apps/api/src/main/resources/application-mock.yml",
             "apps/api/src/main/resources/application-release-mysql.yml",
             "apps/miniapp/scripts/assert-frontend-contracts.mjs",
-            "apps/miniapp/scripts/verify-mp-weixin-output.mjs",
             "apps/miniapp/src/api/client.ts",
             "apps/miniapp/src/api/mock.ts",
             "apps/miniapp/src/api/temporal-overview-contract.ts",
@@ -132,9 +133,10 @@ class TemporalOverviewEvidenceFinalRunTest {
                 .isEqualTo(FRONTEND_IMPLEMENTATION_AGGREGATE_SHA);
         generatorSha = sha256(Files.readAllBytes(root.resolve(GENERATOR_PATH)));
         assertThat(generatorSha).isEqualTo(requireProperty("p001.evidence.expectedGeneratorSha256"));
+        assertThat(requireProperty("p001.evidence.expectedImplementationAggregateSha256"))
+                .isEqualTo(CROSS_STACK_IMPLEMENTATION_AGGREGATE_SHA);
         implementationAggregateSha = aggregate(root, IMPLEMENTATION_PATHS);
-        assertThat(implementationAggregateSha)
-                .isEqualTo(requireProperty("p001.evidence.expectedImplementationAggregateSha256"));
+        assertThat(implementationAggregateSha).isEqualTo(CROSS_STACK_IMPLEMENTATION_AGGREGATE_SHA);
         verifyFixedInputs(root);
         verifyExactScenarioIdentity();
 

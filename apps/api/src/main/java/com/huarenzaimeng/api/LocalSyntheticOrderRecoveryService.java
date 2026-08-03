@@ -117,6 +117,30 @@ class LocalSyntheticOrderRecoveryService {
         }
     }
 
+    synchronized BuyerAuthorization requireCurrentOrderDetailAuthorization(String environment,
+                                                                            String projectSubjectRef,
+                                                                            String sessionRef,
+                                                                            String orderRef) {
+        requireLocalSynthetic(environment, projectSubjectRef, sessionRef);
+        SessionState session = sessions.get(sessionRef);
+        if (session == null || session.role() != ProjectSessionRole.BUYER
+                || session.authorizationSetRef() == null || orderRef == null || orderRef.isBlank()) {
+            throw new FlowRejectedException("ORDER_DETAIL_NOT_AVAILABLE");
+        }
+        AuthorizationSetRecord set = authorizationSets.get(session.authorizationSetRef());
+        try {
+            validateSet(session, set, projectSubjectRef);
+        } catch (FlowRejectedException error) {
+            throw new FlowRejectedException("ORDER_DETAIL_NOT_AVAILABLE");
+        }
+        if (!set.authorizedOrderRefs().contains(orderRef)) {
+            throw new FlowRejectedException("ORDER_DETAIL_NOT_AVAILABLE");
+        }
+        return new BuyerAuthorization(ENVIRONMENT, projectSubjectRef, session.version(),
+                set.authorizationSetRef(), set.authorizationEvidenceVersion(),
+                List.copyOf(set.authorizedOrderRefs()));
+    }
+
     synchronized RecoveryCaseResponse createRecoveryCase(String environment, String projectSubjectRef,
                                                           String sessionRef, RecoveryCommand command) {
         requireLocalSynthetic(environment, projectSubjectRef, sessionRef);
@@ -361,12 +385,20 @@ class LocalSyntheticOrderRecoveryService {
     synchronized void installBuyerAuthorizationForTest(String projectSubjectRef, String sessionRef,
                                                          long sessionVersion, String authorizationSetRef,
                                                          String authorizationEvidenceVersion) {
+        installLocalSyntheticBuyerAuthorization(projectSubjectRef, sessionRef, sessionVersion,
+                authorizationSetRef, authorizationEvidenceVersion, List.of());
+    }
+
+    synchronized void installLocalSyntheticBuyerAuthorization(String projectSubjectRef, String sessionRef,
+                                                               long sessionVersion, String authorizationSetRef,
+                                                               String authorizationEvidenceVersion,
+                                                               List<String> authorizedOrderRefs) {
         Instant issuedAt = clock.instant();
         sessions.put(sessionRef, new SessionState(projectSubjectRef, ProjectSessionRole.BUYER, sessionVersion,
                 authorizationSetRef));
         authorizationSets.put(authorizationSetRef, new AuthorizationSetRecord(authorizationSetRef,
                 projectSubjectRef, ProjectSessionRole.BUYER, sessionVersion, authorizationEvidenceVersion,
-                List.of(), issuedAt, issuedAt.plus(1, ChronoUnit.HOURS), true));
+                List.copyOf(authorizedOrderRefs), issuedAt, issuedAt.plus(1, ChronoUnit.HOURS), true));
     }
 
     synchronized void revokeBuyerAuthorizationForTest(String authorizationSetRef) {

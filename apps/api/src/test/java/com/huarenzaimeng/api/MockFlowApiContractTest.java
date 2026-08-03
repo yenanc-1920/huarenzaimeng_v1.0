@@ -112,11 +112,13 @@ class MockFlowApiContractTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.projectCode").value("IDEMPOTENCY_CONFLICT"));
 
-        mvc.perform(get("/api/v1/orders/{orderRef}/projection", orderRef)
+        mvc.perform(get("/api/v1/orders/{orderRef}", orderRef)
                         .header(TestAccessTokenFilter.HEADER_NAME, TOKEN).header(SUBJECT_HEADER, SUBJECT))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.projectionVersion").value(3))
-                .andExpect(jsonPath("$.data.aggregateVersion").value(3));
+                .andExpect(jsonPath("$.outcome").value("REJECTED"))
+                .andExpect(jsonPath("$.projectCode").value("ORDER_DETAIL_NOT_AVAILABLE"))
+                .andExpect(jsonPath("$.resourceRef").doesNotExist())
+                .andExpect(jsonPath("$.currentProjection").doesNotExist());
     }
 
     @Test
@@ -153,18 +155,21 @@ class MockFlowApiContractTest {
                 .andExpect(jsonPath("$.projectCode").value("ORDER_REPLAYED"));
 
         String orderRef = json.readTree(firstOrder).path("resourceRef").asText();
-        mvc.perform(get("/api/v1/orders/{orderRef}/projection", orderRef)
+        mvc.perform(get("/api/v1/orders/{orderRef}", orderRef)
                         .header(TestAccessTokenFilter.HEADER_NAME, TOKEN))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome").value("REJECTED"))
+                .andExpect(jsonPath("$.projectCode").value("ORDER_DETAIL_NOT_AVAILABLE"));
 
-        mvc.perform(get("/api/v1/orders/{orderRef}/projection", orderRef)
+        mvc.perform(get("/api/v1/orders/{orderRef}", orderRef)
                         .header(TestAccessTokenFilter.HEADER_NAME, TOKEN)
                         .header(SUBJECT_HEADER, SUBJECT))
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-HZM-Mock-Only", "true"))
-                .andExpect(jsonPath("$.status").value("ACCEPTED"))
-                .andExpect(jsonPath("$.projectCode").value("OK"))
-                .andExpect(jsonPath("$.data.projectionVersion").value(1));
+                .andExpect(jsonPath("$.outcome").value("REJECTED"))
+                .andExpect(jsonPath("$.projectCode").value("ORDER_DETAIL_NOT_AVAILABLE"))
+                .andExpect(jsonPath("$.resourceRef").doesNotExist())
+                .andExpect(jsonPath("$.currentProjection").doesNotExist());
     }
 
     @Test

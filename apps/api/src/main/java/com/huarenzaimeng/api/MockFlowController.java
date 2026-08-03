@@ -176,12 +176,6 @@ public class MockFlowController {
                 request.mnpState()));
     }
 
-    @GetMapping({"/orders/{orderRef}", "/orders/{orderRef}/projection"})
-    ResponseEntity<ProjectEnvelope<ProjectProjection>> recover(@RequestHeader(SUBJECT_HEADER) String projectSubjectRef,
-                                                               @PathVariable String orderRef) {
-        return mock(service.getOrder(projectSubjectRef, orderRef));
-    }
-
     @ExceptionHandler(FlowRejectedException.class)
     ResponseEntity<ProjectEnvelope<Void>> rejected(FlowRejectedException error) {
         int status = error.getMessage().endsWith("CONFLICT") ? 409

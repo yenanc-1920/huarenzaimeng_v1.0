@@ -20,6 +20,22 @@ hz-mock:
   real-adapters-enabled: false
 hz:
   test-access-token: ${HZ_TEST_ACCESS_TOKEN:}
+  p014:
+    mode: disabled
+    fixture-mode: no-default
+  p021:
+    mode: disabled
+    fixture-mode: no-default
+  it-session:
+    buyer-token: ${HZ_IT_BUYER_SESSION_TOKEN:}
+    cs-token: ${HZ_IT_ADMIN_CS_SESSION_TOKEN:}
+    fin-token: ${HZ_IT_ADMIN_FIN_SESSION_TOKEN:}
+    buyer-subject-ref: ${HZ_IT_BUYER_SUBJECT_REF:}
+    buyer-session-ref: ${HZ_IT_BUYER_SESSION_REF:}
+    buyer-session-version: ${HZ_IT_BUYER_SESSION_VERSION:0}
+    buyer-authorization-set-ref: ${HZ_IT_BUYER_AUTHORIZATION_SET_REF:}
+    buyer-authorization-evidence-version: ${HZ_IT_BUYER_AUTHORIZATION_EVIDENCE_VERSION:}
+    buyer-authorized-order-refs: ${HZ_IT_BUYER_AUTHORIZED_ORDER_REFS:}
   life-content:
     mode: disabled
   temporal-overview:
