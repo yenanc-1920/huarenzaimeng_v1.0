@@ -1,5 +1,7 @@
 package com.huarenzaimeng.api;
 
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.*;
@@ -8,6 +10,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class P021HostPreflightOuterWrapperContractTest{
  @TempDir Path temp;
+ @BeforeAll static void windowsOnly(){Assumptions.assumeTrue(System.getProperty("os.name","").startsWith("Windows"),"WINDOWS_HOST_TOOLCHAIN_NOT_PRESENT");}
  @Test void bindsTheProjectOfflineRepositoryWithoutUserHomeOrCentralFallback()throws Exception{P021HostPreflightOuterWrapper.validateOfflineRepository();List<String> command=new java.util.ArrayList<>(P021HostPreflightOuterWrapper.mavenLauncherPrefix(Path.of("").toAbsolutePath()));command.addAll(List.of("-o","-Dmaven.repo.local="+P021HostPreflightOuterWrapper.OFFLINE_REPOSITORY.toAbsolutePath().normalize(),"help:evaluate"));String joined=String.join("\n",command);assertThat(joined).contains("\n-o\n","-Dmaven.repo.local=E:\\workspace\\huarenzaimeng\\.m2-local\\repository").doesNotContain("user.home","repo1.maven.org","central");}
  @Test void fakeChildZeroReturnsAndPersistsOuterEvidence()throws Exception{Fixture f=fixture();Path report=f.repo.resolve(P021HostPreflightOuterWrapper.REPORT_ROOT).resolve(P021HostPreflightOuterWrapper.TEST_RUN_ID);
    int exit=run(f,0,report);assertThat(exit).isZero();assertThat(report.resolve("outer-process-evidence.json")).exists();assertThat(report.resolve("outer-process.stdout.txt")).content().contains("FAKE_MAVEN_STDOUT");assertThat(Files.exists(report.resolve("READY"))).isFalse();}

@@ -1,5 +1,7 @@
 package com.huarenzaimeng.api;
 
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,6 +16,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class P021HostPreflightUtf8CompiledLauncherContractTest {
     @TempDir Path temp;
     private static final Path REPOSITORY_ROOT = repositoryRoot();
+
+    @BeforeAll
+    static void windowsOnly() {
+        Assumptions.assumeTrue(
+                System.getProperty("os.name", "").startsWith("Windows"),
+                "WINDOWS_HOST_TOOLCHAIN_NOT_PRESENT");
+    }
 
     @Test void explicitlyCompilesFrozenWrapperAsUtf8AndPreservesChineseAuthorizationRoot()throws Exception{
         Path classes=Files.createDirectories(temp.resolve("classes"));Path source=REPOSITORY_ROOT.resolve("apps/api/src/test/java/com/huarenzaimeng/api/P021HostPreflightOuterWrapper.java"),policy=REPOSITORY_ROOT.resolve("apps/api/src/test/java/com/huarenzaimeng/api/P021HostPreflightRunIdPolicy.java");

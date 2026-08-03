@@ -1,5 +1,6 @@
 package com.huarenzaimeng.api;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -22,6 +23,9 @@ class P021EvidenceHostPreflightTest {
 
     @Test
     void allowedHostLoadsAndParsesFrozenWrapperThenExitsBeforeFormalTest() throws Exception {
+        Assumptions.assumeTrue(
+                System.getProperty("os.name", "").startsWith("Windows"),
+                "WINDOWS_HOST_TOOLCHAIN_NOT_PRESENT");
         String evidenceBefore = treeDigest(EVIDENCE_ROOT);
         assertThat(sha(WRAPPER)).isEqualTo(WRAPPER_SHA);
         assertThat(sha(RUNNER)).isEqualTo(RUNNER_SHA);

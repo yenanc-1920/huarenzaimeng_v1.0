@@ -12,6 +12,7 @@ RUN mvn -B -ntp -pl apps/api -am dependency:go-offline
 
 COPY modules/core/src modules/core/src
 COPY apps/api/src apps/api/src
+COPY apps/api/Invoke-P021OrderDetailEvidenceFinalRun.ps1 apps/api/Invoke-P021OrderDetailEvidenceFinalRun.ps1
 
 RUN mvn -B -ntp -pl apps/api -am clean test
 RUN mvn -B -ntp -pl apps/api -am package -DskipTests
