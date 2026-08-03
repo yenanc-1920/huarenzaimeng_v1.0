@@ -10,6 +10,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MigrationAndConfigContractTest {
 
     @Test
+    void v7ForeignKeysMatchV1ParentColumnDefinitions() throws IOException {
+        String v1 = resource("db/migration/V1__create_core_transaction_tables.sql");
+        String v7 = resource("db/migration/V7__add_order_detail_read_projection.sql");
+        String expectedOrderRef = "order_ref VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL";
+        String expectedQuoteRef = "quote_ref VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL";
+
+        assertThat(table(v1, "hz_order")).contains(expectedOrderRef);
+        assertThat(table(v1, "hz_quote")).contains(expectedQuoteRef);
+        assertThat(table(v7, "hz_order_detail_projection"))
+                .contains(expectedOrderRef, expectedQuoteRef)
+                .contains("FOREIGN KEY (order_ref) REFERENCES hz_order (order_ref)")
+                .contains("FOREIGN KEY (quote_ref) REFERENCES hz_quote (quote_ref)");
+    }
+
+    @Test
     void v2BackfillsExistingAmountsBeforeMakingMinorAmountRequired() throws IOException {
         String sql = resource("db/migration/V2__add_subject_scoped_commands_versions_and_worker_tables.sql");
 
@@ -90,5 +105,13 @@ class MigrationAndConfigContractTest {
 
     private static String source(String path) throws IOException {
         return java.nio.file.Files.readString(java.nio.file.Path.of(path), StandardCharsets.UTF_8);
+    }
+
+    private static String table(String sql, String name) {
+        int start = sql.indexOf("CREATE TABLE " + name + " (");
+        if (start < 0) throw new IllegalArgumentException("missing table: " + name);
+        int end = sql.indexOf(";", start);
+        if (end < 0) throw new IllegalArgumentException("unterminated table: " + name);
+        return sql.substring(start, end);
     }
 }

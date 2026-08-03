@@ -1,5 +1,5 @@
 CREATE TABLE hz_order_detail_projection (
-    order_ref VARCHAR(128) NOT NULL,
+    order_ref VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     quote_ref VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     project_subject_ref VARCHAR(128) NOT NULL,
     session_ref VARCHAR(128) NOT NULL,
