@@ -10,6 +10,10 @@ import java.util.Optional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.Set;
 
@@ -18,6 +22,9 @@ import static com.huarenzaimeng.api.P021OrderDetailDomain.*;
 @Repository
 @ConditionalOnProperty(name = "hz.persistence.mode", havingValue = "mysql")
 class MyBatisP021Store implements P021Store {
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Dhaka");
+    private static final DateTimeFormatter MYSQL_DATETIME =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss.SSSSSS");
     private final P021ProjectionMapper mapper;
     private final ObjectMapper json;
 
@@ -43,7 +50,7 @@ class MyBatisP021Store implements P021Store {
                     || ((Number) row.get("authority_total_minor")).longValue() != price.totalMinor()
                     || !String.valueOf(row.get("authority_currency")).equals(price.currency())
                     || !String.valueOf(row.get("authority_masked_target")).equals(price.maskedTarget())
-                    || !numberEquals(row.get("authority_valid_until_epoch"), price.validUntil().getEpochSecond())
+                    || !validUntilEquals(row.get("authority_valid_until_local"), price.validUntil())
                     || !String.valueOf(row.get("price_snapshot_digest"))
                             .equals(P021OrderDetailService.snapshotDigest(price))
                     || !String.valueOf(row.get("quote_snapshot_digest")).equals(authorityQuoteDigest)
@@ -96,7 +103,7 @@ class MyBatisP021Store implements P021Store {
             boolean currency = price != null && String.valueOf(row.get("authority_currency")).equals(price.currency());
             boolean maskedTarget = price != null && String.valueOf(row.get("authority_masked_target")).equals(price.maskedTarget());
             boolean validUntil = price != null
-                    && numberEquals(row.get("authority_valid_until_epoch"), price.validUntil().getEpochSecond());
+                    && validUntilEquals(row.get("authority_valid_until_local"), price.validUntil());
             boolean priceDigest = price != null && String.valueOf(row.get("price_snapshot_digest"))
                     .equals(P021OrderDetailService.snapshotDigest(price));
             boolean quoteDigestMatched = String.valueOf(row.get("quote_snapshot_digest")).equals(quoteDigest);
@@ -119,6 +126,12 @@ class MyBatisP021Store implements P021Store {
 
     private static boolean numberEquals(Object value, long expected) {
         return value instanceof Number number && number.longValue() == expected;
+    }
+
+    private static boolean validUntilEquals(Object value, Instant expected) {
+        if (!(value instanceof String localWallClock) || expected == null) return false;
+        return LocalDateTime.parse(localWallClock, MYSQL_DATETIME)
+                .atZone(BUSINESS_ZONE).toInstant().equals(expected);
     }
 
     record QualificationDiagnostic(boolean projectionRowExists, boolean authorityOrderJoined,

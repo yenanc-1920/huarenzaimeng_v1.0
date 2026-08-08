@@ -6,11 +6,18 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 class P021MyBatisStoreContractTest {
+    private static final DateTimeFormatter MYSQL_DATETIME =
+            DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss.SSSSSS").withZone(ZoneId.of("Asia/Dhaka"));
+
     @Test void authorityVersionAndPriceDriftFailClosed() throws Exception {
         P021ProjectionMapper mapper = mock(P021ProjectionMapper.class);
         ObjectMapper json = new ObjectMapper().findAndRegisterModules();
@@ -26,15 +33,24 @@ class P021MyBatisStoreContractTest {
         row.put("authority_total_minor", fixture.projection().priceSnapshotSummary().totalMinor());
         row.put("authority_currency", fixture.projection().priceSnapshotSummary().currency());
         row.put("authority_masked_target", fixture.projection().priceSnapshotSummary().maskedTarget());
-        row.put("authority_valid_until_epoch", fixture.projection().priceSnapshotSummary().validUntil().getEpochSecond());
+        row.put("authority_valid_until_local", mysqlWallClock(
+                fixture.projection().priceSnapshotSummary().validUntil()));
         row.put("price_snapshot_digest", fixture.priceSnapshotDigest());
         row.put("authority_quote_snapshot", "{\"amountMinor\":125000,\"currency\":\"BDT\",\"denominationRef\":\"IT-DENOMINATION\",\"supportedOperatorSetVersion\":1,\"catalogVersion\":1}");
         row.put("quote_snapshot_digest", MyBatisP021Store.quoteSnapshotDigest(125000, "BDT",
                 "IT-DENOMINATION", 1, 1));
         when(mapper.selectAuthorized(anyString(), anyString(), anyString())).thenReturn(row);
         MyBatisP021Store store = new MyBatisP021Store(mapper, json);
-        assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
-                identity.sessionRef())).isPresent();
+        TimeZone originalTimeZone = TimeZone.getDefault();
+        try {
+            for (String jvmZone : List.of("Asia/Shanghai", "UTC", "Asia/Dhaka")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(jvmZone));
+                assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
+                        identity.sessionRef())).as("JVM default zone %s must not affect P021", jvmZone).isPresent();
+            }
+        } finally {
+            TimeZone.setDefault(originalTimeZone);
+        }
         assertThat(store.findAuthorized(fixture.projection().orderRef(), new SessionSnapshot(
                 identity.projectSubjectRef(), identity.sessionRef(), 2, fixture.authorizationSetRef(),
                 fixture.authorizationEvidenceVersion(), List.of(fixture.projection().orderRef())))).isEmpty();
@@ -45,12 +61,12 @@ class P021MyBatisStoreContractTest {
         assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
                 identity.sessionRef())).isEmpty();
         row.put("authority_total_minor", fixture.projection().priceSnapshotSummary().totalMinor());
-        row.put("authority_valid_until_epoch",
-                fixture.projection().priceSnapshotSummary().validUntil().getEpochSecond() + 1);
+        row.put("authority_valid_until_local", mysqlWallClock(
+                fixture.projection().priceSnapshotSummary().validUntil().plusMillis(1)));
         assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
                 identity.sessionRef())).isEmpty();
-        row.put("authority_valid_until_epoch",
-                fixture.projection().priceSnapshotSummary().validUntil().getEpochSecond());
+        row.put("authority_valid_until_local", mysqlWallClock(
+                fixture.projection().priceSnapshotSummary().validUntil()));
         row.put("price_snapshot_digest", "0".repeat(64));
         assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
                 identity.sessionRef())).isEmpty();
@@ -79,7 +95,8 @@ class P021MyBatisStoreContractTest {
         row.put("authority_total_minor", fixture.projection().priceSnapshotSummary().totalMinor());
         row.put("authority_currency", fixture.projection().priceSnapshotSummary().currency());
         row.put("authority_masked_target", fixture.projection().priceSnapshotSummary().maskedTarget());
-        row.put("authority_valid_until_epoch", fixture.projection().priceSnapshotSummary().validUntil().getEpochSecond());
+        row.put("authority_valid_until_local", mysqlWallClock(
+                fixture.projection().priceSnapshotSummary().validUntil()));
         row.put("price_snapshot_digest", fixture.priceSnapshotDigest());
         row.put("quote_snapshot_digest", MyBatisP021Store.quoteSnapshotDigest(125000, "BDT", "IT-DENOMINATION", 1, 1));
         row.put("revoked", 0); row.put("authority_order_joined", 1); row.put("authority_quote_joined", 1);
@@ -92,5 +109,9 @@ class P021MyBatisStoreContractTest {
                 1, "IT-AUTHSET-P021", "IT-AUTH-EVIDENCE-P021-V1", List.of("IT-P021-AWAITING", "EXTRA")));
         assertThat(drift.eligible()).isFalse();
         assertThat(drift.authorizedOrderRefsExactlyMatched()).isFalse();
+    }
+
+    private static String mysqlWallClock(Instant value) {
+        return MYSQL_DATETIME.format(value);
     }
 }
