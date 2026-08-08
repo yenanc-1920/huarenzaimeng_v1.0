@@ -12,6 +12,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class P021MyBatisStoreContractTest {
@@ -55,25 +56,37 @@ class P021MyBatisStoreContractTest {
                 identity.projectSubjectRef(), identity.sessionRef(), 2, fixture.authorizationSetRef(),
                 fixture.authorizationEvidenceVersion(), List.of(fixture.projection().orderRef())))).isEmpty();
         row.put("authority_projection_version", 2L);
-        assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
-                identity.sessionRef())).isEmpty();
+        assertThatThrownBy(() -> store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
+                identity.sessionRef())).isInstanceOf(P021StoreReadException.class);
         row.put("authority_projection_version", 1L); row.put("authority_total_minor", 1L);
-        assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
-                identity.sessionRef())).isEmpty();
+        assertThatThrownBy(() -> store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
+                identity.sessionRef())).isInstanceOf(P021StoreReadException.class);
         row.put("authority_total_minor", fixture.projection().priceSnapshotSummary().totalMinor());
         row.put("authority_valid_until_local", mysqlWallClock(
                 fixture.projection().priceSnapshotSummary().validUntil().plusMillis(1)));
-        assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
-                identity.sessionRef())).isEmpty();
+        assertThatThrownBy(() -> store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
+                identity.sessionRef())).isInstanceOf(P021StoreReadException.class);
         row.put("authority_valid_until_local", mysqlWallClock(
                 fixture.projection().priceSnapshotSummary().validUntil()));
         row.put("price_snapshot_digest", "0".repeat(64));
-        assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
-                identity.sessionRef())).isEmpty();
+        assertThatThrownBy(() -> store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
+                identity.sessionRef())).isInstanceOf(P021StoreReadException.class);
         row.put("price_snapshot_digest", fixture.priceSnapshotDigest());
         row.put("authority_quote_snapshot", "{\"amountMinor\":125000,\"currency\":\"BDT\",\"denominationRef\":\"IT-DENOMINATION\",\"supportedOperatorSetVersion\":2,\"catalogVersion\":1}");
-        assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
-                identity.sessionRef())).isEmpty();
+        assertThatThrownBy(() -> store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
+                identity.sessionRef())).isInstanceOf(P021StoreReadException.class);
+    }
+
+    @Test void storeContractFailureMapsToReadErrorInsteadOfNotAvailable() {
+        P021Store store = mock(P021Store.class);
+        when(store.findAuthorized(anyString(), any(SessionSnapshot.class))).thenThrow(new P021StoreReadException());
+        org.springframework.mock.env.MockEnvironment environment = new org.springframework.mock.env.MockEnvironment();
+        P021OrderDetailService service = new P021OrderDetailService(mock(LocalSyntheticOrderRecoveryService.class),
+                new P021OrderDetailSideEffectProbe(), store, environment, "test-readonly", "mysql");
+        var session = new SessionSnapshot("IT-SUBJECT-P021", "IT-SESSION-P021", 1,
+                "IT-AUTHSET-P021", "IT-AUTH-EVIDENCE-P021-V1", List.of("IT-P021-AWAITING"));
+        assertThat(service.read(P021OrderDetailDomain.ENVIRONMENT, session.projectSubjectRef(), session.sessionRef(),
+                "IT-P021-AWAITING", session).projectCode()).isEqualTo(P021OrderDetailDomain.PROJECT_CODE_ERROR);
     }
 
     @Test void qualificationDiagnosticReportsOnlyBooleanPredicates() throws Exception {

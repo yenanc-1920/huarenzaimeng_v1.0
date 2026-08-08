@@ -37,7 +37,7 @@ class MyBatisP021Store implements P021Store {
             Projection projection = json.readValue(String.valueOf(row.get("projection_json")), Projection.class);
             var quoteSnapshot = json.readTree(String.valueOf(row.get("authority_quote_snapshot")));
             if (!quoteSnapshot.isObject() || !keys(quoteSnapshot).equals(Set.of("amountMinor", "currency",
-                    "denominationRef", "supportedOperatorSetVersion", "catalogVersion"))) return Optional.empty();
+                    "denominationRef", "supportedOperatorSetVersion", "catalogVersion"))) throw new P021StoreReadException();
             String authorityQuoteDigest = quoteSnapshotDigest(quoteSnapshot.path("amountMinor").longValue(),
                     quoteSnapshot.path("currency").textValue(), quoteSnapshot.path("denominationRef").textValue(),
                     quoteSnapshot.path("supportedOperatorSetVersion").longValue(),
@@ -54,7 +54,7 @@ class MyBatisP021Store implements P021Store {
                     || !String.valueOf(row.get("price_snapshot_digest"))
                             .equals(P021OrderDetailService.snapshotDigest(price))
                     || !String.valueOf(row.get("quote_snapshot_digest")).equals(authorityQuoteDigest)
-                    || !authorizedOrderRefs.contains(orderRef)) return Optional.empty();
+                    || !authorizedOrderRefs.contains(orderRef)) throw new P021StoreReadException();
             long sessionVersion = ((Number) row.get("session_version")).longValue();
             String authorizationSetRef = String.valueOf(row.get("authorization_set_ref"));
             String evidenceVersion = String.valueOf(row.get("authorization_evidence_version"));
@@ -66,8 +66,10 @@ class MyBatisP021Store implements P021Store {
                     draft.projectSubjectRef(), draft.sessionRole(), draft.sessionVersion(), draft.authorizationSetRef(),
                     draft.authorizationEvidenceVersion(), draft.authorizedOrderRefs(), draft.projection(),
                     draft.priceSnapshotDigest(), draft.fixtureSchemaVersion(), P021OrderDetailService.fixtureDigest(draft)));
+        } catch (P021StoreReadException error) {
+            throw error;
         } catch (RuntimeException | java.io.IOException error) {
-            return Optional.empty();
+            throw new P021StoreReadException(error);
         }
     }
 

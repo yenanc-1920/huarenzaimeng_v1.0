@@ -18,6 +18,11 @@ interface P021Store {
     default void clearForTest() {}
 }
 
+final class P021StoreReadException extends RuntimeException {
+    P021StoreReadException() { super("P021_STORE_READ_INVALID"); }
+    P021StoreReadException(Throwable cause) { super("P021_STORE_READ_INVALID", cause); }
+}
+
 record SessionSnapshot(String projectSubjectRef, String sessionRef, long sessionVersion,
                        String authorizationSetRef, String authorizationEvidenceVersion,
                        List<String> authorizedOrderRefs) {}

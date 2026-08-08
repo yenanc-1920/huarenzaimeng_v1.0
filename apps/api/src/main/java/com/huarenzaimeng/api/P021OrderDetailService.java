@@ -82,7 +82,11 @@ final class P021OrderDetailService {
         } else {
             if (trustedSession == null || !projectSubjectRef.equals(trustedSession.projectSubjectRef())
                     || !sessionRef.equals(trustedSession.sessionRef())) return unavailable();
-            fixture = store.findAuthorized(orderRef, trustedSession).orElse(null);
+            try {
+                fixture = store.findAuthorized(orderRef, trustedSession).orElse(null);
+            } catch (P021StoreReadException error) {
+                return readError();
+            }
         }
         if (fixture == null) return unavailable();
         try {
