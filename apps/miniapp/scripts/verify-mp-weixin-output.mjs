@@ -10,16 +10,22 @@ const requiredArtifacts = [
   'api/client.js',
   'api/mock.js',
   'api/payment-intent-contract.js',
+  'api/p014-topup-contract.js',
+  'api/p014-topup-synthetic.js',
   'pages/index/index.js',
   'pages/index/index.wxml',
   'pages/recharge/select.js',
   'pages/recharge/select.wxml',
   'pages/order/list.js',
   'pages/order/list.wxml',
+  'pages/order/detail.js',
+  'pages/order/detail.wxml',
   'pages/directory/list.js',
   'pages/directory/list.wxml',
   'pages/life-content/list.js',
   'pages/life-content/list.wxml',
+  'pages/order/progress.js',
+  'pages/order/progress.wxml',
 ]
 
 for (const artifact of requiredArtifacts) {
@@ -39,6 +45,9 @@ function collectJavaScript(directory) {
 let staticRequireCount = 0
 for (const file of collectJavaScript(outputRoot)) {
   const source = readFileSync(file, 'utf8')
+  for (const forbidden of ['P021-V01','P021-V16','visualScenario','p021-visual-fixtures','P021-VISUAL-SUBJECT','P021-VISUAL-AUTH']) {
+    if (source.includes(forbidden)) throw new Error(`MP_WEIXIN_P021_DEV_FIXTURE_LEAK:${forbidden}:${relative(outputRoot,file).replaceAll('\\','/')}`)
+  }
   const allRequireCount = (source.match(/\brequire\s*\(/g) || []).length
   const staticRequires = [...source.matchAll(/\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g)]
   if (staticRequires.length !== allRequireCount) {
@@ -61,8 +70,10 @@ for (const [page, root] of [
   ['pages/index/index.wxml', 'data-page-root="home"'],
   ['pages/recharge/select.wxml', 'data-page-root="recharge-select"'],
   ['pages/order/list.wxml', 'data-page-root="order-list"'],
+  ['pages/order/detail.wxml', 'data-page-root="order-detail"'],
   ['pages/directory/list.wxml', 'data-page-root="directory-list"'],
   ['pages/life-content/list.wxml', 'data-page-root="life-content-list"'],
+  ['pages/order/progress.wxml', 'data-page-root="p014-progress"'],
 ]) {
   if (!readFileSync(resolve(outputRoot, page), 'utf8').includes(root)) {
     throw new Error(`MP_WEIXIN_VISIBLE_ROOT_MISSING:${page}`)
@@ -71,6 +82,8 @@ for (const [page, root] of [
 
 const commonClient = readFileSync(resolve(outputRoot, 'api/client.js'), 'utf8')
 const commonMock = readFileSync(resolve(outputRoot, 'api/mock.js'), 'utf8')
+const generatedHome = readFileSync(resolve(outputRoot, 'pages/index/index.js'), 'utf8')
+const retiredTemporalFlow = readFileSync(resolve(outputRoot, 'domain/temporal-overview-flow.js'), 'utf8')
 if (/require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonClient)
   || /require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonMock)) {
   throw new Error('MP_WEIXIN_COMMON_ENTRY_PAYMENT_INTENT_DEPENDENCY_NOT_ISOLATED')
@@ -78,6 +91,12 @@ if (/require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonClient)
 if (/require\(["']\.\/temporal-overview-contract\.js["']\)/.test(commonClient)
   || /require\(["']\.\/temporal-overview-contract\.js["']\)/.test(commonMock)) {
   throw new Error('MP_WEIXIN_COMMON_ENTRY_TEMPORAL_CONTRACT_DEPENDENCY_NOT_ISOLATED')
+}
+if (/temporal-overview-flow\.js/.test(generatedHome)) {
+  throw new Error('MP_WEIXIN_HOME_PAGE_ONLY_TEMPORAL_MODULE_NOT_INLINED')
+}
+if (!/WECHAT_PRECOMPILE_COMPAT_ONLY/.test(retiredTemporalFlow)) {
+  throw new Error('MP_WEIXIN_RETIRED_TEMPORAL_MODULE_COMPATIBILITY_MISSING')
 }
 
 const systemInfo = { statusBarHeight:20, windowWidth:375, pixelRatio:2, platform:'devtools', system:'Windows', language:'zh_CN',
@@ -93,8 +112,10 @@ for (const entry of [
   'pages/index/index.js',
   'pages/recharge/select.js',
   'pages/order/list.js',
+  'pages/order/detail.js',
   'pages/directory/list.js',
   'pages/life-content/list.js',
+  'pages/order/progress.js',
 ]) {
   try {
     createRequire(import.meta.url)(resolve(outputRoot, entry))
@@ -103,4 +124,4 @@ for (const entry of [
   }
 }
 
-console.log(`mp-weixin appservice load: PASS (home + four entries; ${staticRequireCount} relative static requires)`)
+console.log(`mp-weixin appservice load: PASS (home + five entry pages including P014; ${staticRequireCount} relative static requires)`)

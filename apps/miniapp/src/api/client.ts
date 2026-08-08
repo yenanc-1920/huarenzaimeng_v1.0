@@ -1,4 +1,4 @@
-import { mockCatalog, mockDirectory, mockDirectoryDetail, mockEligibility, mockLifeContentDetailDto, mockLifeContentListDto, mockOrders, mockProjection, mockQuote, mockRecovery, mockRecoveryCase, mockReportDirectoryError, mockSupport, mockTemporalOverviewDto } from './mock'
+import { mockCatalog, mockDirectory, mockDirectoryDetail, mockEligibility, mockLifeContentDetailDto, mockLifeContentListDto, mockOrders, mockProjection, mockQuote, mockRecovery, mockRecoveryCase, mockReportDirectoryError, mockSupport, mockTemporalOverviewReadResponse } from './mock'
 import { buildContentErrorReport, mapContentProjectCode, parseContentErrorReportReceipt, parsePublicContentPage, parsePublicContentProjection } from './content-contract'
 import { parseLifeContentDetailResponse, parseLifeContentListResponse } from './life-content-contract'
 import { parseProjectProjection, parseProjectQuote, toOrderProjection, toQuoteSnapshot, type ProjectProjection } from './project-contract'
@@ -11,10 +11,16 @@ import { parseAcceptedProjectEnvelope, ProjectApiError } from './project-envelop
 import { buildOrderCreationCommand, parseOrderCreationResult, type OrderCreationResult } from './order-creation-contract'
 import { readSessionProjection } from '../domain/session'
 import type { CatalogProjection, ContentErrorReportResult, DirectoryDetailResult, DirectorySummary, EligibilityResult, LifeContentDetailResult, LifeContentListResult, OrderProjection, OrderSummary, ProjectSessionProjection, QuoteSnapshot, RechargeSelection, RecoveryResult, SupportCase } from '../domain/types'
+import type { TemporalOverviewReadResponse } from './temporal-overview-contract'
+import { parseP014Response, P014_BACKEND_IMPLEMENTATION_SHA, storeP014OriginalWriteIdentity, type P014CreateCommand, type P014OriginalResultQuery, type P014Response } from './p014-topup-contract'
+import { p014BuiltinSynthetic } from './p014-topup-synthetic'
+import { parseP021Response, type P021Response } from './order-detail-contract'
+import { p021BuiltinSynthetic } from './order-detail-synthetic'
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
 const contentBaseUrl = (import.meta.env.VITE_CONTENT_API_BASE_URL || '/project-api/v1').replace(/\/$/, '')
 const useProjectMockApi = import.meta.env.VITE_USE_PROJECT_MOCK_API === 'true'
+const useP021BuiltinSynthetic = import.meta.env.DEV && import.meta.env.VITE_P021_DATA_MODE === 'BUILTIN_SYNTHETIC'
 const orderRecoveryExternalAuthReady = import.meta.env.VITE_ORDER_RECOVERY_EXTERNAL_AUTH_READY === 'true'
 const projectSubjectRef = import.meta.env.VITE_MOCK_PROJECT_SUBJECT_REF || 'miniapp-local-mock-subject-v1'
 
@@ -35,6 +41,26 @@ function requestAnonymousRead(path:string):Promise<unknown> {
     url:`${baseUrl}${path}`,
     method:'GET',
     success:({data:body})=>resolve(body),
+    fail:()=>reject(new ProjectApiError('NETWORK_ERROR')),
+  }))
+}
+function readCacheControlHeader(headers:unknown):string|null {
+  if(!headers||typeof headers!=='object'||Array.isArray(headers))return null
+  const entries=Object.entries(headers as Record<string,unknown>).filter(([key])=>key.toLowerCase()==='cache-control')
+  return entries.length===1&&typeof entries[0][1]==='string'?entries[0][1]:null
+}
+function requestTemporalOverviewRead():Promise<TemporalOverviewReadResponse> {
+  return new Promise((resolve,reject)=>uni.request({
+    url:`${baseUrl}/home/temporal-overview`,
+    method:'GET',
+    success:({data:body,header,statusCode})=>resolve({body,statusCode,cacheControl:readCacheControlHeader(header)}),
+    fail:()=>reject(new ProjectApiError('NETWORK_ERROR')),
+  }))
+}
+function requestTrustedSessionRead(path:string):Promise<unknown>{
+  return new Promise((resolve,reject)=>uni.request({
+    url:`${baseUrl}${path}`,method:'GET',
+    success:({data:body,statusCode})=>statusCode>=200&&statusCode<300?resolve(body):reject(new ProjectApiError('HTTP_STATUS_REJECTED')),
     fail:()=>reject(new ProjectApiError('NETWORK_ERROR')),
   }))
 }
@@ -83,12 +109,27 @@ export const api = {
   async confirmMockPayment(orderRef: string, commandId: string, idempotencyKey: string, expectedProjectionVersion: number, expectedAggregateVersion: number): Promise<ProjectProjection> {
     return projectProjection(`/orders/${encodeURIComponent(orderRef)}/mock-payment`, 'POST', { commandId, idempotencyKey, expectedProjectionVersion, expectedAggregateVersion })
   },
-  async completeMockTopup(orderRef: string, commandId: string, idempotencyKey: string, expectedProjectionVersion: number, expectedAggregateVersion: number, mnpState: 'CONFIRMED' | 'UNKNOWN'): Promise<ProjectProjection> {
-    return projectProjection(`/orders/${encodeURIComponent(orderRef)}/mock-topup`, 'POST', { commandId, idempotencyKey, expectedProjectionVersion, expectedAggregateVersion, mnpState })
+  async createP014Topup(orderRef:string,command:P014CreateCommand):Promise<P014Response>{
+    if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
+    storeP014OriginalWriteIdentity(uni,orderRef,command)
+    if(!useProjectMockApi)return p014BuiltinSynthetic.create(orderRef,command)
+    return parseP014Response(await requestBody(`/orders/${encodeURIComponent(orderRef)}/topup-intents`,'POST',command))
   },
-  async getCoreProjection(orderRef: string): Promise<ProjectProjection> {
-    if (!useProjectMockApi) throw new ProjectApiError('PROJECT_MOCK_API_DISABLED')
-    return projectProjection(`/orders/${encodeURIComponent(orderRef)}/projection`, 'GET')
+  async getP014TopupResult(orderRef:string,query:P014OriginalResultQuery):Promise<P014Response>{
+    if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
+    if(!useProjectMockApi)return p014BuiltinSynthetic.result(orderRef,query)
+    const params=`commandId=${encodeURIComponent(query.commandId)}&idempotencyKey=${encodeURIComponent(query.idempotencyKey)}&sessionVersion=${query.sessionVersion}&authorizationSetRef=${encodeURIComponent(query.authorizationSetRef)}`
+    return parseP014Response(await requestBody(`/orders/${encodeURIComponent(orderRef)}/topup-intents/result?${params}`,'GET'))
+  },
+  async getP014Progress(orderRef:string):Promise<P014Response>{
+    if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
+    if(!useProjectMockApi)return p014BuiltinSynthetic.progress(orderRef)
+    return parseP014Response(await requestBody(`/orders/${encodeURIComponent(orderRef)}/projection`,'GET'))
+  },
+  async getOrderDetail(orderRef:string):Promise<P021Response>{
+    if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
+    if(useP021BuiltinSynthetic)return p021BuiltinSynthetic.read(orderRef)
+    return parseP021Response(await requestTrustedSessionRead(`/orders/${encodeURIComponent(orderRef)}`))
   },
   async getProjection(orderRef: string): Promise<OrderProjection> {
     if (!orderRef) throw new Error('ORDER_REF_REQUIRED')
@@ -155,11 +196,13 @@ export const api = {
     return parseLifeContentDetailResponse(body,contentRef,contentVersion)
   },
   async getTemporalOverview() {
-    return !useProjectMockApi ? mockTemporalOverviewDto() : requestAnonymousRead('/home/temporal-overview')
+    return !useProjectMockApi ? mockTemporalOverviewReadResponse() : requestTemporalOverviewRead()
   },
 }
 
 export const apiRuntime = Object.freeze({ mode:useProjectMockApi ? 'PROJECT_MOCK_API' : 'BUILTIN_MOCK', baseUrl, contentBaseUrl,
+  p014BackendImplementationSha:P014_BACKEND_IMPLEMENTATION_SHA,
+  p014AllowedActionsSemantics:'CONTROLLED_METADATA_NOT_CLIENT_AUTHORIZATION',p014RealWriteEligibility:0,
   orderRecoveryProjectApiEligibility:useProjectMockApi&&orderRecoveryExternalAuthReady?1:0,
   orderRecoveryAuthBoundary:'RUNTIME_EXTERNAL_SECURE_PROXY_OR_DEVELOPER_TOOL_MANUAL_HEADER_INJECTION_REQUIRED_NO_CLIENT_SECRET',
   subjectRefSemantics:'LOCAL_MOCK_ROUTING_ONLY_NOT_TRUSTED_IDENTITY' })

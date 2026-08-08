@@ -6,7 +6,7 @@ import { samePriceSnapshot } from '../src/domain/price-snapshot.ts'
 import { isAllowedProjectionAction, isWhitelistedNavigation } from '../src/domain/actions.ts'
 import { freezeOrderSnapshot, validateOrderSnapshot } from '../src/domain/snapshot-flow.ts'
 import { parseProjectProjection, parseProjectQuote } from '../src/api/project-contract.ts'
-import { mockCatalog, mockCreatePaymentIntent, mockDirectory, mockDirectoryDetail, mockEligibility, mockLifeContentDetailDto, mockLifeContentListDto, mockOrders, mockQueryPaymentIntent, mockQuote, mockRecovery, mockRecoveryCase, mockReportDirectoryError, mockTemporalOverviewDto } from '../src/api/mock.ts'
+import { mockCatalog, mockCreatePaymentIntent, mockDirectory, mockDirectoryDetail, mockEligibility, mockLifeContentDetailDto, mockLifeContentListDto, mockOrders, mockQueryPaymentIntent, mockQuote, mockRecovery, mockRecoveryCase, mockReportDirectoryError, mockTemporalOverviewReadResponse } from '../src/api/mock.ts'
 import { buildContentErrorReport, mapContentProjectCode, parseContentErrorReportReceipt, parsePublicContentPage, parsePublicContentProjection } from '../src/api/content-contract.ts'
 import { canRetryLifeContentRead, parseLifeContentDetailResponse, parseLifeContentListResponse } from '../src/api/life-content-contract.ts'
 import { LIFE_CONTENT_COUNTER_NAMES, LIFE_CONTENT_EVIDENCE_DENOMINATOR, LIFE_CONTENT_EVIDENCE_PARAMETER_PLAN, LIFE_CONTENT_FIXED_INPUTS } from '../src/api/life-content-evidence.ts'
@@ -20,7 +20,12 @@ import { createOrderCreationNavigationLedger, executeOrderCreationAttempt } from
 import { P013_PAYMENT_SUMMARY_MISSING_FIELDS, buildP013PaymentSummary, buildPaymentIntentCommand, buildPaymentIntentQueryRequest, canCreateLocalSyntheticPaymentIntent, parsePaymentIntentQueryResult, parsePaymentIntentResult, readPaymentIntentWriteIdentity, storePaymentIntentWriteIdentity, validatePaymentIntentQueryResult, validatePaymentIntentResult } from '../src/api/payment-intent-contract.ts'
 import { buildP013AcceptedPageProjection, buildP013MissingWriteIdentityPageProjection, buildP013QueryErrorPageProjection, buildP013QueryPageProjection, buildP013RejectedPageProjection, createPaymentIntentWriteLatch, executePaymentIntentAttempt, executePaymentIntentReadOnlyQuery } from '../src/domain/payment-intent-flow.ts'
 import { executeLifeContentDetailRead } from '../src/domain/life-content-page-executor.ts'
-import { executeTemporalOverviewRead, parseTemporalOverview } from '../src/domain/temporal-overview-flow.ts'
+import { executeTemporalOverviewRead, parseTemporalOverview, parseTemporalOverviewReadResponse } from '../src/domain/temporal-overview-flow.ts'
+import { parseP014Response, P014_BACKEND_IMPLEMENTATION_SHA, readP014OriginalWriteIdentity, storeP014OriginalWriteIdentity } from '../src/api/p014-topup-contract.ts'
+import { p014BuiltinSynthetic } from '../src/api/p014-topup-synthetic.ts'
+import { parseP021Response, P021_BACKEND_IMPLEMENTATION_SHA, P021_D3_03_SHA, P021_D3_04_SHA, P021_D3_05_SHA, P021_D3_REGISTRY_SHA, P021_STATE_CODES } from '../src/api/order-detail-contract.ts'
+import { p021SyntheticResponse } from '../src/api/order-detail-synthetic.ts'
+import { createP021PageState, executeP021Read } from '../src/domain/order-detail-flow.ts'
 import {
   buildLifeContentEvidenceRunnerManifest,
   LIFE_CONTENT_EVIDENCE_OUTPUT_DIRECTORY,
@@ -69,18 +74,24 @@ assert.match(cache, /candidate\.orderRef !== orderRef/, 'candidate orderRef must
 assert.doesNotMatch(client, /getProjection\(orderRef\s*=/, 'getProjection must not have a fixed default orderRef')
 assert.match(client, /acceptNewerProjection\(orderRef, projection\)/, 'cache acceptance must be scoped by orderRef')
 assert.match(list, /orderRef=\$\{encodeURIComponent\(ref\)\}/, 'list route must carry opaque orderRef')
-assert.match(detail, /api\.getProjection\(orderRef\.value\)|api\.getCoreProjection\(orderRef\.value\)/, 'detail must query by route orderRef')
+assert.match(detail, /executeP021Read\(state,uni,api,orderRef\.value\)/, 'P021 detail must query its isolated strict API by route orderRef')
 assert.match(refund, /p\.value\?\.facts\.refund/, 'refund R must come from projection')
 assert.match(refund, /p\.value\?\.facts\.accounting/, 'refund L must come from projection')
 assert.match(refund, /p\.value\?\.facts\.delivery/, 'refund D must come from projection')
 assert.match(refund, /rConfirmed&&!lClosed/, 'R confirmed/L open message must be conditional')
 assert.match(quote, /validUntil/, 'P012 must display and validate snapshot expiry')
 assert.match(payment, /validateOrderSnapshot/, 'P013 must validate frozen projection snapshot')
-assert.match(progress, /validateOrderSnapshot/, 'P014 must validate frozen projection snapshot')
+assert.match(progress, /api\.getP014Progress\(orderRef\.value\)/, 'P014 must consume the isolated strict progress endpoint')
+assert.match(progress, /response\.outcome!==['"]ACCEPTED['"]\|\|response\.projectCode!==['"]TOPUP_PROGRESS_READ['"]/, 'P014 must fail closed before rendering a non-progress response')
+assert.match(progress, /withdraw\(\);[\s\S]*api\.getP014Progress/, 'P014 must withdraw the old projection before every read')
+assert.doesNotMatch(progress, /REQUEST_MOCK_TOPUP|completeMockTopup|mock-topup|requestPayment|prepay_id/, 'P014 must not expose the retired mock topup write or a payment SDK')
 assert.match(home, /<button class="card nav"/, 'P001 clickable cards must be buttons')
+assert.doesNotMatch(home, /from ['"]\.\.\/\.\.\/domain\/temporal-overview-flow['"]/, 'P001 must not depend on a newly emitted page-only runtime module')
+assert.match(home, /function parseTemporalOverview\(/, 'P001 strict temporal parser must stay inside the page compilation unit')
 assert.equal(manifest['mp-weixin']?.appid, 'wx91e4e752ea4a55ee', 'mp-weixin source manifest must retain the approved AppID')
-assert.equal(packageJson.scripts['build:mp-weixin'], 'node scripts/clean-mp-weixin-output.mjs && uni build -p mp-weixin && node scripts/verify-mp-weixin-output.mjs', 'mp-weixin build must clean stale output and verify the generated module closure')
+assert.equal(packageJson.scripts['build:mp-weixin'], 'node scripts/clean-mp-weixin-output.mjs && uni build -p mp-weixin && node scripts/write-mp-weixin-compat-modules.mjs && node scripts/verify-mp-weixin-output.mjs', 'mp-weixin build must clean stale output, restore retired-path compatibility, and verify the generated module closure')
 assert.ok(existsSync(resolve(process.cwd(),'scripts/clean-mp-weixin-output.mjs')), 'mp-weixin clean step must exist')
+assert.ok(existsSync(resolve(process.cwd(),'scripts/write-mp-weixin-compat-modules.mjs')), 'mp-weixin retired-path compatibility step must exist')
 assert.ok(existsSync(resolve(process.cwd(),'scripts/verify-mp-weixin-output.mjs')), 'mp-weixin module-closure verification must exist')
 for (const route of ['pages/recharge/select', 'pages/order/list', 'pages/directory/list']) {
   assert.ok(pages.pages.some((page) => page.path === route), `home target must be registered: ${route}`)
@@ -188,47 +199,10 @@ assert.throws(() => parseContentErrorReportReceipt({ supportRef:'SUPPORT-CNT-1-V
 assert.match(header, /left && hasLeftHandler/, 'left header action requires a listener')
 assert.match(header, /right && hasRightHandler/, 'right header action requires a listener')
 assert.match(header, /v-if="title"/, 'non-home header must support a page title')
-assert.match(progress, /p\.value\?\.facts\.delivery==='CONFIRMED'/, 'builtin projection must make the completed result reachable')
-assert.match(progress, /v-if="!finished" class="secondary"/, 'completed result must not keep the refresh action')
-assert.match(detail, /resultIcon=computed/, 'detail icon must follow the delivery state')
-assert.match(detail, /resultDescription=computed/, 'detail explanation must follow the delivery state')
-const between = (source, start, end) => {
-  const from = source.indexOf(start)
-  const to = source.indexOf(end, from + start.length)
-  assert.ok(from >= 0 && to > from, `missing state section: ${start}`)
-  return source.slice(from, to)
-}
-const processingTimeline = between(detail, `<view v-if="detailState==='processing'" class="timeline"`, `<view v-else-if="detailState==='completed'" class="timeline"`)
-const completedTimeline = between(detail, `<view v-else-if="detailState==='completed'" class="timeline"`, `<view v-else class="timeline" data-state="conflict"`)
-const conflictTimeline = between(detail, `<view v-else class="timeline" data-state="conflict"`, `<view class="action">`)
-const detailActions = between(detail, `<view class="action">`, `</view></view></template>`)
-const processingAction = between(detailActions, `<button v-if="detailState==='processing'"`, `<button v-else-if="detailState==='completed'"`)
-const completedAction = between(detailActions, `<button v-else-if="detailState==='completed'"`, `<button v-else class="primary"`)
-const conflictAction = between(detailActions, `<button v-else class="primary"`, `</button>`)
-assert.match(processingTimeline, /正在处理充值/, 'processing timeline must expose processing copy')
-assert.match(processingTimeline, /请勿重复充值/, 'processing timeline must expose replay warning')
-assert.match(completedTimeline, /充值已完成/, 'completed timeline must expose completed copy')
-assert.match(completedTimeline, /已确认到账/, 'completed timeline must expose confirmed delivery copy')
-assert.doesNotMatch(completedTimeline, /正在处理|请勿重复充值|刷新进度/, 'completed timeline must not expose processing or refresh copy')
-assert.match(conflictTimeline, /结果需要核对/, 'conflict timeline must expose review copy')
-assert.match(conflictTimeline, /尚不能确认充值完成/, 'conflict timeline must avoid an ordinary completion promise')
-assert.doesNotMatch(conflictTimeline, /本单流程已完成/, 'conflict timeline must not promise completion')
-assert.match(detail, /结果存在冲突，尚不能确认完成，请联系支持协助核对。/, 'conflict explanation must stay non-final')
-assert.match(processingAction, /刷新进度/, 'processing action must refresh')
-assert.match(completedAction, />完成/, 'completed action must finish without refresh')
-assert.match(conflictAction, />联系支持/, 'conflict action must route to support')
-assert.match(detail, /p&&!ready&&detailState==='processing'/, 'stale projection notice must be processing-only')
-const renderedDetail = {
-  processing: `充值处理中 我们正在确认结果，请勿重复充值。 信息已更新 请刷新后查看最新内容。 ${processingTimeline} ${processingAction}`,
-  completed: `充值已完成 充值结果已经确认。 ${completedTimeline} ${completedAction}`,
-  conflict: `需要协助 结果存在冲突，尚不能确认完成，请联系支持协助核对。 ${conflictTimeline} ${conflictAction}`,
-}
-assert.match(renderedDetail.processing, /充值处理中[\s\S]*信息已更新[\s\S]*正在处理充值[\s\S]*刷新进度/, 'processing render must contain only its prompt, timeline and action')
-assert.doesNotMatch(renderedDetail.processing, /充值已完成|结果需要核对|>完成|>联系支持/, 'processing render must exclude completed and conflict content')
-assert.match(renderedDetail.completed, /充值已完成[\s\S]*充值结果已经确认[\s\S]*已确认到账[\s\S]*>完成/, 'completed render must contain only its prompt, timeline and action')
-assert.doesNotMatch(renderedDetail.completed, /信息已更新|请刷新|正在处理|请勿重复充值|结果需要核对|刷新进度|>联系支持/, 'completed render must exclude processing and conflict content')
-assert.match(renderedDetail.conflict, /需要协助[\s\S]*尚不能确认完成[\s\S]*结果需要核对[\s\S]*>联系支持/, 'conflict render must contain only its prompt, timeline and action')
-assert.doesNotMatch(renderedDetail.conflict, /信息已更新|请刷新|正在处理充值|请勿重复充值|本单流程已完成|刷新进度|>完成/, 'conflict render must exclude processing and completed content')
+assert.match(progress, /stateCode===['"]DELIVERED['"]/, 'P014 completed copy must come from the strict projection state')
+assert.match(progress, /data-write-eligibility="0"/, 'P014 must keep real write eligibility at zero')
+for(const copy of ['等待付款','正在确认付款','已付款，等待充值','正在充值','充值结果待确认','已到账','已确认未到账','退款处理中','已退款','到账与退款核对中','客服处理中'])assert.ok(detail.includes(copy),`P021 must map the frozen public state to ordinary Chinese: ${copy}`)
+assert.match(detail,/正在读取订单详情[\s\S]*当前无法安全显示订单详情[\s\S]*暂时无法读取[\s\S]*订单信息已更新/,'P021 must expose distinct safe loading, unavailable, error and drift states')
 for(const state of ['AWAITING_PAYMENT','PAYMENT_PROCESSING','PAID_AWAITING_TOPUP','TOPUP_PROCESSING','TOPUP_RESULT_UNKNOWN','DELIVERED','CONFIRMED_NOT_DELIVERED','REFUND_PROCESSING','REFUNDED','DELIVERY_REFUND_CONFLICT_REVIEW','SUPPORT_REVIEW'])assert.match(list,new RegExp(`${state}:'`),`order list must map ${state}`)
 assert.match(mock, /stateCode:'DELIVERED'/, 'mock orders must include a delivered sample')
 assert.match(quote, /quote\.faceValue\.minor/, 'arrival amount must use the quoted face value')
@@ -794,8 +768,8 @@ assert.equal(isWhitelistedNavigation('HOME'),true,'known navigation must pass')
 assert.equal(isWhitelistedNavigation('PAY_AGAIN'),false,'business action must not enter navigation whitelist')
 assert.match(quote, /freezeOrderSnapshot\(uni,orderRef/, 'P012 must freeze snapshot using created orderRef')
 assert.match(payment, /validateOrderSnapshot\(uni,orderRef\.value/, 'P013 must use shared frozen snapshot validator')
-assert.match(progress, /validateOrderSnapshot\(uni,orderRef\.value/, 'P014 must use shared frozen snapshot validator')
-assert.match(detailPage, /validateOrderSnapshot\(uni,orderRef\.value/, 'P021 must use shared frozen snapshot validator')
+assert.match(progress, /priceSnapshotSummary\.maskedRecipientNumber/, 'P014 must render only the validated frozen snapshot summary')
+assert.match(detailPage, /executeP021Read\(state,uni,api,orderRef\.value\)/, 'P021 must use its strict frozen-summary and generation executor')
 const memory=new Map();const storage={getStorageSync:key=>memory.get(key),setStorageSync:(key,value)=>memory.set(key,value)}
 assert.equal(freezeOrderSnapshot(storage,'order-flow-1',baseline),true,'P012 flow must persist frozen snapshot')
 assert.equal(validateOrderSnapshot(storage,'order-flow-1',{...baseline}),true,'matching projection must pass page flow')
@@ -819,7 +793,7 @@ assert.doesNotMatch(mock, /^import (?!type )[^\n]*payment-intent-contract/m, 'sh
 assert.match(paymentIntentClient, /export const paymentIntentApi = \{[\s\S]*async create\([\s\S]*async query\(/, 'payment runtime adapter must stay isolated to the payment page')
 assert.doesNotMatch(payment, /navigateTo|redirectTo|switchTab|reLaunch|requestPayment|prepay_id/, 'P013 PaymentIntent creation must not navigate or invoke a payment SDK')
 assert.match(paymentIntentClient, /parsePaymentIntentQueryResult\(body\)/, 'isolated project API read-only query must consume the frozen strict eight-field DTO')
-assert.match(progress, /core\.value\.projectionVersion,core\.value\.aggregateVersion/, 'topup must use projection dual versions')
+assert.match(client, /p014AllowedActionsSemantics:['"]CONTROLLED_METADATA_NOT_CLIENT_AUTHORIZATION['"]/, 'P014 allowedActions must remain controlled metadata')
 const validQuote={quoteRef:'Q-1',maskedPhone:'01xx78',operatorCode:'OP',productCode:'P1',denominationRef:'D1',supportedOperatorSetVersion:1,catalogVersion:2,totalAmountMinor:1280,currency:'CNY',expiresAt:'2099-01-01T00:00:00Z'}
 assert.deepEqual(parseProjectQuote(validQuote),validQuote,'valid Quote DTO must parse without casting')
 assert.throws(()=>parseProjectQuote({...validQuote,totalAmountMinor:'1280'}),/INVALID_QUOTE_DTO/,'invalid Quote DTO must be rejected')
@@ -1017,8 +991,11 @@ assert.doesNotMatch(lifeContentDetail,/console\.|analytics|trackEvent|setStorage
 const lifeVisibleTemplates=[lifeContentList,lifeContentDetail].map((source)=>source.match(/<template>([\s\S]*?)<\/template>/)?.[1]||'').join('\n')
 assert.doesNotMatch(lifeVisibleTemplates,/>[^<]*(?:LOCAL_SYNTHETIC|LIFE_CONTENT_|ContentRef|ContentVersion|Evidence|Fixture|READY|STALE|UNDER_REVIEW|EXPIRED|REMOVED|UNKNOWN|ERROR)[^<]*</,'P042/P043 visible copy must not expose machine states, versions, evidence IDs or engineering terms')
 
-const readyTemporalDto=await mockTemporalOverviewDto()
-const readyTemporal=parseTemporalOverview(readyTemporalDto)
+const readyTemporalRead=await mockTemporalOverviewReadResponse()
+const readyTemporalDto=readyTemporalRead.body
+const readyTemporal=parseTemporalOverviewReadResponse(readyTemporalRead)
+assert.equal(readyTemporalRead.statusCode,200,'P001 controlled Mock must expose the successful HTTP status')
+assert.equal(readyTemporalRead.cacheControl,'private, no-cache, no-store, max-age=0','P001 controlled Mock must explicitly expose an equivalent no-store response header')
 assert.equal(Object.keys(readyTemporalDto).length,12,'P001 temporal overview must expose the strict twelve-field envelope')
 assert.deepEqual(Object.keys(readyTemporalDto.clocks).sort(),['beijing','dhaka'],'P001 temporal overview must expose exactly two fixed clocks')
 assert.deepEqual(Object.keys(readyTemporalDto.holidays).sort(),['bangladesh','china'],'P001 temporal overview must expose exactly two fixed holiday projections')
@@ -1027,6 +1004,23 @@ assert.equal(Object.keys(readyTemporalDto.holidays.china).length,11,'P001 holida
 assert.equal(readyTemporal.clocks.dhaka.localDate,readyTemporal.holidays.bangladesh.localDate,'Dhaka clock and Bangladesh holiday must share the same reference-derived local date')
 assert.equal(readyTemporal.clocks.beijing.localDate,readyTemporal.holidays.china.localDate,'Beijing clock and China holiday must share the same reference-derived local date')
 const temporalClone=(value)=>JSON.parse(JSON.stringify(value))
+const temporalRead=(body,cacheControl='no-store',statusCode=200)=>({body,statusCode,cacheControl})
+for(const allowedHeader of ['no-store','No-Cache, NO-STORE, private','must-revalidate, no-store, max-age=0, s-maxage="0"']){
+  assert.equal(parseTemporalOverviewReadResponse(temporalRead(readyTemporalDto,allowedHeader)).requestRef,readyTemporal.requestRef,`P001 must accept a valid no-store directive set: ${allowedHeader}`)
+}
+for(const [label,response] of [
+  ['missing-header',{body:readyTemporalDto,statusCode:200,cacheControl:null}],
+  ['missing-no-store',temporalRead(readyTemporalDto,'private, no-cache')],
+  ['public-conflict',temporalRead(readyTemporalDto,'no-store, public')],
+  ['immutable-conflict',temporalRead(readyTemporalDto,'no-store, immutable')],
+  ['positive-max-age',temporalRead(readyTemporalDto,'no-store, max-age=60')],
+  ['positive-s-maxage',temporalRead(readyTemporalDto,'no-store, s-maxage=1')],
+  ['invalid-max-age',temporalRead(readyTemporalDto,'no-store, max-age=invalid')],
+  ['invalid-empty-token',temporalRead(readyTemporalDto,'no-store,,private')],
+  ['wrong-http-status',temporalRead(readyTemporalDto,'no-store',500)],
+  ['body-only',readyTemporalDto],
+  ['unknown-wrapper-field',{...temporalRead(readyTemporalDto),cached:true}],
+])assert.throws(()=>parseTemporalOverviewReadResponse(response),/INVALID_TEMPORAL_HTTP_RESPONSE/,`P001 ${label} response must fail closed before body parsing`)
 assert.throws(()=>parseTemporalOverview({...readyTemporalDto,deviceTimeZone:'Asia/Tokyo'}),/INVALID_TEMPORAL_OVERVIEW_DTO/,'P001 unknown/device fields must fail closed')
 const temporalMissing=temporalClone(readyTemporalDto);delete temporalMissing.referenceInstant
 assert.throws(()=>parseTemporalOverview(temporalMissing),/INVALID_TEMPORAL_OVERVIEW_DTO/,'P001 missing reference instant must fail closed')
@@ -1069,15 +1063,30 @@ assert.equal(Object.keys(parseTemporalOverview(temporalUnknown)).length,12,'P001
 const makeTemporalState=()=>({viewState:'LOADING',overview:null,readGeneration:0,lastAuthorityState:null,lastReferenceInstant:null})
 const recoveredState=makeTemporalState()
 const degraded=temporalClone(readyTemporal);degraded.clockState='DHAKA_UNAVAILABLE';degraded.clocks.dhaka.availabilityState='UNAVAILABLE';degraded.clocks.dhaka.localDate=null;degraded.clocks.dhaka.localTime=null
-await executeTemporalOverviewRead(recoveredState,{getOverview:async()=>degraded},'FIRST_SHOW')
+let temporalQueryCall=0
+const readOnce=(body,cacheControl='no-store')=>({getOverview:async()=>{temporalQueryCall+=1;return temporalRead(body,cacheControl)}})
+await executeTemporalOverviewRead(recoveredState,readOnce(degraded),'FIRST_SHOW')
 assert.equal(recoveredState.viewState,'DHAKA_UNAVAILABLE','P001 must preserve the healthy clock when one side is unavailable')
+assert.equal(temporalQueryCall,1,'P001 first show must issue exactly one anonymous read')
 const refreshed=temporalClone(readyTemporal);refreshed.referenceInstant='2026-08-02T06:01:00Z';refreshed.generatedAt='2026-08-02T06:01:01Z'
-assert.equal((await executeTemporalOverviewRead(recoveredState,{getOverview:async()=>refreshed},'FOREGROUND_SHOW')).recoveredOnce,true,'P001 must surface RECOVERED once after a new reference instant restores both clocks')
+assert.equal((await executeTemporalOverviewRead(recoveredState,readOnce(refreshed),'FOREGROUND_SHOW')).recoveredOnce,true,'P001 must surface RECOVERED once after a new reference instant restores both clocks')
 assert.equal(recoveredState.viewState,'RECOVERED','P001 recovered transition must be observable once')
-assert.equal((await executeTemporalOverviewRead(recoveredState,{getOverview:async()=>refreshed},'FOREGROUND_SHOW')).recoveredOnce,false,'P001 must not loop RECOVERED for the same authority state/reference')
+assert.equal((await executeTemporalOverviewRead(recoveredState,readOnce(refreshed),'FOREGROUND_SHOW')).recoveredOnce,false,'P001 must not loop RECOVERED for the same authority state/reference')
 assert.equal(recoveredState.viewState,'BOTH_AVAILABLE','P001 must settle to BOTH_AVAILABLE after the one-time recovery')
+assert.equal(temporalQueryCall,3,'P001 each explicit lifecycle invocation must issue one GET without duplicate or implicit reads')
 
-assert.match(client,/requestAnonymousRead\('\/home\/temporal-overview'\)/,'P001 must consume the frozen anonymous GET path without body or query')
+const rejectedCacheState=makeTemporalState()
+rejectedCacheState.viewState='BOTH_AVAILABLE';rejectedCacheState.overview=readyTemporal;rejectedCacheState.lastAuthorityState='BOTH_AVAILABLE';rejectedCacheState.lastReferenceInstant=readyTemporal.referenceInstant
+let rejectedCacheQueryCall=0
+await executeTemporalOverviewRead(rejectedCacheState,{getOverview:async()=>{rejectedCacheQueryCall+=1;return temporalRead(readyTemporalDto,'public, max-age=60')}},'FOREGROUND_SHOW')
+assert.equal(rejectedCacheQueryCall,1,'P001 invalid cache policy must not trigger an implicit retry')
+assert.equal(rejectedCacheState.overview,null,'P001 invalid cache policy must discard the body and revoke an old current overview')
+assert.equal(rejectedCacheState.viewState,'BOTH_UNAVAILABLE','P001 invalid cache policy must use the existing safe read-failure state')
+
+assert.match(client,/requestTemporalOverviewRead\(\):Promise<TemporalOverviewReadResponse>[\s\S]*url:`\$\{baseUrl\}\/home\/temporal-overview`[\s\S]*method:'GET'/,'P001 must consume the frozen anonymous GET path without body or query')
+assert.match(client,/success:\(\{data:body,header,statusCode\}\)=>resolve\(\{body,statusCode,cacheControl:readCacheControlHeader\(header\)\}\)/,'P001 adapter must retain the HTTP status and controlled Cache-Control header beside the unparsed body')
+assert.match(client,/key\.toLowerCase\(\)==='cache-control'/,'P001 adapter must read Cache-Control header names case-insensitively')
+assert.match(mock,/mockTemporalOverviewReadResponse[\s\S]*statusCode:200,cacheControl:'private, no-cache, no-store, max-age=0'/,'P001 Mock must expose the same explicit HTTP metadata boundary')
 const temporalClient=client.slice(client.indexOf('async getTemporalOverview'),client.indexOf('\n  },',client.indexOf('async getTemporalOverview'))+5)
 assert.doesNotMatch(temporalClient,/projectSubjectRef|openid|device|timeZone|referenceInstant|header:|data:/i,'P001 read must not submit identity, device timezone or client time fields')
 assert.ok(home.indexOf('class="hero"')<home.indexOf('class="temporal-card"'),'P001 recharge hero must remain before the temporal read-only card')
@@ -1091,10 +1100,229 @@ assert.match(home,/同一基准，不使用设备时区/,'P001 must explain the 
 const temporalTemplate=home.slice(home.indexOf('<view class="temporal-card"'),home.indexOf('<view class="entries">'))
 assert.doesNotMatch(temporalTemplate,/LOCAL_SYNTHETIC|ReferenceInstant|Fixture|Evidence|Authorization|提醒我|订阅|通知/,'P001 visible temporal card must not expose engineering terms or reminder/notification actions')
 assert.doesNotMatch(temporalContract,/\b(?:const|function)\s+|export function|parseTemporalOverview/,'P001 contract module must remain type-only')
+assert.match(home,/P001_INLINE_RUNTIME_AUTHORITY/,'P001 page must declare its inline flow as the only runtime authority')
+assert.match(temporalFlow,/P001_CONTRACT_CANDIDATE_NOT_PAGE_RUNTIME/,'P001 domain flow must declare itself a non-runtime drift mirror')
+const compactTemporalRule=(source,name)=>{
+  const line=source.match(new RegExp(`const ${name}[^\\n]+`))?.[0]
+  assert.ok(line,`P001 mirrored rule must exist: ${name}`)
+  return line.replace(/\s+/g,'')
+}
+for(const ruleName of ['DEGRADED_STATES','CLOCK_STATES','HOLIDAY_STATES','RETRY_CLASSES','ROOT_KEYS','CLOCK_KEYS','HOLIDAY_KEYS']){
+  assert.equal(compactTemporalRule(home,ruleName),compactTemporalRule(temporalFlow,ruleName),`P001 inline authority and domain mirror must keep ${ruleName} in lockstep`)
+}
+const compactNoStoreGate=(source)=>source.slice(source.indexOf('function hasRequiredNoStore'),source.indexOf('function parseTemporalOverviewReadResponse')).replace(/\s+/g,'').replace(/export$/,'')
+assert.equal(compactNoStoreGate(home),compactNoStoreGate(temporalFlow),'P001 inline authority and domain mirror must keep the HTTP no-store gate in lockstep')
+for(const source of [home,temporalFlow]){
+  assert.match(source,/exactKeys\(value,\['body','statusCode','cacheControl'\]\)/,'P001 response wrapper must reject unknown HTTP/body fields')
+  assert.match(source,/value\.statusCode!==200/,'P001 response wrapper must reject unsuccessful HTTP status before parsing body')
+  assert.match(source,/generation!==state\.readGeneration/,'P001 flow must discard a late response from an older generation')
+  assert.match(source,/state\.overview=null/,'P001 flow must revoke the old overview before or after a failed read')
+}
 assert.match(temporalFlow,/exactKeys\(value,ROOT_KEYS\)/,'P001 flow must reject unknown root fields')
 assert.match(temporalFlow,/exactKeys\(value,CLOCK_KEYS\)/,'P001 flow must reject unknown clock fields')
 assert.match(temporalFlow,/exactKeys\(value,HOLIDAY_KEYS\)/,'P001 flow must reject unknown holiday fields')
 assert.match(temporalFlow,/parseClock\(value\.clocks\.dhaka,'DHAKA','Asia\/Dhaka'\)/,'P001 strict DTO must bind the server-declared Dhaka zone identifier')
 assert.match(temporalFlow,/parseClock\(value\.clocks\.beijing,'BEIJING','Asia\/Shanghai'\)/,'P001 strict DTO must bind the server-declared Beijing zone identifier')
+
+assert.equal(P014_BACKEND_IMPLEMENTATION_SHA,'46849B2856431B21FAE002B988822803606C4C60545434BD9ECE608CADEACF89','P014 must bind the unique frozen backend implementation')
+p014BuiltinSynthetic.resetForContractTest()
+const p014Initial=await p014BuiltinSynthetic.progress('ORDER-P014-SYN-001')
+assert.equal(p014Initial.projectCode,'TOPUP_PROGRESS_READ','P014 builtin adapter must expose a strict readable projection')
+assert.equal(Object.keys(p014Initial).length,8,'P014 response envelope must have exactly eight fields')
+assert.equal(Object.keys(p014Initial.currentProjection).length,15,'P014 projection must have exactly fifteen fields')
+assert.equal(Object.keys(p014Initial.currentProjection.priceSnapshotSummary).length,10,'P014 PriceSnapshot must have exactly ten fields')
+assert.equal(Object.keys(p014Initial.currentProjection.progressSummary).length,7,'P014 progress summary must have exactly seven fields')
+assert.ok(p014Initial.currentProjection.allowedActions.every(action=>Object.keys(action).length===4),'P014 each allowed action must have exactly four fields')
+const p014Command={commandId:'CMD-P014-001',idempotencyKey:'IDEM-P014-001',topupCreationPrecondition:'TOPUP_INTENT_MUST_NOT_EXIST',sessionVersion:1,authorizationSetRef:'AUTH-P014-001',expectedProjectionVersion:1,expectedAggregateVersion:1}
+const p014Created=await p014BuiltinSynthetic.create('ORDER-P014-SYN-001',p014Command)
+assert.equal(p014Created.projectCode,'TOPUP_INTENT_CREATED','P014 builtin first command must express CREATED')
+assert.equal((await p014BuiltinSynthetic.create('ORDER-P014-SYN-001',p014Command)).projectCode,'TOPUP_INTENT_REPLAYED','P014 builtin exact replay must not create another intent')
+assert.equal((await p014BuiltinSynthetic.result('ORDER-P014-SYN-001',{commandId:p014Command.commandId,idempotencyKey:p014Command.idempotencyKey,sessionVersion:1,authorizationSetRef:'AUTH-P014-001'})).projectCode,'TOPUP_INTENT_RESULT_FOUND','P014 original-key query must express RESULT_FOUND')
+const p014Unknown=parseP014Response({requestRef:'CMD-P014-UNKNOWN',outcome:'UNKNOWN',projectCode:'TOPUP_INTENT_RESULT_UNKNOWN',resourceRef:null,aggregateVersion:null,currentProjection:null,retryClass:'SAME_ACTION_QUERY_ONLY',nextPollAt:'2026-08-03T00:05:00Z'})
+assert.equal(p014Unknown.currentProjection,null,'P014 UNKNOWN must not retain a projection')
+const p014Rejected=parseP014Response({requestRef:'CMD-P014-REJECTED',outcome:'REJECTED',projectCode:'TOPUP_INTENT_RESULT_REJECTED',resourceRef:null,aggregateVersion:null,currentProjection:null,retryClass:'NONE',nextPollAt:null})
+assert.equal(p014Rejected.currentProjection,null,'P014 REJECTED must not retain a projection')
+const p014Unavailable=await p014BuiltinSynthetic.progress('ORDER-NOT-AUTHORIZED')
+assert.equal(p014Unavailable.projectCode,'TOPUP_PROGRESS_NOT_AVAILABLE','P014 unavailable projection must use the frozen not-available response')
+assert.equal(p014Unavailable.currentProjection,null,'P014 NOT_AVAILABLE must withdraw the projection')
+const p014Raw=JSON.parse(JSON.stringify(p014Created))
+const p014DecisionRows={
+  PAYMENT_CONFIRMED_READY_FOR_TOPUP:{stateCode:'PAID_AWAITING_TOPUP',responsibilityCode:'NONE',actions:['CREATE_LOCAL_SYNTHETIC_TOPUP','REFRESH_ORDER_PROJECTION','OPEN_SUPPORT','SAFE_LEAVE'],hasTopup:false,w:'CONFIRMED',u:'NOT_OBSERVED',d:'UNKNOWN',l:'NOT_OBSERVED',supportRef:null,nextReviewPoint:null},
+  PAYMENT_CONFIRMED_TOPUP_QUALIFICATION_CHECKING:{stateCode:'PAID_AWAITING_TOPUP',responsibilityCode:'SYSTEM_RECHECK',actions:['REFRESH_ORDER_PROJECTION','OPEN_SUPPORT','SAFE_LEAVE'],hasTopup:false,w:'CONFIRMED',u:'NOT_OBSERVED',d:'UNKNOWN',l:'NOT_OBSERVED',supportRef:null,nextReviewPoint:null},
+  PAYMENT_CONFIRMATION_CHECKING_NO_AUTO_TOPUP:{stateCode:'PAID_AWAITING_TOPUP',responsibilityCode:'SYSTEM_RECHECK',actions:['REFRESH_ORDER_PROJECTION','OPEN_SUPPORT','SAFE_LEAVE'],hasTopup:false,w:'UNKNOWN',u:'NOT_OBSERVED',d:'UNKNOWN',l:'NOT_OBSERVED',supportRef:null,nextReviewPoint:null},
+  TOPUP_FACT_CONFLICT_UNDER_REVIEW:{stateCode:'SUPPORT_REVIEW',responsibilityCode:'SUPPORT_REVIEW',actions:['QUERY_ORIGINAL_TOPUP','OPEN_SUPPORT','SAFE_LEAVE'],hasTopup:true,w:'CONFIRMED',u:'CONFLICT',d:'UNKNOWN',l:'NOT_OBSERVED',supportRef:'SUPPORT-P014-P2',nextReviewPoint:'2026-08-03T00:05:00Z'},
+  DELIVERY_EVIDENCE_UNDER_REVIEW:{stateCode:'SUPPORT_REVIEW',responsibilityCode:'ACCOUNTING_REVIEW',actions:['QUERY_ORIGINAL_TOPUP','OPEN_SUPPORT','SAFE_LEAVE'],hasTopup:true,w:'CONFIRMED',u:'UNKNOWN',d:'CONFIRMED',l:'NOT_OBSERVED',supportRef:'SUPPORT-P014-P3',nextReviewPoint:'2026-08-03T00:05:00Z'},
+  TOPUP_DELIVERED:{stateCode:'DELIVERED',responsibilityCode:'NONE',actions:['REFRESH_ORDER_PROJECTION','OPEN_SUPPORT','SAFE_LEAVE'],hasTopup:true,w:'CONFIRMED',u:'CONFIRMED',d:'CONFIRMED',l:'CONFIRMED',supportRef:null,nextReviewPoint:null},
+  TOPUP_RESULT_PENDING_CONFIRMATION:{stateCode:'TOPUP_RESULT_UNKNOWN',responsibilityCode:'SUPPORT_REVIEW',actions:['QUERY_ORIGINAL_TOPUP','OPEN_SUPPORT','SAFE_LEAVE'],hasTopup:true,w:'CONFIRMED',u:'UNKNOWN',d:'UNKNOWN',l:'NOT_OBSERVED',supportRef:'SUPPORT-P014-P5',nextReviewPoint:'2026-08-03T00:05:00Z'},
+  UPSTREAM_CONFIRMED_DELIVERY_ABSENT:{stateCode:'CONFIRMED_NOT_DELIVERED',responsibilityCode:'SUPPORT_REVIEW',actions:['QUERY_ORIGINAL_TOPUP','REFRESH_ORDER_PROJECTION','OPEN_SUPPORT','SAFE_LEAVE'],hasTopup:true,w:'CONFIRMED',u:'CONFIRMED',d:'ABSENT_CONFIRMED',l:'NOT_OBSERVED',supportRef:'SUPPORT-P014-P6',nextReviewPoint:'2026-08-03T00:05:00Z'},
+  TOPUP_PROCESSING_DELIVERY_UNCONFIRMED:{stateCode:'TOPUP_PROCESSING',responsibilityCode:'SYSTEM_RECHECK',actions:['QUERY_ORIGINAL_TOPUP','REFRESH_ORDER_PROJECTION','OPEN_SUPPORT','SAFE_LEAVE'],hasTopup:true,w:'CONFIRMED',u:'NOT_OBSERVED',d:'UNKNOWN',l:'NOT_OBSERVED',supportRef:null,nextReviewPoint:'2026-08-03T00:05:00Z'},
+}
+function p014DecisionResponse(messageCode,overrides={}){
+  const row={...p014DecisionRows[messageCode],...overrides}
+  const raw=structuredClone(p014Raw),projection=raw.currentProjection
+  projection.stateCode=row.stateCode
+  projection.topupIntentRef=row.hasTopup?'topup_p014_decision_001':null
+  projection.dispatchIntentRef=row.hasTopup?'dispatch_p014_decision_001':null
+  const states=[row.w,row.u,row.d,row.l]
+  projection.paymentConfirmationState=row.w;projection.upstreamDebitState=row.u;projection.deliveryState=row.d;projection.accountingClosureState=row.l
+  projection.factTimeline.forEach((fact,index)=>{fact.state=states[index]})
+  projection.progressSummary={userMessageCode:messageCode,confirmedItems:projection.factTimeline.filter(f=>f.state==='CONFIRMED'||f.state==='ABSENT_CONFIRMED').map(f=>f.factCode),
+    unknownItems:projection.factTimeline.filter(f=>f.state==='UNKNOWN'||f.state==='NOT_OBSERVED').map(f=>f.factCode),responsibilityCode:row.responsibilityCode,
+    supportRef:row.supportRef,updatedAt:'2026-08-03T06:00:00+06:00',nextReviewPoint:row.nextReviewPoint}
+  projection.allowedActions=row.actions.map((actionCode,index)=>({actionCode,enabled:true,expectedProjectionVersion:projection.projectionVersion,actionBindingVersion:`BIND-P014-DECISION-${index}`}))
+  raw.resourceRef=projection.topupIntentRef
+  raw.projectCode='TOPUP_PROGRESS_READ';raw.requestRef=null
+  return raw
+}
+for(const messageCode of Object.keys(p014DecisionRows)){
+  assert.equal(parseP014Response(p014DecisionResponse(messageCode)).currentProjection.progressSummary.userMessageCode,messageCode,`P014 ${messageCode} public facts/action decision must parse`)
+}
+for(const messageCode of ['TOPUP_FACT_CONFLICT_UNDER_REVIEW','DELIVERY_EVIDENCE_UNDER_REVIEW','TOPUP_RESULT_PENDING_CONFIRMATION','UPSTREAM_CONFIRMED_DELIVERY_ABSENT','TOPUP_PROCESSING_DELIVERY_UNCONFIRMED']){
+  assert.equal(parseP014Response(p014DecisionResponse(messageCode,{nextReviewPoint:null})).currentProjection.progressSummary.nextReviewPoint,null,`P014 ${messageCode} must accept a legitimate null next review point`)
+}
+for(const invalidNextReviewPoint of [42,'2026-8-03T00:00:00Z','2026-08-03 00:00:00Z']){
+  assert.throws(()=>parseP014Response(p014DecisionResponse('TOPUP_RESULT_PENDING_CONFIRMATION',{nextReviewPoint:invalidNextReviewPoint})),/INVALID_P014_PROGRESS_SUMMARY/,`P014 invalid next review point must fail closed: ${invalidNextReviewPoint}`)
+}
+const p014NullFactTimes=p014DecisionResponse('TOPUP_PROCESSING_DELIVERY_UNCONFIRMED')
+p014NullFactTimes.currentProjection.factTimeline[1].occurredAt=null;p014NullFactTimes.currentProjection.factTimeline[1].observedAt=null
+assert.equal(parseP014Response(p014NullFactTimes).currentProjection.factTimeline[1].observedAt,null,'P014 legitimate null fact times must remain null')
+const missingEnvelope=structuredClone(p014Raw);delete missingEnvelope.retryClass
+assert.throws(()=>parseP014Response(missingEnvelope),/INVALID_P014_RESPONSE/,'P014 missing envelope field must fail closed')
+assert.throws(()=>parseP014Response({...p014Raw,extra:true}),/INVALID_P014_RESPONSE/,'P014 additional envelope field must fail closed')
+assert.throws(()=>parseP014Response({...p014Raw,projectCode:'UNLISTED'}),/INVALID_P014_RESPONSE/,'P014 unknown project code must fail closed')
+const badProjection=structuredClone(p014Raw);badProjection.currentProjection.aggregateVersion+=1
+assert.throws(()=>parseP014Response(badProjection),/P014_AGGREGATE_VERSION_MISMATCH|P014_RESOURCE_PAYLOAD_MISMATCH/,'P014 cross-field aggregate mismatch must fail closed')
+const badAction=structuredClone(p014Raw);badAction.currentProjection.allowedActions[0].expectedProjectionVersion+=1
+assert.throws(()=>parseP014Response(badAction),/INVALID_P014_ALLOWED_ACTION/,'P014 action binding version mismatch must fail closed')
+const badPrice=structuredClone(p014Raw);delete badPrice.currentProjection.priceSnapshotSummary.currency
+assert.throws(()=>parseP014Response(badPrice),/INVALID_P014_PRICE_SNAPSHOT/,'P014 incomplete PriceSnapshot must fail closed')
+for(const invalidTime of ['2026-8-03T00:00:00Z','2026-02-30T00:00:00Z','2026-08-03 00:00:00Z','2026-08-03T24:00:00Z','2026-08-03T00:00:00+24:00']){
+  const badFact=structuredClone(p014Raw);badFact.currentProjection.factTimeline[0].observedAt=invalidTime
+  assert.throws(()=>parseP014Response(badFact),/INVALID_P014_FACT/,`P014 non-RFC3339 fact time must fail closed: ${invalidTime}`)
+}
+const badDecision=structuredClone(p014Raw);badDecision.currentProjection.progressSummary.userMessageCode='TOPUP_DELIVERED'
+assert.throws(()=>parseP014Response(badDecision),/P014_DECISION_MATRIX_MISMATCH/,'P014 cross-state decision mismatch must fail closed')
+assert.throws(()=>parseP014Response(p014DecisionResponse('TOPUP_DELIVERED',{d:'UNKNOWN'})),/P014_DECISION_MATRIX_MISMATCH/,'P014 DELIVERED without closed U/D/L facts must fail closed')
+assert.throws(()=>parseP014Response(p014DecisionResponse('UPSTREAM_CONFIRMED_DELIVERY_ABSENT',{u:'UNKNOWN'})),/P014_DECISION_MATRIX_MISMATCH/,'P014 confirmed-not-delivered without U confirmed must fail closed')
+assert.throws(()=>parseP014Response(p014DecisionResponse('TOPUP_FACT_CONFLICT_UNDER_REVIEW',{u:'UNKNOWN'})),/P014_DECISION_MATRIX_MISMATCH/,'P014 hidden duplicate-fact conflict not provable from the DTO must fail closed')
+const p014IdentityMemory=new Map(),p014IdentityStorage={getStorageSync:key=>p014IdentityMemory.get(key),setStorageSync:(key,value)=>p014IdentityMemory.set(key,value)}
+storeP014OriginalWriteIdentity(p014IdentityStorage,'ORDER-P014-SYN-001',p014Command)
+const p014BuyerSession={role:'BUYER',sessionVersion:1,authorizationSetRef:'AUTH-P014-001',authorizedOrderRefs:['ORDER-P014-SYN-001'],issuedAt:'2026-08-03T00:00:00Z',expiresAt:'2099-08-03T00:00:00Z'}
+assert.deepEqual(readP014OriginalWriteIdentity(p014IdentityStorage,'ORDER-P014-SYN-001',p014BuyerSession),{commandId:'CMD-P014-001',idempotencyKey:'IDEM-P014-001',sessionVersion:1,authorizationSetRef:'AUTH-P014-001'},'P014 original result query must reuse the frozen double keys and session binding')
+assert.equal(readP014OriginalWriteIdentity(p014IdentityStorage,'ORDER-P014-SYN-001',{...p014BuyerSession,authorizedOrderRefs:[]}),null,'P014 original query must close before GET when the order leaves the authorization set')
+assert.ok(client.includes('/topup-intents`'),'P014 client must expose the frozen create endpoint')
+assert.ok(client.includes('/topup-intents/result?${params}'),'P014 client must expose the original-key result endpoint')
+assert.ok(client.includes('/projection`'),'P014 client must expose the frozen progress endpoint')
+assert.match(client,/storeP014OriginalWriteIdentity\(uni,orderRef,command\)/,'P014 create adapter must freeze the original double keys before the write attempt')
+assert.doesNotMatch(progress,/createP014Topup|setInterval|setTimeout|onShow/,'P014 progress page must not expose a write, timer, lifecycle poll or automatic result query')
+assert.match(progress,/readP014OriginalWriteIdentity\(uni,orderRef\.value,readSessionProjection\(uni\)\)/,'P014 original-result action must use non-creating frozen identity lookup')
+assert.match(progress,/v-if="!loading && canQueryOriginal"[\s\S]*queryOriginalResult/,'P014 QUERY action must be rendered only from validated allowedActions')
+assert.match(progress,/v-if="!loading && canRefresh"[\s\S]*refresh/,'P014 refresh must be rendered only from validated allowedActions')
+assert.match(progress,/v-if="!loading && supportRef"[\s\S]*openSupport/,'P014 support navigation must require the same projection nonempty SupportRef')
+assert.match(progress,/价格显示版本[\s\S]*priceSnapshotSummary\.displayVersion[\s\S]*价格有效至[\s\S]*priceSnapshotSummary\.expiresAt/,'P014 must render the complete frozen PriceSnapshot display metadata')
+for(const label of ['收款确认','上游处理','到账结果','账务闭包','仍无法确认','当前责任','更新时间','下一复核点','权威确认尚未到账'])assert.ok(progress.includes(label),`P014 page must render ordinary Chinese fact/progress copy: ${label}`)
+
+assert.equal(P021_BACKEND_IMPLEMENTATION_SHA,'C4A8D77A5422354C546473DAF013893952349A447349B3E8CC9F89A884CF0ADE','P021 must bind the final frozen backend DTO implementation')
+assert.deepEqual([P021_D3_03_SHA,P021_D3_04_SHA,P021_D3_05_SHA,P021_D3_REGISTRY_SHA],['33CCC6BB94B2D2A95E798C7CAD44C839CC35D8B577727492C64F10776E6FDA95','B12E780F19AB333458018C908324EADA6F84E1ECD35349FB739A7DC5AE22E4DB','CC27E94902FF2BCE86E02EE553F2E03F7E7752603AD247D826E619F929856282','6321D16CAC17D426801F26F5AD643BAB418D08FF72FD299BCEA7FB20C9522A0C'],'P021 must bind the final D3 consumption rules')
+assert.equal(P021_STATE_CODES.length,11,'P021 must consume exactly the eleven frozen public states')
+for(const stateCode of P021_STATE_CODES)assert.equal(parseP021Response(p021SyntheticResponse('ORDER-P021-FE',stateCode)).currentProjection.stateCode,stateCode,`P021 ${stateCode} strict positive response must parse`)
+const p021AwaitingPayment=p021SyntheticResponse('ORDER-P021-FE','AWAITING_PAYMENT').currentProjection
+assert.deepEqual(p021AwaitingPayment.confirmedItems,[],'P021 AWAITING_PAYMENT builtin view must not claim payment confirmation')
+assert.deepEqual(p021AwaitingPayment.unknownItems,[],'P021 AWAITING_PAYMENT builtin view must remain a user-payment wait, not a confirmation result')
+const p021PaymentProcessing=p021SyntheticResponse('ORDER-P021-FE','PAYMENT_PROCESSING').currentProjection
+assert.deepEqual(p021PaymentProcessing.confirmedItems,[],'P021 PAYMENT_PROCESSING builtin view must not claim payment confirmation')
+assert.deepEqual(p021PaymentProcessing.unknownItems,['PAYMENT_CONFIRMATION'],'P021 PAYMENT_PROCESSING builtin view must render payment confirmation as pending')
+assert.match(detailPage,/v-if="projection\.confirmedItems\.length"[\s\S]*v-if="projection\.unknownItems\.length"/,'P021 view must only render confirmed and pending fact rows from the calibrated projection arrays')
+const p021Raw=structuredClone(p021SyntheticResponse('ORDER-P021-FE','TOPUP_RESULT_UNKNOWN'))
+assert.equal(Object.keys(p021Raw).length,8,'P021 response must have exactly eight fields')
+assert.equal(Object.keys(p021Raw.currentProjection).length,13,'P021 projection must have exactly thirteen fields')
+assert.equal(Object.keys(p021Raw.currentProjection.priceSnapshotSummary).length,10,'P021 PriceSnapshot must have exactly ten fields')
+assert.equal(Object.keys(p021Raw.currentProjection.timeline[0]).length,6,'P021 timeline item must have exactly six fields')
+assert.ok(p021Raw.currentProjection.allowedActions.every(action=>Object.keys(action).length===4),'P021 allowed actions must have exactly four fields')
+for(const mutate of [
+  raw=>{raw.extra=true},
+  raw=>{delete raw.currentProjection.updatedAt},
+  raw=>{raw.currentProjection.stateCode='UNLISTED'},
+  raw=>{raw.currentProjection.timeline[0].sequence=2},
+  raw=>{raw.currentProjection.timeline[0].projectionVersion=3},
+  raw=>{raw.currentProjection.timeline[0].stateCode='DELIVERED'},
+  raw=>{raw.currentProjection.allowedActions[0].actionBindingVersion=3},
+  raw=>{raw.currentProjection.allowedActions[1].supportRef='SUPPORT-OTHER'},
+  raw=>{raw.currentProjection.priceSnapshotSummary.maskedTarget='01700001234'},
+  raw=>{raw.currentProjection.updatedAt='2026-8-03 00:00:00'},
+]){
+  const invalid=structuredClone(p021Raw);mutate(invalid);assert.throws(()=>parseP021Response(invalid),/P021|INVALID/, 'P021 malformed or cross-field response must fail closed')
+}
+assert.throws(()=>parseP021Response({...p021Raw,projectCode:'ORDER_DETAIL_READ_ERROR',outcome:'ACCEPTED'}),/INVALID_P021_REJECTED_RESPONSE/,'P021 response combinations must be mutually exclusive')
+
+const p021Now=Date.parse('2026-08-03T00:00:00Z')
+const p021Session={role:'BUYER',projectSubjectRef:'SUBJECT-P021',sessionVersion:1,authorizationSetRef:'AUTHSET-P021',authorizationEvidenceVersion:'AUTH-EV-P021',authorizedOrderRefs:['ORDER-P021-FE'],issuedAt:'2026-08-02T00:00:00Z',expiresAt:'2099-08-03T00:00:00Z',semantics:'SERVER_PROJECTION_CACHE_NOT_AUTHORITY'}
+const p021Frozen={priceSnapshotRef:'PRICE-P021-SYN-1',version:'DISPLAY-V1',totalAmount:125000,currency:'BDT',phone:'******1234',operator:'SYN Operator',product:'SYN Package',targetValueDisplay:'1000 BDT',targetCurrency:'BDT',validUntil:'2099-08-03T01:00:00Z'}
+const p021Runtime=()=>{const memory=new Map([['projectSessionProjection',structuredClone(p021Session)],['priceSnapshot:ORDER-P021-FE',structuredClone(p021Frozen)]]);return{memory,storage:{getStorageSync:key=>memory.get(key),setStorageSync:(key,value)=>memory.set(key,value)}}}
+const p021ReadyRuntime=p021Runtime(),p021ReadyState=createP021PageState();let p021QueryCalls=0
+await executeP021Read(p021ReadyState,p021ReadyRuntime.storage,{getOrderDetail:async()=>{p021QueryCalls++;return p021SyntheticResponse('ORDER-P021-FE','TOPUP_RESULT_UNKNOWN',2)}},'ORDER-P021-FE',()=>p021Now)
+assert.equal(p021ReadyState.viewState,'READY');assert.equal(p021ReadyState.projection.stateCode,'TOPUP_RESULT_UNKNOWN');assert.equal(p021QueryCalls,1,'P021 user read must issue exactly one GET')
+const oldProjection=p021ReadyState.projection
+await executeP021Read(p021ReadyState,p021ReadyRuntime.storage,{getOrderDetail:async()=>{throw new Error('NETWORK')}},'ORDER-P021-FE',()=>p021Now)
+assert.equal(p021ReadyState.viewState,'READ_ERROR');assert.equal(p021ReadyState.projection,null,'P021 read error must not restore an old detail')
+assert.notEqual(oldProjection,null)
+
+const p021DriftRuntime=p021Runtime(),p021DriftState=createP021PageState();let resolveDrift
+const driftPromise=executeP021Read(p021DriftState,p021DriftRuntime.storage,{getOrderDetail:()=>new Promise(resolve=>{resolveDrift=resolve})},'ORDER-P021-FE',()=>p021Now)
+p021DriftRuntime.memory.set('projectSessionProjection',{...p021Session,authorizationSetRef:'AUTHSET-P021-CHANGED'})
+resolveDrift(p021SyntheticResponse('ORDER-P021-FE','TOPUP_PROCESSING',2));await driftPromise
+assert.equal(p021DriftState.viewState,'NOT_AVAILABLE');assert.equal(p021DriftState.projection,null,'P021 session drift must withdraw and reject the response')
+const p021SubjectDriftRuntime=p021Runtime(),p021SubjectDriftState=createP021PageState();let resolveSubjectDrift
+const subjectDriftPromise=executeP021Read(p021SubjectDriftState,p021SubjectDriftRuntime.storage,{getOrderDetail:()=>new Promise(resolve=>{resolveSubjectDrift=resolve})},'ORDER-P021-FE',()=>p021Now)
+p021SubjectDriftRuntime.memory.set('projectSessionProjection',{...p021Session,projectSubjectRef:'SUBJECT-P021-CHANGED'})
+resolveSubjectDrift(p021SyntheticResponse('ORDER-P021-FE','TOPUP_PROCESSING',2));await subjectDriftPromise
+assert.equal(p021SubjectDriftState.viewState,'NOT_AVAILABLE');assert.equal(p021SubjectDriftState.projection,null,'P021 project subject drift during GET must withdraw and reject the response')
+
+const p021RaceRuntime=p021Runtime(),p021RaceState=createP021PageState();let resolveOlder,resolveNewer
+const older=executeP021Read(p021RaceState,p021RaceRuntime.storage,{getOrderDetail:()=>new Promise(resolve=>{resolveOlder=resolve})},'ORDER-P021-FE',()=>p021Now)
+const newer=executeP021Read(p021RaceState,p021RaceRuntime.storage,{getOrderDetail:()=>new Promise(resolve=>{resolveNewer=resolve})},'ORDER-P021-FE',()=>p021Now)
+resolveNewer(p021SyntheticResponse('ORDER-P021-FE','DELIVERED',3));await newer
+resolveOlder(p021SyntheticResponse('ORDER-P021-FE','TOPUP_PROCESSING',2));await older
+assert.equal(p021RaceState.viewState,'READY');assert.equal(p021RaceState.projection.projectionVersion,3,'P021 late earlier-generation response must not overwrite the newer projection')
+await executeP021Read(p021RaceState,p021RaceRuntime.storage,{getOrderDetail:async()=>p021SyntheticResponse('ORDER-P021-FE','TOPUP_PROCESSING',2)},'ORDER-P021-FE',()=>p021Now)
+assert.equal(p021RaceState.viewState,'INFORMATION_UPDATED');assert.equal(p021RaceState.projection,null,'P021 lower version must fail closed without old detail')
+const p021SnapshotDrift=p021Runtime();p021SnapshotDrift.memory.set('priceSnapshot:ORDER-P021-FE',{...p021Frozen,totalAmount:125001})
+const p021SnapshotState=createP021PageState();await executeP021Read(p021SnapshotState,p021SnapshotDrift.storage,{getOrderDetail:async()=>p021SyntheticResponse('ORDER-P021-FE')},'ORDER-P021-FE',()=>p021Now)
+assert.equal(p021SnapshotState.viewState,'INFORMATION_UPDATED');assert.equal(p021SnapshotState.projection,null,'P021 snapshot drift must fail closed')
+for(const [field,value] of [['targetValueDisplay','DIFFERENT'],['targetCurrency','USD']]){
+  const runtime=p021Runtime();runtime.memory.set('priceSnapshot:ORDER-P021-FE',{...p021Frozen,[field]:value});const state=createP021PageState()
+  await executeP021Read(state,runtime.storage,{getOrderDetail:async()=>p021SyntheticResponse('ORDER-P021-FE')},'ORDER-P021-FE',()=>p021Now)
+  assert.equal(state.viewState,'INFORMATION_UPDATED',`P021 cached ${field} drift must fail closed`)
+}
+const p021NoCache=p021Runtime();p021NoCache.memory.delete('priceSnapshot:ORDER-P021-FE');const p021NoCacheState=createP021PageState()
+await executeP021Read(p021NoCacheState,p021NoCache.storage,{getOrderDetail:async()=>p021SyntheticResponse('ORDER-P021-FE')},'ORDER-P021-FE',()=>p021Now)
+assert.equal(p021NoCacheState.viewState,'READY','P021 authoritative ten-field server snapshot must remain consumable when optional local cache is absent')
+const p021NoSubject=p021Runtime();p021NoSubject.memory.set('projectSessionProjection',{...p021Session,projectSubjectRef:''});let noSubjectCalls=0
+await executeP021Read(createP021PageState(),p021NoSubject.storage,{getOrderDetail:async()=>{noSubjectCalls++;return p021SyntheticResponse('ORDER-P021-FE')}},'ORDER-P021-FE',()=>p021Now)
+assert.equal(noSubjectCalls,0,'P021 blank projectSubjectRef must close before GET')
+const p021Expiry=p021Runtime();p021Expiry.memory.set('projectSessionProjection',{...p021Session,expiresAt:'2026-08-03T00:00:01Z'});let clockRead=0
+const p021ExpiryState=createP021PageState();await executeP021Read(p021ExpiryState,p021Expiry.storage,{getOrderDetail:async()=>p021SyntheticResponse('ORDER-P021-FE')},'ORDER-P021-FE',()=>clockRead++===0?p021Now:p021Now+2000)
+assert.equal(p021ExpiryState.viewState,'NOT_AVAILABLE','P021 must recheck expiration at a fresh time after the response')
+const p021CanonicalRuntime=p021Runtime(),p021CanonicalState=createP021PageState();const canonicalResponse=p021SyntheticResponse('ORDER-P021-FE','DELIVERED',4)
+await executeP021Read(p021CanonicalState,p021CanonicalRuntime.storage,{getOrderDetail:async()=>canonicalResponse},'ORDER-P021-FE',()=>p021Now)
+const reordered={...canonicalResponse,currentProjection:Object.fromEntries(Object.entries(canonicalResponse.currentProjection).reverse())}
+await executeP021Read(p021CanonicalState,p021CanonicalRuntime.storage,{getOrderDetail:async()=>reordered},'ORDER-P021-FE',()=>p021Now)
+assert.equal(p021CanonicalState.viewState,'READY','P021 equivalent DTO key ordering must have the same canonical digest')
+
+assert.match(client,/requestTrustedSessionRead\(`\/orders\/\$\{encodeURIComponent\(orderRef\)\}`\)/,'P021 must use the frozen GET path without query or body')
+const p021Transport=client.slice(client.indexOf('function requestTrustedSessionRead'),client.indexOf('\n}',client.indexOf('function requestTrustedSessionRead'))+2)
+assert.match(p021Transport,/statusCode>=200&&statusCode<300\?resolve\(body\):reject/,'P021 transport must reject non-success HTTP status before DTO parsing')
+assert.doesNotMatch(p021Transport,/\bheader\s*:|method:'GET'\s*,\s*data\s*:|projectSubjectRef|authorizationSetRef|sessionVersion/,'P021 browser transport must not submit identity or authorization claims')
+assert.doesNotMatch(detailPage,/api\.getProjection|acceptNewerProjection|onShow|setInterval|setTimeout|requestPayment|createOrder|createP014Topup|confirmMockPayment/,'P021 page must not retain the old projection cache or expose automatic/write flows')
+assert.match(detailPage,/data-page-root="order-detail"[\s\S]*data-page-id="UX-P021"[\s\S]*:data-view-state="state\.viewState"/,'P021 must expose a stable visible page root and view state')
+assert.match(detailPage,/data-write-eligibility="0"/,'P021 real write eligibility must remain zero')
+assert.match(detailPage,/executeP021Read\(state,uni,api,orderRef\.value\)/,'P021 page must use the withdrawal/generation executor')
+assert.match(detailPage,/role="list" aria-label="订单事实时间线"[\s\S]*role="listitem"/,'P021 timeline must expose list semantics')
+assert.match(detailPage,/`\$\{currency\} \$\{minor\}（最小单位）`/,'P021 amount must display the integer minor unit without assuming two decimals')
+assert.doesNotMatch(detailPage,/targetValueDisplay\}\}\s*\{\{projection\.priceSnapshotSummary\.targetCurrency/,'P021 targetValueDisplay is complete display text and must not append currency')
+assert.doesNotMatch(detailPage,/replace\(\/\(\?:\\\.\\d\+\)\?\(\?:Z\|\[\+\-\]/,'P021 time display must not relabel an unconverted offset as UTC')
+const p021Template=detailPage.match(/<template>([\s\S]*?)<\/template>/)?.[1]||''
+assert.doesNotMatch(p021Template,/>[^<]*(?:AWAITING_PAYMENT|PAYMENT_PROCESSING|PAID_AWAITING_TOPUP|TOPUP_PROCESSING|TOPUP_RESULT_UNKNOWN|DELIVERED|CONFIRMED_NOT_DELIVERED|REFUND_PROCESSING|REFUNDED|DELIVERY_REFUND_CONFLICT_REVIEW|SUPPORT_REVIEW|LOCAL_SYNTHETIC|Fixture|EvidenceRef|authorizationSetRef|sessionVersion|stateCode)[^<]*</,'P021 visible text must not expose machine states, authorization fields or engineering terms')
+assert.doesNotMatch(p021Template,/发起付款|创建充值|发起退款|重新付款|重新充值/,'P021 DOM must not expose a money write action')
 
 console.log('frontend contract assertions: PASS (DEV-INT + negative cases)')

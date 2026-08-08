@@ -1,4 +1,7 @@
-import type { ClockAuthorityState, ClockViewState, HolidayState, TemporalClock, TemporalHoliday, TemporalOverview } from '../api/temporal-overview-contract'
+import type { ClockAuthorityState, ClockViewState, HolidayState, TemporalClock, TemporalHoliday, TemporalOverview, TemporalOverviewReadResponse } from '../api/temporal-overview-contract'
+
+// P001_CONTRACT_CANDIDATE_NOT_PAGE_RUNTIME: the page compilation unit is the
+// only runtime authority; this duplicate is exercised only to detect drift.
 
 export type TemporalReadTrigger='FIRST_SHOW'|'FOREGROUND_SHOW'|'USER_REFRESH'
 export interface TemporalOverviewPageState {
@@ -82,9 +85,36 @@ export function parseTemporalOverview(value:unknown):TemporalOverview {
   return {...value,clocks:{dhaka,beijing},holidays:{china,bangladesh}} as unknown as TemporalOverview
 }
 
+function hasRequiredNoStore(value:string):boolean {
+  const rawDirectives=value.split(',')
+  if(rawDirectives.length===0||rawDirectives.some((item)=>item.trim().length===0))return false
+  const directives=new Map<string,string|null>()
+  for(const raw of rawDirectives){
+    const match=/^([!#$%&'*+\-.^_`|~0-9A-Za-z]+)(?:\s*=\s*("[^"\r\n]*"|[!#$%&'*+\-.^_`|~0-9A-Za-z]+))?$/.exec(raw.trim())
+    if(!match)return false
+    const name=match[1].toLowerCase()
+    if(directives.has(name))return false
+    const directiveValue=match[2]===undefined?null:match[2].replace(/^"|"$/g,'')
+    directives.set(name,directiveValue)
+  }
+  if(directives.get('no-store')!==null||!directives.has('no-store')||directives.has('public')||directives.has('immutable'))return false
+  for(const name of ['max-age','s-maxage']){
+    if(!directives.has(name))continue
+    const directiveValue=directives.get(name)
+    if(directiveValue===null||!/^\d+$/.test(directiveValue)||Number(directiveValue)>0)return false
+  }
+  return true
+}
+
+export function parseTemporalOverviewReadResponse(value:unknown):TemporalOverview {
+  if(!isRecord(value)||!exactKeys(value,['body','statusCode','cacheControl'])||value.statusCode!==200
+    ||typeof value.cacheControl!=='string'||!hasRequiredNoStore(value.cacheControl))throw new Error('INVALID_TEMPORAL_HTTP_RESPONSE')
+  return parseTemporalOverview(value.body)
+}
+
 export async function executeTemporalOverviewRead(
   state:TemporalOverviewPageState,
-  api:{getOverview:()=>Promise<unknown>},
+  api:{getOverview:()=>Promise<TemporalOverviewReadResponse>},
   _trigger:TemporalReadTrigger,
 ):Promise<{recoveredOnce:boolean}> {
   const previousState=state.lastAuthorityState
@@ -93,7 +123,7 @@ export async function executeTemporalOverviewRead(
   state.viewState='LOADING'
   state.overview=null
   try{
-    const overview=parseTemporalOverview(await api.getOverview())
+    const overview=parseTemporalOverviewReadResponse(await api.getOverview())
     if(generation!==state.readGeneration)return{recoveredOnce:false}
     const recoveredOnce=overview.clockState==='BOTH_AVAILABLE'&&previousState!==null&&DEGRADED_STATES.includes(previousState)
       &&previousReference!==null&&overview.referenceInstant!==previousReference

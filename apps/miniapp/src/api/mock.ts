@@ -1,7 +1,7 @@
 import type { CatalogItem, CatalogProjection, ContentErrorReportCommand, ContentErrorReportResult, DirectoryDetailResult, DirectoryItem, DirectorySummary, EligibilityResult, LifeContentDetailState, LifeContentReadState, OrderProjection, OrderSummary, ProjectSessionProjection, QuoteSnapshot, RechargeSelection, RecoveryResult, SupportCase } from '../domain/types'
 import type { OrderCreationProjection } from './order-creation-contract'
 import type { PaymentIntentCommand, PaymentIntentProjection, PaymentIntentQueryRequest, PaymentIntentQueryResult, PaymentIntentResult } from './payment-intent-contract.ts'
-import type { TemporalOverview } from './temporal-overview-contract'
+import type { TemporalOverview, TemporalOverviewReadResponse } from './temporal-overview-contract'
 
 const wait = (ms = 180) => new Promise((resolve) => setTimeout(resolve, ms))
 const MOCK_PAYMENT_INTENT_CREATION_PRECONDITION = 'PAYMENT_INTENT_MUST_NOT_EXIST' as const
@@ -275,4 +275,8 @@ export async function mockTemporalOverviewDto():Promise<TemporalOverview> {
     },
     retryClass:'NONE',
   }
+}
+
+export async function mockTemporalOverviewReadResponse():Promise<TemporalOverviewReadResponse> {
+  return {body:await mockTemporalOverviewDto(),statusCode:200,cacheControl:'private, no-cache, no-store, max-age=0'}
 }

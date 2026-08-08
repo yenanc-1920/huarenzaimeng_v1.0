@@ -39,3 +39,9 @@ export interface TemporalOverview {
   holidays: { china: TemporalHoliday; bangladesh: TemporalHoliday }
   retryClass: 'NONE' | 'USER_INITIATED_READ_ONLY'
 }
+
+export interface TemporalOverviewReadResponse {
+  body: unknown
+  statusCode: number
+  cacheControl: string | null
+}
