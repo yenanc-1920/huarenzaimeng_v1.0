@@ -3,7 +3,6 @@ package com.huarenzaimeng.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
-import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +26,7 @@ class P021MyBatisStoreContractTest {
         row.put("authority_total_minor", fixture.projection().priceSnapshotSummary().totalMinor());
         row.put("authority_currency", fixture.projection().priceSnapshotSummary().currency());
         row.put("authority_masked_target", fixture.projection().priceSnapshotSummary().maskedTarget());
-        row.put("authority_valid_until", Timestamp.from(fixture.projection().priceSnapshotSummary().validUntil()));
+        row.put("authority_valid_until_epoch", fixture.projection().priceSnapshotSummary().validUntil().getEpochSecond());
         row.put("price_snapshot_digest", fixture.priceSnapshotDigest());
         row.put("authority_quote_snapshot", "{\"amountMinor\":125000,\"currency\":\"BDT\",\"denominationRef\":\"IT-DENOMINATION\",\"supportedOperatorSetVersion\":1,\"catalogVersion\":1}");
         row.put("quote_snapshot_digest", MyBatisP021Store.quoteSnapshotDigest(125000, "BDT",
@@ -46,6 +45,12 @@ class P021MyBatisStoreContractTest {
         assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
                 identity.sessionRef())).isEmpty();
         row.put("authority_total_minor", fixture.projection().priceSnapshotSummary().totalMinor());
+        row.put("authority_valid_until_epoch",
+                fixture.projection().priceSnapshotSummary().validUntil().getEpochSecond() + 1);
+        assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
+                identity.sessionRef())).isEmpty();
+        row.put("authority_valid_until_epoch",
+                fixture.projection().priceSnapshotSummary().validUntil().getEpochSecond());
         row.put("price_snapshot_digest", "0".repeat(64));
         assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
                 identity.sessionRef())).isEmpty();
@@ -74,7 +79,7 @@ class P021MyBatisStoreContractTest {
         row.put("authority_total_minor", fixture.projection().priceSnapshotSummary().totalMinor());
         row.put("authority_currency", fixture.projection().priceSnapshotSummary().currency());
         row.put("authority_masked_target", fixture.projection().priceSnapshotSummary().maskedTarget());
-        row.put("authority_valid_until", Timestamp.from(fixture.projection().priceSnapshotSummary().validUntil()));
+        row.put("authority_valid_until_epoch", fixture.projection().priceSnapshotSummary().validUntil().getEpochSecond());
         row.put("price_snapshot_digest", fixture.priceSnapshotDigest());
         row.put("quote_snapshot_digest", MyBatisP021Store.quoteSnapshotDigest(125000, "BDT", "IT-DENOMINATION", 1, 1));
         row.put("revoked", 0); row.put("authority_order_joined", 1); row.put("authority_quote_joined", 1);

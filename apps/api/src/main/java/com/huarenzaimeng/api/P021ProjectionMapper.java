@@ -17,7 +17,8 @@ interface P021ProjectionMapper {
                o.aggregate_version AS authority_aggregate_version,
                o.projection_version AS authority_projection_version,
                q.total_amount_minor AS authority_total_minor, q.total_currency AS authority_currency,
-               q.phone_masked AS authority_masked_target, q.expires_at AS authority_valid_until,
+               q.phone_masked AS authority_masked_target,
+               UNIX_TIMESTAMP(q.expires_at) AS authority_valid_until_epoch,
                CAST(q.price_snapshot AS CHAR) AS authority_quote_snapshot
           FROM hz_order_detail_projection p
           JOIN hz_order o ON o.order_ref=p.order_ref AND o.quote_ref=p.quote_ref
@@ -43,7 +44,8 @@ interface P021ProjectionMapper {
                o.aggregate_version AS authority_aggregate_version,
                o.projection_version AS authority_projection_version,
                q.total_amount_minor AS authority_total_minor, q.total_currency AS authority_currency,
-               q.phone_masked AS authority_masked_target, q.expires_at AS authority_valid_until,
+               q.phone_masked AS authority_masked_target,
+               UNIX_TIMESTAMP(q.expires_at) AS authority_valid_until_epoch,
                CAST(q.price_snapshot AS CHAR) AS authority_quote_snapshot,
                CASE WHEN o.order_ref IS NULL THEN 0 ELSE 1 END AS authority_order_joined,
                CASE WHEN q.quote_ref IS NULL THEN 0 ELSE 1 END AS authority_quote_joined

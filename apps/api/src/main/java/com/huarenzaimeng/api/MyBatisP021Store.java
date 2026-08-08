@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.sql.Timestamp;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -44,7 +43,7 @@ class MyBatisP021Store implements P021Store {
                     || ((Number) row.get("authority_total_minor")).longValue() != price.totalMinor()
                     || !String.valueOf(row.get("authority_currency")).equals(price.currency())
                     || !String.valueOf(row.get("authority_masked_target")).equals(price.maskedTarget())
-                    || !((Timestamp) row.get("authority_valid_until")).toInstant().equals(price.validUntil())
+                    || !numberEquals(row.get("authority_valid_until_epoch"), price.validUntil().getEpochSecond())
                     || !String.valueOf(row.get("price_snapshot_digest"))
                             .equals(P021OrderDetailService.snapshotDigest(price))
                     || !String.valueOf(row.get("quote_snapshot_digest")).equals(authorityQuoteDigest)
@@ -96,8 +95,8 @@ class MyBatisP021Store implements P021Store {
             boolean totalMinor = price != null && numberEquals(row.get("authority_total_minor"), price.totalMinor());
             boolean currency = price != null && String.valueOf(row.get("authority_currency")).equals(price.currency());
             boolean maskedTarget = price != null && String.valueOf(row.get("authority_masked_target")).equals(price.maskedTarget());
-            boolean validUntil = price != null && row.get("authority_valid_until") instanceof Timestamp timestamp
-                    && timestamp.toInstant().equals(price.validUntil());
+            boolean validUntil = price != null
+                    && numberEquals(row.get("authority_valid_until_epoch"), price.validUntil().getEpochSecond());
             boolean priceDigest = price != null && String.valueOf(row.get("price_snapshot_digest"))
                     .equals(P021OrderDetailService.snapshotDigest(price));
             boolean quoteDigestMatched = String.valueOf(row.get("quote_snapshot_digest")).equals(quoteDigest);
