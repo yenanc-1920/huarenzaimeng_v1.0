@@ -16,6 +16,7 @@ $script:Database = 'huarenzaimeng_it_vnext'
 $script:OrderRefs = @('IT-P021-AWAITING','IT-P021-PAYMENT','IT-P021-TOPUP','IT-P021-UNKNOWN','IT-P021-DELIVERED','IT-P021-REFUNDED','IT-P021-REVOKED')
 $script:EvidenceRoot = Join-Path $script:EntryScriptRoot '..\..\项目管理\正式交付\D4-开发计划与工程准备\证据\P021-IT'
 $script:PageCollector = Join-Path $script:EntryScriptRoot '..\miniapp\scripts\collect-p021-it-page-actual.ps1'
+$script:PageCollectorHost = Join-Path $script:EntryScriptRoot '..\miniapp\scripts\collect-p021-it-page-actual-host.cmd'
 $script:PageCollectorNode = Join-Path $script:EntryScriptRoot '..\miniapp\scripts\collect-p021-it-page-actual.mjs'
 $script:DiagnosticController = Join-Path $script:EntryScriptRoot 'src\main\java\com\huarenzaimeng\api\P021TestReadonlyDiagnosticController.java'
 $script:FixtureFile = Join-Path $script:EntryScriptRoot 'src\test\resources\db\fixture\VnextP021OrderDetailCloudBaseConsoleFixture.sql'
@@ -33,13 +34,14 @@ function ConvertFrom-SecureStringPlain([Security.SecureString]$Value) {
 
 function Assert-Authorization($auth) {
     $required = @('RunId','Scope','BaseUrl','Database','ValidFrom','ValidUntil','SingleUse','AutomaticRetryAllowed',
-        'WrapperSha256','PageCollectorSha256','PageCollectorNodeSha256','PageCollectorAggregateSha256','DiagnosticControllerSha256','FixtureSha256','V7Sha256','ManifestSha256','ServiceVersion','DatabaseInstanceIdentity','BrowserExecutable','BrowserSha256')
+        'WrapperSha256','PageCollectorSha256','PageCollectorHostSha256','PageCollectorNodeSha256','PageCollectorAggregateSha256','DiagnosticControllerSha256','FixtureSha256','V7Sha256','ManifestSha256','ServiceVersion','DatabaseInstanceIdentity','BrowserExecutable','BrowserSha256')
     foreach ($key in $required) { if ($null -eq $auth.$key) { throw "AUTHORIZATION_MISSING_$key" } }
     if ($auth.RunId -notmatch '^P021-IT-20260808-FINAL-[0-9]{3}$') { throw 'RUN_ID_INVALID' }
     if ($auth.Scope -cne $script:Scope -or $auth.BaseUrl -cne $script:BaseUrl -or $auth.Database -cne $script:Database) { throw 'AUTHORIZATION_SCOPE_MISMATCH' }
     if ($auth.SingleUse -ne $true -or $auth.AutomaticRetryAllowed -ne $false) { throw 'AUTHORIZATION_RETRY_POLICY_INVALID' }
     if ($auth.WrapperSha256 -cne (Get-Sha256Hex $script:EntryScriptPath) -or
         $auth.PageCollectorSha256 -cne (Get-Sha256Hex $script:PageCollector) -or
+        $auth.PageCollectorHostSha256 -cne (Get-Sha256Hex $script:PageCollectorHost) -or
         $auth.PageCollectorNodeSha256 -cne (Get-Sha256Hex $script:PageCollectorNode) -or
         $auth.PageCollectorAggregateSha256 -cne '50A157DBDEBC61EB4FA682F865E0E2799BFE1D65A7A5BA3015DB5277AA2B5281' -or
         $auth.DiagnosticControllerSha256 -cne (Get-Sha256Hex $script:DiagnosticController) -or
@@ -133,8 +135,11 @@ function Invoke-It03Rollback([string]$Buyer) {
 function Invoke-PageCollector($auth,[string]$ScenarioId,[string]$SubcaseId,[string]$PageKind,[string]$Role,[string]$OrderRef,[string]$ExpectedViewState,[string]$DelayPlan,[string]$Token) {
     $output=Join-Path $stagingRoot ("page\$ScenarioId\$SubcaseId")
     [IO.Directory]::CreateDirectory($output)|Out-Null
-    $args=@('-NoLogo','-NoProfile','-NonInteractive','-File',$script:PageCollector,'-ScenarioId',$ScenarioId,'-SubcaseId',$SubcaseId,'-PageKind',$PageKind,'-Role',$Role,'-BaseUrl',$script:BaseUrl,'-OrderRef',$OrderRef,'-ExpectedViewState',$ExpectedViewState,'-OutputDirectory',$output,'-BrowserExecutable',$auth.BrowserExecutable,'-BrowserSha256',$auth.BrowserSha256,'-ViewportWidth',$(if($PageKind -eq 'MINIAPP_P021'){'375'}else{'1280'}),'-ViewportHeight',$(if($PageKind -eq 'MINIAPP_P021'){'812'}else{'790'}),'-DelayPlan',$DelayPlan)
-    $psi=[Diagnostics.ProcessStartInfo]::new();$psi.FileName='powershell.exe';$psi.Arguments=($args|ForEach-Object{'"'+($_ -replace '"','\"')+'"'}) -join ' '
+    $pageParams=[ordered]@{ScenarioId=$ScenarioId;SubcaseId=$SubcaseId;PageKind=$PageKind;Role=$Role;BaseUrl=$script:BaseUrl;OrderRef=$OrderRef;ExpectedViewState=$ExpectedViewState;OutputDirectory=$output;BrowserExecutable=$auth.BrowserExecutable;BrowserSha256=$auth.BrowserSha256;ViewportWidth=$(if($PageKind -eq 'MINIAPP_P021'){375}else{1280});ViewportHeight=$(if($PageKind -eq 'MINIAPP_P021'){812}else{790});DelayPlan=$DelayPlan}
+    $psi=[Diagnostics.ProcessStartInfo]::new();$psi.FileName=$script:PageCollectorHost
+    $psi.EnvironmentVariables['P021_PAGE_COLLECTOR']=$script:PageCollector
+    $psi.EnvironmentVariables['P021_PAGE_COLLECTOR_ROOT']=(Split-Path -Parent $script:PageCollector)
+    $psi.EnvironmentVariables['P021_PAGE_PARAMS']=($pageParams|ConvertTo-Json -Compress)
     $psi.UseShellExecute=$false;$psi.RedirectStandardInput=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true;$psi.CreateNoWindow=$true
     $p=[Diagnostics.Process]::new();$p.StartInfo=$psi;[void]$p.Start();$p.StandardInput.WriteLine(([ordered]@{BUYER=$(if($Role -eq 'BUYER'){$Token}else{$null});CS=$(if($Role -eq 'CS'){$Token}else{$null});FIN=$(if($Role -eq 'FIN'){$Token}else{$null})}|ConvertTo-Json -Compress));$p.StandardInput.Close()
     $out=$p.StandardOutput.ReadToEnd();$err=$p.StandardError.ReadToEnd();$p.WaitForExit()

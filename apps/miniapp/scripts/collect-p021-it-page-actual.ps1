@@ -17,7 +17,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $node=(Get-Command node.exe -ErrorAction Stop).Source
-$entry=Join-Path $PSScriptRoot 'collect-p021-it-page-actual.mjs'
+$entryRoot=if([string]::IsNullOrWhiteSpace($PSScriptRoot)){$env:P021_PAGE_COLLECTOR_ROOT}else{$PSScriptRoot}
+if([string]::IsNullOrWhiteSpace($entryRoot)){throw 'PAGE_COLLECTOR_ROOT_UNAVAILABLE'}
+$entry=Join-Path $entryRoot 'collect-p021-it-page-actual.mjs'
 $arguments=@($entry,'--scenario-id',$ScenarioId,'--subcase-id',$SubcaseId,'--page-kind',$PageKind,'--role',$Role,'--base-url',$BaseUrl,'--order-ref',$OrderRef,'--expected-view-state',$ExpectedViewState,'--output-directory',$OutputDirectory,'--browser-executable',$BrowserExecutable,'--browser-sha256',$BrowserSha256,'--viewport-width',[string]$ViewportWidth,'--viewport-height',[string]$ViewportHeight,'--delay-plan',$DelayPlan)
 & $node @arguments
 exit $LASTEXITCODE
