@@ -1,0 +1,21 @@
+import { readFile } from 'node:fs/promises'
+
+const read=path=>readFile(new URL(path,import.meta.url),'utf8')
+const collector=await read('./collect-p021-it-page-actual.mjs')
+const wrapper=await read('./collect-p021-it-page-actual.ps1')
+const page=await read('../src/pages/order/detail.vue')
+const fixture=await read('../src/dev/p021-it-fixtures.ts')
+const admin=await read('../../admin-web/src/App.vue')
+const adminPage=await read('../../admin-web/src/components/P021AdminOrderDetail.vue')
+const must=(condition,message)=>{if(!condition)throw new Error(message)}
+for(const token of ['PROJECTION_LOW_VERSION','ORDER_VERSION_CONFLICT','QUOTE_DIGEST_CONFLICT','LATE_LOWER_VERSION_AFTER_READY'])must(fixture.includes(token),`FIXTURE_PLAN_MISSING:${token}`)
+for(const token of ['executeP021Read','prepareP021ItRealSession','data-it-completed','data-it-old-content-restored'])must(fixture.includes(token)||page.includes(token),`REAL_PAGE_CHAIN_MISSING:${token}`)
+for(const token of ['P021AdminOrderDetail','p021ItOrderRef','p021ItRole'])must(admin.includes(token),`ADMIN_DEV_ENTRY_MISSING:${token}`)
+for(const token of ['data-visible-field-keys','data-read-state','data-detail-count'])must(adminPage.includes(token),`ADMIN_DOM_CONTRACT_MISSING:${token}`)
+for(const token of ['IT01','IT02','--user-data-dir=','Network.requestWillBeSent','Page.captureScreenshot','Runtime.evaluate','BrowserSha','ForbiddenFindings','ForbiddenFieldFindings','ForbiddenIdentityHeaderFindings','AllowedHosts','BrowserNetwork','ProxyNetwork','BrowserRequestHeaderNames','QueryCount','ProjectionVersion','WriteActionCount'])must(collector.includes(token),`COLLECTOR_GATE_MISSING:${token}`)
+must(collector.includes("p021ItRole=${role}")&&!collector.includes("role==='CONTENT'?'FIN'"),'CONTENT_ROLE_MUST_NOT_MAP_TO_FIN')
+must(collector.includes("scenarioId!=='IT04'||(dom.viewState==='READY'&&dom.projectionVersion>=4)"),'IT04_FINAL_VERSION_GATE_MISSING')
+must(!collector.includes('Authorization:')&&!collector.includes('Bearer '),'SECRET_HEADER_LITERAL_FORBIDDEN')
+must(wrapper.includes('Set-StrictMode -Version Latest')&&wrapper.includes("Get-Command node.exe")&&wrapper.includes('exit $LASTEXITCODE'),'POWERSHELL51_INTERFACE_INCOMPLETE')
+must(!wrapper.includes('Invoke-Expression')&&!wrapper.includes('ExecutionPolicy'),'POWERSHELL_POLICY_BYPASS_FORBIDDEN')
+console.log('P021 IT page collector offline assertions: PASS')

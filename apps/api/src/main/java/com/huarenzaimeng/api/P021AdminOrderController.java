@@ -29,17 +29,19 @@ final class P021AdminOrderController {
 
     private final P021Store store;
     private final P021OrderDetailService validator;
+    private final P021OrderDetailSideEffectProbe probe;
     private final String subjectRef;
     private final String sessionRef;
     private final SessionSnapshot trustedSession;
     P021AdminOrderController(P021Store store, P021OrderDetailService validator,
+                             P021OrderDetailSideEffectProbe probe,
                              @Value("${hz.it-session.buyer-subject-ref:}") String subjectRef,
                              @Value("${hz.it-session.buyer-session-ref:}") String sessionRef,
                              @Value("${hz.it-session.buyer-session-version:0}") long sessionVersion,
                              @Value("${hz.it-session.buyer-authorization-set-ref:}") String authorizationSetRef,
                              @Value("${hz.it-session.buyer-authorization-evidence-version:}") String evidenceVersion,
                              @Value("${hz.it-session.buyer-authorized-order-refs:}") String authorizedOrderRefs) {
-        this.store = store; this.validator = validator; this.subjectRef = subjectRef; this.sessionRef = sessionRef;
+        this.store = store; this.validator = validator; this.probe = probe; this.subjectRef = subjectRef; this.sessionRef = sessionRef;
         this.trustedSession = new SessionSnapshot(subjectRef, sessionRef, sessionVersion, authorizationSetRef,
                 evidenceVersion, authorizedOrderRefs.isBlank() ? List.of()
                 : java.util.Arrays.stream(authorizedOrderRefs.split(",", -1)).map(String::trim).toList());
@@ -50,6 +52,7 @@ final class P021AdminOrderController {
         if (request.getContentLengthLong() > 0 || !request.getParameterMap().isEmpty()) return unavailable();
         String role = attribute(request, TrustedTestSessionCookieFilter.TRUSTED_ADMIN_ROLE);
         if (!"CS".equals(role) && !"FIN".equals(role)) return unavailable();
+        probe.observeQuery();
         Fixture fixture = store.findAuthorized(orderRef, trustedSession).orElse(null);
         if (fixture == null || !validator.isStrictStoredFixture(fixture, orderRef)) return unavailable();
         Projection p = fixture.projection();
