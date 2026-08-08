@@ -1,4 +1,20 @@
 {
-  "pages": [{"path":"pages/index/index","style":{"navigationBarTitleText":"华人在孟"}}],
-  "globalStyle": {"navigationBarBackgroundColor":"#E84B2C","navigationBarTextStyle":"white","backgroundColor":"#FFF7F1"}
+  "pages": [
+    {"path":"pages/index/index","style":{"navigationStyle":"custom"}},
+    {"path":"pages/recharge/select","style":{"navigationStyle":"custom"}},
+    {"path":"pages/recharge/quote","style":{"navigationStyle":"custom"}},
+    {"path":"pages/order/progress","style":{"navigationStyle":"custom"}},
+    {"path":"pages/order/detail","style":{"navigationStyle":"custom"}},
+    {"path":"pages/payment/status","style":{"navigationStyle":"custom"}},
+    {"path":"pages/refund/status","style":{"navigationStyle":"custom"}},
+    {"path":"pages/order/list","style":{"navigationStyle":"custom"}},
+    {"path":"pages/auth/expired","style":{"navigationStyle":"custom"}},
+    {"path":"pages/order/recovery","style":{"navigationStyle":"custom"}},
+    {"path":"pages/support/case","style":{"navigationStyle":"custom"}},
+    {"path":"pages/directory/list","style":{"navigationStyle":"custom"}},
+    {"path":"pages/directory/detail","style":{"navigationStyle":"custom"}},
+    {"path":"pages/life-content/list","style":{"navigationStyle":"custom"}},
+    {"path":"pages/life-content/detail","style":{"navigationStyle":"custom"}}
+  ],
+  "globalStyle": {"navigationBarBackgroundColor":"#2457A6","navigationBarTextStyle":"white","backgroundColor":"#F3F6FA"}
 }
