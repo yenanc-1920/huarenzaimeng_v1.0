@@ -56,6 +56,15 @@ class P021TestReadonlyIntegrationContractTest {
                 .andExpect(jsonPath("$.projectCode").value("ORDER_DETAIL_NOT_AVAILABLE"));
     }
 
+    @Test void duplicateBuyerCookiesFailClosed() throws Exception {
+        mvc.perform(get("/api/v1/orders/{orderRef}", P021OrderDetailFixtureLoader.ORDER_REF)
+                        .cookie(new Cookie("HZM_IT_SESSION", "buyer-cookie"),
+                                new Cookie("HZM_IT_SESSION", "buyer-cookie")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectCode").value("ORDER_DETAIL_NOT_AVAILABLE"))
+                .andExpect(jsonPath("$.currentProjection").doesNotExist());
+    }
+
     @Test void adminCsAndFinReceiveMutuallyExclusiveReadOnlyFields() throws Exception {
         mvc.perform(get("/admin-read/v1/orders/{orderRef}", P021OrderDetailFixtureLoader.ORDER_REF)
                         .cookie(new Cookie("HZM_IT_SESSION", "cs-cookie")))
