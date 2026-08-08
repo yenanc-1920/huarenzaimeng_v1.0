@@ -38,6 +38,13 @@ interface P021ProjectionMapper {
         SELECT p.project_subject_ref, p.session_ref, p.session_version,
                p.authorization_set_ref, p.authorization_evidence_version,
                CAST(p.authorized_order_refs AS CHAR) AS authorized_order_refs, p.revoked,
+               p.price_snapshot_digest, p.quote_snapshot_digest,
+               CAST(p.projection_json AS CHAR) AS projection_json,
+               o.aggregate_version AS authority_aggregate_version,
+               o.projection_version AS authority_projection_version,
+               q.total_amount_minor AS authority_total_minor, q.total_currency AS authority_currency,
+               q.phone_masked AS authority_masked_target, q.expires_at AS authority_valid_until,
+               CAST(q.price_snapshot AS CHAR) AS authority_quote_snapshot,
                CASE WHEN o.order_ref IS NULL THEN 0 ELSE 1 END AS authority_order_joined,
                CASE WHEN q.quote_ref IS NULL THEN 0 ELSE 1 END AS authority_quote_joined
           FROM hz_order_detail_projection p

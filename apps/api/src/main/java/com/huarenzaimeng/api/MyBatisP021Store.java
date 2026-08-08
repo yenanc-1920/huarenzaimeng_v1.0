@@ -82,13 +82,35 @@ class MyBatisP021Store implements P021Store {
             boolean evidence = session != null && String.valueOf(row.get("authorization_evidence_version"))
                     .equals(session.authorizationEvidenceVersion());
             boolean refsEqual = session != null && refs.equals(session.authorizedOrderRefs());
+            Projection projection = json.readValue(String.valueOf(row.get("projection_json")), Projection.class);
+            var quoteSnapshot = json.readTree(String.valueOf(row.get("authority_quote_snapshot")));
+            boolean quoteShape = quoteSnapshot.isObject() && keys(quoteSnapshot).equals(Set.of("amountMinor",
+                    "currency", "denominationRef", "supportedOperatorSetVersion", "catalogVersion"));
+            String quoteDigest = quoteShape ? quoteSnapshotDigest(quoteSnapshot.path("amountMinor").longValue(),
+                    quoteSnapshot.path("currency").textValue(), quoteSnapshot.path("denominationRef").textValue(),
+                    quoteSnapshot.path("supportedOperatorSetVersion").longValue(),
+                    quoteSnapshot.path("catalogVersion").longValue()) : "INVALID";
+            PriceSnapshotSummary price = projection.priceSnapshotSummary();
+            boolean aggregateVersion = numberEquals(row.get("authority_aggregate_version"), projection.aggregateVersion());
+            boolean projectionVersion = numberEquals(row.get("authority_projection_version"), projection.projectionVersion());
+            boolean totalMinor = price != null && numberEquals(row.get("authority_total_minor"), price.totalMinor());
+            boolean currency = price != null && String.valueOf(row.get("authority_currency")).equals(price.currency());
+            boolean maskedTarget = price != null && String.valueOf(row.get("authority_masked_target")).equals(price.maskedTarget());
+            boolean validUntil = price != null && row.get("authority_valid_until") instanceof Timestamp timestamp
+                    && timestamp.toInstant().equals(price.validUntil());
+            boolean priceDigest = price != null && String.valueOf(row.get("price_snapshot_digest"))
+                    .equals(P021OrderDetailService.snapshotDigest(price));
+            boolean quoteDigestMatched = String.valueOf(row.get("quote_snapshot_digest")).equals(quoteDigest);
             return new QualificationDiagnostic(true, numberIsOne(row.get("authority_order_joined")),
                     numberIsOne(row.get("authority_quote_joined")), subject, sessionRef, sessionVersion, setRef,
-                    evidence, refs.contains(orderRef), refsEqual, !numberIsOne(row.get("revoked")), true);
+                    evidence, refs.contains(orderRef), refsEqual, !numberIsOne(row.get("revoked")), true,
+                    true, quoteShape, aggregateVersion, projectionVersion, totalMinor, currency, maskedTarget,
+                    validUntil, priceDigest, quoteDigestMatched);
         } catch (RuntimeException | java.io.IOException error) {
             return new QualificationDiagnostic(true, numberIsOne(row.get("authority_order_joined")),
                     numberIsOne(row.get("authority_quote_joined")), false, false, false, false, false,
-                    false, false, !numberIsOne(row.get("revoked")), false);
+                    false, false, !numberIsOne(row.get("revoked")), false, false, false, false, false,
+                    false, false, false, false, false, false);
         }
     }
 
@@ -96,22 +118,35 @@ class MyBatisP021Store implements P021Store {
         return value instanceof Number number && number.longValue() == 1L;
     }
 
+    private static boolean numberEquals(Object value, long expected) {
+        return value instanceof Number number && number.longValue() == expected;
+    }
+
     record QualificationDiagnostic(boolean projectionRowExists, boolean authorityOrderJoined,
                                    boolean authorityQuoteJoined, boolean subjectMatched,
                                    boolean sessionRefMatched, boolean sessionVersionMatched,
                                    boolean authorizationSetMatched, boolean authorizationEvidenceMatched,
                                    boolean orderIncludedInStoredAuthorization, boolean authorizedOrderRefsExactlyMatched,
-                                   boolean notRevoked, boolean storedAuthorizationReadable) {
+                                   boolean notRevoked, boolean storedAuthorizationReadable,
+                                   boolean projectionJsonParsed, boolean quoteSnapshotShapeMatched,
+                                   boolean aggregateVersionMatched, boolean projectionVersionMatched,
+                                   boolean totalMinorMatched, boolean currencyMatched, boolean maskedTargetMatched,
+                                   boolean validUntilMatched, boolean priceSnapshotDigestMatched,
+                                   boolean quoteSnapshotDigestMatched) {
         static QualificationDiagnostic missing() {
             return new QualificationDiagnostic(false, false, false, false, false, false, false, false,
-                    false, false, false, false);
+                    false, false, false, false, false, false, false, false, false, false, false, false,
+                    false, false);
         }
 
         boolean eligible() {
             return projectionRowExists && authorityOrderJoined && authorityQuoteJoined && subjectMatched
                     && sessionRefMatched && sessionVersionMatched && authorizationSetMatched
                     && authorizationEvidenceMatched && orderIncludedInStoredAuthorization
-                    && authorizedOrderRefsExactlyMatched && notRevoked && storedAuthorizationReadable;
+                    && authorizedOrderRefsExactlyMatched && notRevoked && storedAuthorizationReadable
+                    && projectionJsonParsed && quoteSnapshotShapeMatched && aggregateVersionMatched
+                    && projectionVersionMatched && totalMinorMatched && currencyMatched && maskedTargetMatched
+                    && validUntilMatched && priceSnapshotDigestMatched && quoteSnapshotDigestMatched;
         }
     }
 

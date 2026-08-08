@@ -65,6 +65,18 @@ class P021MyBatisStoreContractTest {
         row.put("authorization_set_ref", "IT-AUTHSET-P021");
         row.put("authorization_evidence_version", "IT-AUTH-EVIDENCE-P021-V1");
         row.put("authorized_order_refs", json.writeValueAsString(List.of("IT-P021-AWAITING")));
+        LocalSyntheticIdentity identity = LocalSyntheticIdentity.fromToken("diagnostic");
+        var fixture = P021OrderDetailFixtureLoader.fixture(identity, UserOrderStateCode.AWAITING_PAYMENT,
+                1, 1, null, List.of(), List.of());
+        row.put("projection_json", json.writeValueAsString(fixture.projection()));
+        row.put("authority_quote_snapshot", "{\"amountMinor\":125000,\"currency\":\"BDT\",\"denominationRef\":\"IT-DENOMINATION\",\"supportedOperatorSetVersion\":1,\"catalogVersion\":1}");
+        row.put("authority_aggregate_version", 1L); row.put("authority_projection_version", 1L);
+        row.put("authority_total_minor", fixture.projection().priceSnapshotSummary().totalMinor());
+        row.put("authority_currency", fixture.projection().priceSnapshotSummary().currency());
+        row.put("authority_masked_target", fixture.projection().priceSnapshotSummary().maskedTarget());
+        row.put("authority_valid_until", Timestamp.from(fixture.projection().priceSnapshotSummary().validUntil()));
+        row.put("price_snapshot_digest", fixture.priceSnapshotDigest());
+        row.put("quote_snapshot_digest", MyBatisP021Store.quoteSnapshotDigest(125000, "BDT", "IT-DENOMINATION", 1, 1));
         row.put("revoked", 0); row.put("authority_order_joined", 1); row.put("authority_quote_joined", 1);
         when(mapper.selectQualificationDiagnostic("IT-P021-AWAITING")).thenReturn(row);
         MyBatisP021Store store = new MyBatisP021Store(mapper, json);
