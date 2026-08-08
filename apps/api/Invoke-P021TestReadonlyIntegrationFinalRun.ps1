@@ -6,18 +6,21 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$script:EntryScriptPath = if ([string]::IsNullOrWhiteSpace($PSCommandPath)) { $env:P021_IT_WRAPPER } else { $PSCommandPath }
+if ([string]::IsNullOrWhiteSpace($script:EntryScriptPath)) { throw 'ENTRY_SCRIPT_PATH_UNAVAILABLE' }
+$script:EntryScriptRoot = Split-Path -Parent $script:EntryScriptPath
 
 $script:Scope = 'P021_TEST_READONLY_INTEGRATION_7_SCENARIO'
 $script:BaseUrl = 'https://huaren-api-it-284852-10-1456291159.sh.run.tcloudbase.com'
 $script:Database = 'huarenzaimeng_it_vnext'
 $script:OrderRefs = @('IT-P021-AWAITING','IT-P021-PAYMENT','IT-P021-TOPUP','IT-P021-UNKNOWN','IT-P021-DELIVERED','IT-P021-REFUNDED','IT-P021-REVOKED')
-$script:EvidenceRoot = Join-Path $PSScriptRoot '..\..\项目管理\正式交付\D4-开发计划与工程准备\证据\P021-IT'
-$script:PageCollector = Join-Path $PSScriptRoot '..\miniapp\scripts\collect-p021-it-page-actual.ps1'
-$script:PageCollectorNode = Join-Path $PSScriptRoot '..\miniapp\scripts\collect-p021-it-page-actual.mjs'
-$script:DiagnosticController = Join-Path $PSScriptRoot 'src\main\java\com\huarenzaimeng\api\P021TestReadonlyDiagnosticController.java'
-$script:FixtureFile = Join-Path $PSScriptRoot 'src\test\resources\db\fixture\VnextP021OrderDetailCloudBaseConsoleFixture.sql'
-$script:V7File = Join-Path $PSScriptRoot 'src\main\resources\db\migration\V7__add_order_detail_read_projection.sql'
-$script:ManifestFile = Join-Path $PSScriptRoot 'manifests\P021-IT最终执行准备固定清单.txt'
+$script:EvidenceRoot = Join-Path $script:EntryScriptRoot '..\..\项目管理\正式交付\D4-开发计划与工程准备\证据\P021-IT'
+$script:PageCollector = Join-Path $script:EntryScriptRoot '..\miniapp\scripts\collect-p021-it-page-actual.ps1'
+$script:PageCollectorNode = Join-Path $script:EntryScriptRoot '..\miniapp\scripts\collect-p021-it-page-actual.mjs'
+$script:DiagnosticController = Join-Path $script:EntryScriptRoot 'src\main\java\com\huarenzaimeng\api\P021TestReadonlyDiagnosticController.java'
+$script:FixtureFile = Join-Path $script:EntryScriptRoot 'src\test\resources\db\fixture\VnextP021OrderDetailCloudBaseConsoleFixture.sql'
+$script:V7File = Join-Path $script:EntryScriptRoot 'src\main\resources\db\migration\V7__add_order_detail_read_projection.sql'
+$script:ManifestFile = Join-Path $script:EntryScriptRoot 'manifests\P021-IT最终执行准备固定清单.txt'
 $script:ObservedRequests = [Collections.Generic.List[object]]::new()
 
 function Get-Sha256Hex([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash }
@@ -35,7 +38,7 @@ function Assert-Authorization($auth) {
     if ($auth.RunId -notmatch '^P021-IT-20260808-FINAL-[0-9]{3}$') { throw 'RUN_ID_INVALID' }
     if ($auth.Scope -cne $script:Scope -or $auth.BaseUrl -cne $script:BaseUrl -or $auth.Database -cne $script:Database) { throw 'AUTHORIZATION_SCOPE_MISMATCH' }
     if ($auth.SingleUse -ne $true -or $auth.AutomaticRetryAllowed -ne $false) { throw 'AUTHORIZATION_RETRY_POLICY_INVALID' }
-    if ($auth.WrapperSha256 -cne (Get-Sha256Hex $PSCommandPath) -or
+    if ($auth.WrapperSha256 -cne (Get-Sha256Hex $script:EntryScriptPath) -or
         $auth.PageCollectorSha256 -cne (Get-Sha256Hex $script:PageCollector) -or
         $auth.PageCollectorNodeSha256 -cne (Get-Sha256Hex $script:PageCollectorNode) -or
         $auth.PageCollectorAggregateSha256 -cne '50A157DBDEBC61EB4FA682F865E0E2799BFE1D65A7A5BA3015DB5277AA2B5281' -or
@@ -208,7 +211,7 @@ function Invoke-SevenScenarios([string]$Buyer, [string]$Cs, [string]$Fin) {
 
 function Invoke-SelfTest {
     if ($script:BaseUrl -notmatch '^https://huaren-api-it-' -or $script:Database -cne 'huarenzaimeng_it_vnext' -or $script:OrderRefs.Count -ne 7) { throw 'FIXED_BOUNDARY_INVALID' }
-    $source = Get-Content -Raw -LiteralPath $PSCommandPath
+    $source = Get-Content -Raw -LiteralPath $script:EntryScriptPath
     foreach ($token in @('AutomaticRetryAllowed','ROLLBACK','P021-IT-01','P021-IT-07','Read-Host -AsSecureString','READY.json','BLOCKED.json')) {
         if (-not $source.Contains($token)) { throw "SELFTEST_MISSING_$token" }
     }
