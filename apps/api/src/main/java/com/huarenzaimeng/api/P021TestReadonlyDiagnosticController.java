@@ -18,9 +18,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.io.IOException;
 
 /** Test-environment-only observation and rollback probe. Never enabled by release defaults. */
 @RestController
@@ -52,9 +55,7 @@ final class P021TestReadonlyDiagnosticController {
                                                             @RequestParam String nonce) {
         requireBuyer(request);
         if (!nonce.matches("[A-F0-9]{32}")) throw new IllegalArgumentException("invalid nonce");
-        String revision = firstNonBlank(System.getenv("K_REVISION"), System.getenv("TCB_CLOUD_RUN_VERSION"),
-                System.getenv("CLOUD_RUN_REVISION"));
-        if (revision == null) throw new IllegalStateException("trusted runtime revision unavailable");
+        String revision = runtimeIdentity();
         probe.observeQuery();
         String databaseIdentity = jdbc.queryForObject(
                 "SELECT CONCAT(DATABASE(),'|',@@hostname,'|',@@port,'|',@@server_uuid)", String.class);
@@ -132,6 +133,32 @@ final class P021TestReadonlyDiagnosticController {
     private static String firstNonBlank(String... values) {
         for (String value : values) if (value != null && !value.isBlank()) return value;
         return null;
+    }
+    static String runtimeIdentity() {
+        String platformRevision = firstNonBlank(System.getenv("K_REVISION"),
+                System.getenv("TCB_CLOUD_RUN_VERSION"), System.getenv("CLOUD_RUN_REVISION"));
+        if (platformRevision != null) return "PLATFORM_REVISION:" + platformRevision;
+        Path artifact = runningArtifact();
+        if (artifact == null) throw new IllegalStateException("trusted runtime identity unavailable");
+        return artifactIdentity(artifact);
+    }
+    static String artifactIdentity(Path artifact) {
+        try {
+            return "ARTIFACT_SHA256:" + HexFormat.of().withUpperCase().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(artifact)));
+        } catch (IOException | NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("trusted runtime identity unavailable", exception);
+        }
+    }
+    private static Path runningArtifact() {
+        String command = System.getProperty("sun.java.command", "").trim();
+        if (!command.isEmpty()) {
+            String executable = command.split("\\s+", 2)[0];
+            Path candidate = Path.of(executable).toAbsolutePath().normalize();
+            if (candidate.toString().endsWith(".jar") && Files.isRegularFile(candidate)) return candidate;
+        }
+        Path cloudArtifact = Path.of("/app/app.jar");
+        return Files.isRegularFile(cloudArtifact) ? cloudArtifact : null;
     }
     private static String sha256(String value) {
         try {

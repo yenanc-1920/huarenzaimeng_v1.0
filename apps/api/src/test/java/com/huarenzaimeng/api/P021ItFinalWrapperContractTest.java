@@ -1,6 +1,7 @@
 package com.huarenzaimeng.api;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -9,6 +10,8 @@ class P021ItFinalWrapperContractTest {
     private static final Path WRAPPER = Path.of("Invoke-P021TestReadonlyIntegrationFinalRun.ps1");
     private static final Path COLLECTOR = Path.of("../miniapp/scripts/collect-p021-it-page-actual.ps1");
     private static final Path DIAGNOSTIC = Path.of("src/main/java/com/huarenzaimeng/api/P021TestReadonlyDiagnosticController.java");
+
+    @TempDir Path temporaryDirectory;
 
     @Test void wrapperFreezesTargetDatabaseSevenRefsAndSingleUsePolicy() throws Exception {
         String text = Files.readString(WRAPPER);
@@ -60,5 +63,13 @@ class P021ItFinalWrapperContractTest {
                 .contains("status.setRollbackOnly()").contains("hz.p021.mode").contains("test-readonly")
                 .contains("hz.persistence.mode").contains("mysql");
         assertThat(text).doesNotContain("@RequestBody").doesNotContain("String sql").doesNotContain("nativeQuery");
+    }
+
+    @Test void runtimeChallengeFallsBackToVerifiableArtifactIdentity() throws Exception {
+        Path artifact = temporaryDirectory.resolve("app.jar");
+        Files.writeString(artifact, "fixed-artifact");
+        assertThat(P021TestReadonlyDiagnosticController.artifactIdentity(artifact))
+                .matches("ARTIFACT_SHA256:[A-F0-9]{64}")
+                .isEqualTo(P021TestReadonlyDiagnosticController.artifactIdentity(artifact));
     }
 }
