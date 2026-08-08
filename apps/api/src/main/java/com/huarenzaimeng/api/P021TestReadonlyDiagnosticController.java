@@ -40,11 +40,13 @@ final class P021TestReadonlyDiagnosticController {
     private final P021OrderDetailService service;
     private final P021OrderDetailSideEffectProbe probe;
     private final ObjectMapper mapper;
+    private final MyBatisP021Store store;
 
     P021TestReadonlyDiagnosticController(JdbcTemplate jdbc, TransactionTemplate transactions,
                                          P021OrderDetailService service, P021OrderDetailSideEffectProbe probe,
-                                         ObjectMapper mapper) {
+                                         ObjectMapper mapper, MyBatisP021Store store) {
         this.jdbc=jdbc; this.transactions=transactions; this.service=service; this.probe=probe; this.mapper=mapper;
+        this.store=store;
     }
 
     @GetMapping("/counters") Map<String,Long> counters(HttpServletRequest request) {
@@ -92,6 +94,35 @@ final class P021TestReadonlyDiagnosticController {
                 String.class, FIXED_ORDER);
         try { return mapper.readTree(json); }
         catch (JsonProcessingException exception) { throw new IllegalStateException("stored projection invalid", exception); }
+    }
+
+    @GetMapping("/qualification") Map<String,Object> qualification(HttpServletRequest request) {
+        requireBuyer(request);
+        probe.observeQuery();
+        SessionSnapshot trusted = session(request);
+        MyBatisP021Store.QualificationDiagnostic diagnostic = store.diagnose(FIXED_ORDER, trusted);
+        var stored = trusted == null ? java.util.Optional.<P021OrderDetailDomain.Fixture>empty()
+                : store.findAuthorized(FIXED_ORDER, trusted);
+        boolean authorityPayloadValidated = stored.isPresent();
+        boolean strictFixtureValidated = stored.filter(value -> service.isStrictStoredFixture(value, FIXED_ORDER))
+                .isPresent();
+        return Map.ofEntries(
+                Map.entry("projectCode", "P021_QUALIFICATION_DIAGNOSTIC"),
+                Map.entry("projectionRowExists", diagnostic.projectionRowExists()),
+                Map.entry("authorityOrderJoined", diagnostic.authorityOrderJoined()),
+                Map.entry("authorityQuoteJoined", diagnostic.authorityQuoteJoined()),
+                Map.entry("subjectMatched", diagnostic.subjectMatched()),
+                Map.entry("sessionRefMatched", diagnostic.sessionRefMatched()),
+                Map.entry("sessionVersionMatched", diagnostic.sessionVersionMatched()),
+                Map.entry("authorizationSetMatched", diagnostic.authorizationSetMatched()),
+                Map.entry("authorizationEvidenceMatched", diagnostic.authorizationEvidenceMatched()),
+                Map.entry("orderIncludedInStoredAuthorization", diagnostic.orderIncludedInStoredAuthorization()),
+                Map.entry("authorizedOrderRefsExactlyMatched", diagnostic.authorizedOrderRefsExactlyMatched()),
+                Map.entry("notRevoked", diagnostic.notRevoked()),
+                Map.entry("storedAuthorizationReadable", diagnostic.storedAuthorizationReadable()),
+                Map.entry("authorityPayloadValidated", authorityPayloadValidated),
+                Map.entry("strictFixtureValidated", strictFixtureValidated),
+                Map.entry("eligible", diagnostic.eligible() && authorityPayloadValidated && strictFixtureValidated));
     }
 
     @PostMapping("/conflict/{kind}") Object conflict(HttpServletRequest request, @PathVariable String kind) {

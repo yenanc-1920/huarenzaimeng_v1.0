@@ -65,6 +65,56 @@ class MyBatisP021Store implements P021Store {
         }
     }
 
+    QualificationDiagnostic diagnose(String orderRef, SessionSnapshot session) {
+        Map<String, Object> row = mapper.selectQualificationDiagnostic(orderRef);
+        if (row == null) return QualificationDiagnostic.missing();
+        try {
+            List<String> refs = json.readValue(String.valueOf(row.get("authorized_order_refs")),
+                    json.getTypeFactory().constructCollectionType(List.class, String.class));
+            boolean subject = session != null && String.valueOf(row.get("project_subject_ref"))
+                    .equals(session.projectSubjectRef());
+            boolean sessionRef = session != null && String.valueOf(row.get("session_ref"))
+                    .equals(session.sessionRef());
+            boolean sessionVersion = session != null
+                    && ((Number) row.get("session_version")).longValue() == session.sessionVersion();
+            boolean setRef = session != null && String.valueOf(row.get("authorization_set_ref"))
+                    .equals(session.authorizationSetRef());
+            boolean evidence = session != null && String.valueOf(row.get("authorization_evidence_version"))
+                    .equals(session.authorizationEvidenceVersion());
+            boolean refsEqual = session != null && refs.equals(session.authorizedOrderRefs());
+            return new QualificationDiagnostic(true, numberIsOne(row.get("authority_order_joined")),
+                    numberIsOne(row.get("authority_quote_joined")), subject, sessionRef, sessionVersion, setRef,
+                    evidence, refs.contains(orderRef), refsEqual, !numberIsOne(row.get("revoked")), true);
+        } catch (RuntimeException | java.io.IOException error) {
+            return new QualificationDiagnostic(true, numberIsOne(row.get("authority_order_joined")),
+                    numberIsOne(row.get("authority_quote_joined")), false, false, false, false, false,
+                    false, false, !numberIsOne(row.get("revoked")), false);
+        }
+    }
+
+    private static boolean numberIsOne(Object value) {
+        return value instanceof Number number && number.longValue() == 1L;
+    }
+
+    record QualificationDiagnostic(boolean projectionRowExists, boolean authorityOrderJoined,
+                                   boolean authorityQuoteJoined, boolean subjectMatched,
+                                   boolean sessionRefMatched, boolean sessionVersionMatched,
+                                   boolean authorizationSetMatched, boolean authorizationEvidenceMatched,
+                                   boolean orderIncludedInStoredAuthorization, boolean authorizedOrderRefsExactlyMatched,
+                                   boolean notRevoked, boolean storedAuthorizationReadable) {
+        static QualificationDiagnostic missing() {
+            return new QualificationDiagnostic(false, false, false, false, false, false, false, false,
+                    false, false, false, false);
+        }
+
+        boolean eligible() {
+            return projectionRowExists && authorityOrderJoined && authorityQuoteJoined && subjectMatched
+                    && sessionRefMatched && sessionVersionMatched && authorizationSetMatched
+                    && authorizationEvidenceMatched && orderIncludedInStoredAuthorization
+                    && authorizedOrderRefsExactlyMatched && notRevoked && storedAuthorizationReadable;
+        }
+    }
+
     private static Set<String> keys(com.fasterxml.jackson.databind.JsonNode node) {
         java.util.HashSet<String> result = new java.util.HashSet<>(); node.fieldNames().forEachRemaining(result::add);
         return Set.copyOf(result);

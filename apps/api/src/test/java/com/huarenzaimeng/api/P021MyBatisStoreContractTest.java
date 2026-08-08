@@ -54,4 +54,26 @@ class P021MyBatisStoreContractTest {
         assertThat(store.findAuthorized(fixture.projection().orderRef(), identity.projectSubjectRef(),
                 identity.sessionRef())).isEmpty();
     }
+
+    @Test void qualificationDiagnosticReportsOnlyBooleanPredicates() throws Exception {
+        P021ProjectionMapper mapper = mock(P021ProjectionMapper.class);
+        ObjectMapper json = new ObjectMapper().findAndRegisterModules();
+        Map<String, Object> row = new HashMap<>();
+        row.put("project_subject_ref", "IT-SUBJECT-P021");
+        row.put("session_ref", "IT-SESSION-P021");
+        row.put("session_version", 1L);
+        row.put("authorization_set_ref", "IT-AUTHSET-P021");
+        row.put("authorization_evidence_version", "IT-AUTH-EVIDENCE-P021-V1");
+        row.put("authorized_order_refs", json.writeValueAsString(List.of("IT-P021-AWAITING")));
+        row.put("revoked", 0); row.put("authority_order_joined", 1); row.put("authority_quote_joined", 1);
+        when(mapper.selectQualificationDiagnostic("IT-P021-AWAITING")).thenReturn(row);
+        MyBatisP021Store store = new MyBatisP021Store(mapper, json);
+        var ok = store.diagnose("IT-P021-AWAITING", new SessionSnapshot("IT-SUBJECT-P021", "IT-SESSION-P021",
+                1, "IT-AUTHSET-P021", "IT-AUTH-EVIDENCE-P021-V1", List.of("IT-P021-AWAITING")));
+        assertThat(ok.eligible()).isTrue();
+        var drift = store.diagnose("IT-P021-AWAITING", new SessionSnapshot("IT-SUBJECT-P021", "IT-SESSION-P021",
+                1, "IT-AUTHSET-P021", "IT-AUTH-EVIDENCE-P021-V1", List.of("IT-P021-AWAITING", "EXTRA")));
+        assertThat(drift.eligible()).isFalse();
+        assertThat(drift.authorizedOrderRefsExactlyMatched()).isFalse();
+    }
 }

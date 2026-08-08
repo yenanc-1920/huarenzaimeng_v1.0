@@ -33,4 +33,19 @@ interface P021ProjectionMapper {
     Map<String, Object> selectAuthorized(@Param("orderRef") String orderRef,
                                          @Param("subjectRef") String subjectRef,
                                          @Param("sessionRef") String sessionRef);
+
+    @Select("""
+        SELECT p.project_subject_ref, p.session_ref, p.session_version,
+               p.authorization_set_ref, p.authorization_evidence_version,
+               CAST(p.authorized_order_refs AS CHAR) AS authorized_order_refs, p.revoked,
+               CASE WHEN o.order_ref IS NULL THEN 0 ELSE 1 END AS authority_order_joined,
+               CASE WHEN q.quote_ref IS NULL THEN 0 ELSE 1 END AS authority_quote_joined
+          FROM hz_order_detail_projection p
+          LEFT JOIN hz_order o ON o.order_ref=p.order_ref AND o.quote_ref=p.quote_ref
+                              AND o.project_subject_ref=p.project_subject_ref
+          LEFT JOIN hz_quote q ON q.quote_ref=p.quote_ref AND q.project_subject_ref=p.project_subject_ref
+         WHERE p.order_ref = #{orderRef}
+         LIMIT 1
+        """)
+    Map<String, Object> selectQualificationDiagnostic(@Param("orderRef") String orderRef);
 }
