@@ -11,9 +11,7 @@ CREATE TABLE admin_user (
     created_at TIMESTAMP(3) NOT NULL,
     updated_at TIMESTAMP(3) NOT NULL,
     PRIMARY KEY (user_id),
-    UNIQUE KEY uk_admin_user_username (username),
-    CONSTRAINT chk_admin_user_role CHECK (role_code IN ('SUPER_ADMIN', 'CS', 'FIN', 'CONTENT')),
-    CONSTRAINT chk_admin_user_status CHECK (status_code IN ('ACTIVE', 'LOCKED', 'DISABLED'))
+    UNIQUE KEY uk_admin_user_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE admin_session (
