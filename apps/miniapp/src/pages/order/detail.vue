@@ -38,11 +38,11 @@ async function load(){
   if(!orderRef.value){state.projection=null;state.viewState='NOT_AVAILABLE';return}
   try{await executeP021Read(state,uni,api,orderRef.value)}finally{if(itRealSession.value)itCompleted.value=true}
 }
-async function loadVisualScenario(value:unknown){
+async function loadVisualScenario(value:unknown,parameterId?:unknown){
   if(typeof value!=='string')return false
   const fixture=await import('../../dev/p021-visual-fixtures')
   if(!fixture.isP021VisualScenarioId(value))return false
-  orderRef.value='ORDER-P021-VISUAL';await fixture.runP021VisualScenario(state,value);return true
+  orderRef.value='ORDER-P021-VISUAL';await fixture.runP021VisualScenario(state,value,typeof parameterId==='string'?parameterId:undefined);return true
 }
 async function loadItScenario(value:unknown){
   if(typeof value!=='string')return false
@@ -55,7 +55,7 @@ async function loadItScenario(value:unknown){
 function safeBack(){uni.navigateBack({fail:()=>uni.reLaunch({url:'/pages/order/list'})})}
 function openSupport(){if(supportRef.value)uni.navigateTo({url:`/pages/support/case?supportRef=${encodeURIComponent(supportRef.value)}`})}
 onLoad(query=>{
-  if(import.meta.env.DEV){void loadItScenario(query?.itDelayPlan).then(consumed=>consumed||loadVisualScenario(query?.visualScenario)).then(async consumed=>{if(!consumed){orderRef.value=typeof query?.orderRef==='string'?decodeURIComponent(query.orderRef):'';if(typeof query?.itRealSession==='string'){const fixture=await import('../../dev/p021-it-fixtures');itRealSession.value=query.itRealSession;fixture.prepareP021ItRealSession(uni,orderRef.value,query.itRealSession!=='UNAUTHENTICATED')}await load()}});return}
+  if(import.meta.env.DEV){void loadItScenario(query?.itDelayPlan).then(consumed=>consumed||loadVisualScenario(query?.visualScenario,query?.visualSubcase)).then(async consumed=>{if(!consumed){orderRef.value=typeof query?.orderRef==='string'?decodeURIComponent(query.orderRef):'';if(typeof query?.itRealSession==='string'){const fixture=await import('../../dev/p021-it-fixtures');itRealSession.value=query.itRealSession;fixture.prepareP021ItRealSession(uni,orderRef.value,query.itRealSession!=='UNAUTHENTICATED')}await load()}});return}
   orderRef.value=typeof query?.orderRef==='string'?decodeURIComponent(query.orderRef):'';load()
 })
 </script>
@@ -64,14 +64,14 @@ onLoad(query=>{
   <view class="page" data-page-root="order-detail" data-page-id="UX-P021" :data-view-state="state.viewState" :data-projection-version="projection?.projectionVersion??0" :data-detail-count="projection?1:0" :data-it-completed="itCompleted" :data-it-old-content-restored="itOldContentRestored" :data-it-delay-plan="itDelayPlan" data-write-eligibility="0">
     <AppHeader title="订单详情" left="订单" @left="safeBack"/>
     <view class="content">
-      <view v-if="state.viewState==='LOADING'" data-status-panel="LOADING"><StatusNotice tone="unknown" title="正在读取订单详情" role="status">正在确认当前授权和最新订单状态。</StatusNotice></view>
-      <view v-else-if="state.viewState==='NOT_AVAILABLE'" data-status-panel="NOT_AVAILABLE"><StatusNotice tone="risk" title="当前无法安全显示订单详情" role="alert">请重新建立订单访问后再试；这里不会确认订单是否存在。</StatusNotice></view>
-      <view v-else-if="state.viewState==='READ_ERROR'" data-status-panel="READ_ERROR"><StatusNotice tone="risk" title="暂时无法读取" role="alert">旧详情已撤销，你可以主动重新读取或安全返回。</StatusNotice></view>
-      <view v-else-if="state.viewState==='INFORMATION_UPDATED'" data-status-panel="INFORMATION_UPDATED"><StatusNotice tone="unknown" title="订单信息已更新" role="status">当前响应未通过版本或价格快照核对，请主动重新读取。</StatusNotice></view>
+      <view v-if="state.viewState==='LOADING'" data-status-panel="LOADING"><StatusNotice tone="unknown" title="正在读取订单详情" aria-label="正在读取订单详情" role="status">正在确认当前授权和最新订单状态。</StatusNotice></view>
+      <view v-else-if="state.viewState==='NOT_AVAILABLE'" data-status-panel="NOT_AVAILABLE"><StatusNotice tone="risk" title="当前无法安全显示订单详情" aria-label="当前无法安全显示订单详情" role="alert">请重新建立订单访问后再试；这里不会确认订单是否存在。</StatusNotice></view>
+      <view v-else-if="state.viewState==='READ_ERROR'" data-status-panel="READ_ERROR"><StatusNotice tone="risk" title="暂时无法读取" aria-label="暂时无法读取" role="alert">旧详情已撤销，你可以主动重新读取或安全返回。</StatusNotice></view>
+      <view v-else-if="state.viewState==='INFORMATION_UPDATED'" data-status-panel="INFORMATION_UPDATED"><StatusNotice tone="unknown" title="订单信息已更新" aria-label="订单信息已更新" role="status">当前响应未通过版本或价格快照核对，请主动重新读取。</StatusNotice></view>
 
       <view v-if="state.viewState==='READY'&&projection&&currentCopy" data-detail-content="1">
-        <view class="status-card" data-status-card="READY" role="status" aria-live="polite">
-          <view class="heading" role="heading" aria-level="1">{{currentCopy.title}}</view>
+        <view class="status-card" data-status-card="READY" role="status" aria-live="polite" aria-labelledby="p021-status-title">
+          <view id="p021-status-title" class="heading" role="heading" aria-level="1">{{currentCopy.title}}</view>
           <text>{{currentCopy.description}}</text>
         </view>
         <view class="card price-card" data-price-summary="1" aria-label="冻结价格摘要">
@@ -101,14 +101,14 @@ onLoad(query=>{
       </view>
     </view>
     <view class="action" data-action-container="readonly">
-      <button v-if="state.viewState!=='LOADING'&&(state.viewState!=='READY'||canRefresh)" data-action-code="REFRESH_ORDER_DETAIL" class="secondary" @click="load">重新读取</button>
-      <button v-if="state.viewState==='READY'&&supportRef" data-action-code="OPEN_SUPPORT" class="secondary" @click="openSupport">联系客服核对</button>
-      <button data-action-code="SAFE_BACK" class="primary" @click="safeBack">返回订单</button>
+      <button v-if="state.viewState!=='LOADING'&&(state.viewState!=='READY'||canRefresh)" data-action-code="REFRESH_ORDER_DETAIL" class="secondary" role="button" tabindex="0" aria-label="重新读取" @click="load">重新读取</button>
+      <button v-if="state.viewState==='READY'&&supportRef" data-action-code="OPEN_SUPPORT" class="secondary" role="button" tabindex="0" aria-label="联系客服核对" @click="openSupport">联系客服核对</button>
+      <button data-action-code="SAFE_BACK" class="primary" role="button" tabindex="0" aria-label="返回订单" @click="safeBack">返回订单</button>
     </view>
   </view>
 </template>
 
 <style src="../../styles/shared.css"></style>
 <style scoped>
-.status-card,.card{margin-top:24rpx;padding:34rpx;border-radius:32rpx;background:#fff}.status-card{background:#fff7e9}.heading{font-size:42rpx;font-weight:900}.status-card>text{display:block;margin-top:12rpx;color:var(--muted);line-height:1.6}.section-title{font-weight:900;margin-bottom:18rpx}.kv{display:flex;justify-content:space-between;gap:24rpx;padding:18rpx 0;border-bottom:1rpx solid var(--line)}.kv:last-child{border-bottom:0}.kv text:first-child{color:var(--muted)}.kv text:last-child{text-align:right;font-weight:700;overflow-wrap:anywhere}.fact-line{display:block;margin-top:14rpx;line-height:1.55}.unknown{color:var(--unknown)}.timeline-item{display:flex;align-items:flex-start;padding:18rpx 0}.dot{width:22rpx;height:22rpx;margin:8rpx 24rpx 0 0;border-radius:50%;background:var(--brand);flex:none}.timeline-title,.timeline-time{display:block}.timeline-title{font-weight:800}.timeline-time{margin-top:6rpx;color:var(--muted);font-size:23rpx}.action button{min-height:88rpx}.content{overflow-x:hidden}
+.status-card,.card{margin-top:24rpx;padding:34rpx;border-radius:32rpx;background:#fff}.status-card{background:#fff7e9}.heading{font-size:42rpx;font-weight:900}.status-card>text{display:block;margin-top:12rpx;color:var(--muted);line-height:1.6}.section-title{font-weight:900;margin-bottom:18rpx}.kv{display:flex;justify-content:space-between;gap:24rpx;padding:18rpx 0;border-bottom:1rpx solid var(--line)}.kv:last-child{border-bottom:0}.kv text:first-child{color:var(--muted)}.kv text:last-child{text-align:right;font-weight:700;overflow-wrap:anywhere}.fact-line{display:block;margin-top:14rpx;line-height:1.55}.unknown{color:var(--unknown)}.timeline-item{display:flex;align-items:flex-start;padding:18rpx 0}.dot{width:22rpx;height:22rpx;margin:8rpx 24rpx 0 0;border-radius:50%;background:var(--brand);flex:none}.timeline-title,.timeline-time{display:block}.timeline-title{font-weight:800}.timeline-time{margin-top:6rpx;color:var(--muted);font-size:23rpx}.action button{min-height:88rpx}.action button:focus-visible,.action uni-button:focus-visible{outline:4rpx solid #155eef;outline-offset:4rpx}.content{overflow-x:hidden}
 </style>

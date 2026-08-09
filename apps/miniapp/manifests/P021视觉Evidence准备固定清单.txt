@@ -1,0 +1,35 @@
+P021 视觉 Evidence 准备固定清单
+
+状态：PRECHECKED_NOT_RUN；无 RunId；未创建 EvidencePackage/Index/READY；未提交、未推送
+固定业务输入7文件聚合：3825FB4F5B5DCF685426491FC05C151FF899641FC24CC44487931B15C0A018AA
+D2清单：516EA3ACA003BEF18A49D5961F13DCCE313CAD4C1B60C44964519CA793CE52BF
+视觉分母：TOTAL=16 / PASS=0 / NOT_RUN=16
+
+聚合规则
+- 以下10个仓库相对路径按 .NET StringComparer.Ordinal 等价顺序排列。
+- 每行严格为 path|UPPERCASE_SHA256。
+- UTF-8无BOM；行间单LF；末行无LF；对完整字节计算SHA-256。
+- 本清单不纳入10文件聚合，避免自引用。
+
+apps/miniapp/package.json|50A96430E29694140318F713479A6AF730ABFD8C6D56825F7A3E63E8521729D7
+apps/miniapp/scripts/assert-frontend-contracts.mjs|8593CD7E2B97313486E5F95C74262A32A151D9221CD06B51CB3D35665AE60E9B
+apps/miniapp/scripts/preflight-p021-visual-evidence.mjs|361FCDB8F9F26AF6C10404CFC512CD333E997E26491474D19A50A903898C593C
+apps/miniapp/scripts/verify-mp-weixin-output.mjs|6561E7BD0309EA9BDDEE3275E726F7048F586D4336DD8C987A8F104F811EEAB1
+apps/miniapp/src/api/client.ts|276513DA8410D3B536E6F6D5E30F0A64C9EF038AC8A87441F506C16F955DA11F
+apps/miniapp/src/api/order-detail-contract.ts|9761D6102B2908A6CE13C9691257F2B29C41B3193CD62FF902BF01F31D23F314
+apps/miniapp/src/api/order-detail-synthetic.ts|FFCBF6010FD6395C957B76DA0A5C2309A596B56CA09B6474ECDC1F7DB6F8EBE1
+apps/miniapp/src/dev/p021-visual-fixtures.ts|BC07EB34F6801D349AB1ED4EE659CE60D94BC56759D47C205AF46EAE18C4F579
+apps/miniapp/src/domain/order-detail-flow.ts|0F4028AB37DD0157B45E58BCF06F18781562A9A262957F1FA19A72C837A26F1F
+apps/miniapp/src/pages/order/detail.vue|6A28C9CD42A452D207B0069540FEB5522ED755ADDCF3E444E65EB119712A478E
+
+10文件聚合 SHA-256：B0479DF3266F27E9979302ED6690B639038EF6F7D9090A5150ECE9CF80B73FB6
+
+准备结果
+- P021-V01～P021-V16稳定且唯一；每槽位Expected DOM/视口/截图/键盘/读屏字段齐备，Actual保持null。
+- V14保留一个视觉槽；四个Subcase均先建立旧READY详情，再实际撤旧，并要求未来Actual DOM结构、文本和动作签名同形。
+- V16四个Subcase均先建立旧READY详情；最终详情数和旧内容命中数由state/DOM采集计算，不使用常量结论。
+- Actual比较器逐项校验标题唯一次数、视口、截图尺寸/DPR、整视口、无裁切/补边、requiredEvidence和禁见词位置/计数明细。
+- 默认整视口375×812；V05/V06/V10/V12/V14窄屏抽查320×568；禁止裁切、补边、后期缩放。
+- 页面入口仅DEV动态导入并走实际executeP021Read；生产构建门禁禁止场景ID、入口参数和夹具身份字面量。
+- preflight：PASS；frontend-contracts：PASS；clean mp-weixin build/appservice：PASS；git diff --check：PASS。
+- 正式16项未执行；真实网络、身份、DB、微信、Reloadly、资金、真机、生产均NOT_RUN。

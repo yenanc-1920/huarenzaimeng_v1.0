@@ -202,6 +202,9 @@ assert.match(header, /v-if="title"/, 'non-home header must support a page title'
 assert.match(progress, /stateCode===['"]DELIVERED['"]/, 'P014 completed copy must come from the strict projection state')
 assert.match(progress, /data-write-eligibility="0"/, 'P014 must keep real write eligibility at zero')
 for(const copy of ['等待付款','正在确认付款','已付款，等待充值','正在充值','充值结果待确认','已到账','已确认未到账','退款处理中','已退款','到账与退款核对中','客服处理中'])assert.ok(detail.includes(copy),`P021 must map the frozen public state to ordinary Chinese: ${copy}`)
+assert.match(detail,/data-status-card="READY"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-labelledby="p021-status-title"/,'P021 READY status region must bind its accessible name to the visible status heading')
+assert.match(detail,/id="p021-status-title"[^>]*role="heading"[^>]*aria-level="1"/,'P021 READY status heading must remain an independent level-one heading')
+for(const [title,role] of [['正在读取订单详情','status'],['当前无法安全显示订单详情','alert'],['暂时无法读取','alert'],['订单信息已更新','status']])assert.match(detail,new RegExp(`<StatusNotice[^>]*title="${title}"[^>]*aria-label="${title}"[^>]*role="${role}"`),`P021 non-READY status must expose its visible title as the accessible name: ${title}`)
 assert.match(detail,/正在读取订单详情[\s\S]*当前无法安全显示订单详情[\s\S]*暂时无法读取[\s\S]*订单信息已更新/,'P021 must expose distinct safe loading, unavailable, error and drift states')
 for(const state of ['AWAITING_PAYMENT','PAYMENT_PROCESSING','PAID_AWAITING_TOPUP','TOPUP_PROCESSING','TOPUP_RESULT_UNKNOWN','DELIVERED','CONFIRMED_NOT_DELIVERED','REFUND_PROCESSING','REFUNDED','DELIVERY_REFUND_CONFLICT_REVIEW','SUPPORT_REVIEW'])assert.match(list,new RegExp(`${state}:'`),`order list must map ${state}`)
 assert.match(mock, /stateCode:'DELIVERED'/, 'mock orders must include a delivered sample')
@@ -1318,6 +1321,10 @@ assert.match(detailPage,/data-page-root="order-detail"[\s\S]*data-page-id="UX-P0
 assert.match(detailPage,/data-write-eligibility="0"/,'P021 real write eligibility must remain zero')
 assert.match(detailPage,/executeP021Read\(state,uni,api,orderRef\.value\)/,'P021 page must use the withdrawal/generation executor')
 assert.match(detailPage,/role="list" aria-label="订单事实时间线"[\s\S]*role="listitem"/,'P021 timeline must expose list semantics')
+for(const [actionCode,label] of [['REFRESH_ORDER_DETAIL','重新读取'],['OPEN_SUPPORT','联系客服核对'],['SAFE_BACK','返回订单']]){
+  assert.match(detailPage,new RegExp(`data-action-code="${actionCode}"[^>]*role="button"[^>]*tabindex="0"[^>]*aria-label="${label}"`),`P021 ${actionCode} must remain a keyboard-focusable named button in H5 and Mini Program output`)
+}
+assert.match(detailPage,/\.action button:focus-visible,\.action uni-button:focus-visible\{outline:4rpx solid #155eef;outline-offset:4rpx\}/,'P021 readonly actions must expose a visible H5 and native-button keyboard focus indicator')
 assert.match(detailPage,/`\$\{currency\} \$\{minor\}（最小单位）`/,'P021 amount must display the integer minor unit without assuming two decimals')
 assert.doesNotMatch(detailPage,/targetValueDisplay\}\}\s*\{\{projection\.priceSnapshotSummary\.targetCurrency/,'P021 targetValueDisplay is complete display text and must not append currency')
 assert.doesNotMatch(detailPage,/replace\(\/\(\?:\\\.\\d\+\)\?\(\?:Z\|\[\+\-\]/,'P021 time display must not relabel an unconverted offset as UTC')
