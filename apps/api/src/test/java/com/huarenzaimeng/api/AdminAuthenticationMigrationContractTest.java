@@ -21,6 +21,9 @@ class AdminAuthenticationMigrationContractTest {
                 // enforce CHECK constraints. Role and status values are therefore
                 // written through the application's fixed allowlist, not a MySQL 8
                 // named-CHECK clause that prevents the migration from parsing.
-                .doesNotContain("CONSTRAINT chk_admin_user_role", "CONSTRAINT chk_admin_user_status");
+                .doesNotContain("CONSTRAINT chk_admin_user_role", "CONSTRAINT chk_admin_user_status")
+                // MySQL 5.7 with explicit_defaults_for_timestamp disabled otherwise
+                // synthesizes a zero-date default, which strict mode rejects.
+                .doesNotContain("TIMESTAMP(3) NOT NULL,", "TIMESTAMP(3) NULL,");
     }
 }
