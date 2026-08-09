@@ -1,3 +1,15 @@
+FROM node:24-alpine AS admin-web-build
+
+WORKDIR /workspace/apps/admin-web
+COPY apps/admin-web/package.json apps/admin-web/package-lock.json ./
+RUN npm ci
+COPY apps/admin-web/index.html apps/admin-web/tsconfig.json apps/admin-web/vite.config.ts ./
+COPY apps/admin-web/src src
+COPY apps/admin-web/scripts scripts
+COPY apps/miniapp/src/static/logo.png /workspace/apps/miniapp/src/static/logo.png
+ENV VITE_ADMIN_DATA_MODE=PROJECT_API_PROXY
+RUN npm run test:contracts && npm run build
+
 FROM maven:3.9.11-eclipse-temurin-17 AS build
 
 WORKDIR /workspace
@@ -13,6 +25,7 @@ RUN mvn -B -ntp -s .mvn/settings.xml -pl apps/api -am dependency:go-offline
 
 COPY modules/core/src modules/core/src
 COPY apps/api/src apps/api/src
+COPY --from=admin-web-build /workspace/apps/admin-web/dist apps/api/src/main/resources/static
 COPY apps/api/Invoke-P021OrderDetailEvidenceFinalRun.ps1 apps/api/Invoke-P021OrderDetailEvidenceFinalRun.ps1
 COPY apps/api/Invoke-P021TestReadonlyIntegrationFinalRun.ps1 apps/api/Invoke-P021TestReadonlyIntegrationFinalRun.ps1
 COPY apps/miniapp/scripts/collect-p021-it-page-actual.ps1 apps/miniapp/scripts/collect-p021-it-page-actual.ps1
@@ -33,6 +46,8 @@ RUN groupadd --system --gid 10001 app \
 COPY --from=build --chown=10001:10001 /workspace/apps/api/target/api-*.jar app.jar
 
 ENV SERVER_PORT=8080
+# Fail closed by default. The Cloud Hosting service must explicitly set
+# SPRING_PROFILES_ACTIVE=release-mysql after the readiness gate.
 ENV SPRING_PROFILES_ACTIVE=mock
 EXPOSE 8080
 

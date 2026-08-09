@@ -157,9 +157,10 @@ export const parseAdminPageProjection = (value: unknown, requestedPage: PageId):
   return value as unknown as AdminPageProjection
 }
 
-export const resolveAdminDataMode = (value: unknown): AdminDataMode | null => {
-  if (value === undefined || value === '') return 'BUILTIN_SYNTHETIC'
-  return value === 'BUILTIN_SYNTHETIC' || value === 'PROJECT_API_PROXY' ? value : null
+export const resolveAdminDataMode = (value: unknown, allowBuiltinSynthetic = false): AdminDataMode | null => {
+  if (value === undefined || value === '') return allowBuiltinSynthetic ? 'BUILTIN_SYNTHETIC' : null
+  if (value === 'BUILTIN_SYNTHETIC') return allowBuiltinSynthetic ? value : null
+  return value === 'PROJECT_API_PROXY' ? value : null
 }
 
 export async function loadAdminPage(
@@ -182,7 +183,10 @@ export async function loadAdminPage(
       credentials: 'include',
       headers: { Accept: 'application/json' },
     })
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
+      return { status: 'UNAUTHENTICATED', data: null, message: '登录已失效，请重新登录' }
+    }
+    if (response.status === 403) {
       return { status: 'ACCESS_DENIED', data: null, message: '当前无法访问此页面', denialKind: 'ROLE_DENIED' }
     }
     if (response.status === 404) return { status: 'UNAVAILABLE', data: null, message: '后台只读代理尚未配置' }

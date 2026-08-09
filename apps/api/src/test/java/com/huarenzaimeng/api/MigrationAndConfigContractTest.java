@@ -80,6 +80,8 @@ class MigrationAndConfigContractTest {
                 .contains("${HZ_DATASOURCE_URL}")
                 .contains("${SPRING_DATASOURCE_PASSWORD}")
                 .contains("${SPRING_FLYWAY_PASSWORD}")
+                .contains("test-access-token: ${HZ_TEST_ACCESS_TOKEN:}")
+                .contains("content-token: ${HZ_CONTENT_ADMIN_TOKEN:}")
                 .contains("enabled: true");
         String explicitDataSource = source("src/main/java/com/huarenzaimeng/api/config/ReleaseMysqlDataSourceConfig.java");
         assertThat(explicitDataSource).contains("@Profile(\"release-mysql\")")

@@ -29,7 +29,13 @@ class BuildSelectionContractTest {
         assertThat(test).isGreaterThanOrEqualTo(0);
         assertThat(packaging).isGreaterThan(test);
         assertThat(dockerfile).contains("SPRING_PROFILES_ACTIVE=mock")
+                .contains("FROM node:24-alpine AS admin-web-build")
+                .contains("VITE_ADMIN_DATA_MODE=PROJECT_API_PROXY")
+                .contains("npm run test:contracts && npm run build")
+                .contains("COPY --from=admin-web-build /workspace/apps/admin-web/dist apps/api/src/main/resources/static")
                 .contains("USER 10001:10001")
                 .contains("--chown=10001:10001");
+        assertThat(Files.readString(PROJECT_ROOT.resolve("apps/api/src/main/java/com/huarenzaimeng/api/MockFlowController.java")))
+                .contains("@Profile({\"mock\", \"test\"})");
     }
 }

@@ -146,6 +146,7 @@ export type AdminPageProjection =
 export type AdminReadState =
   | { status: 'LOADING'; data: null; message: string }
   | { status: 'READY'; data: AdminPageProjection; message: string }
+  | { status: 'UNAUTHENTICATED'; data: null; message: string }
   | { status: 'ACCESS_DENIED'; data: null; message: string; denialKind: 'ROLE_DENIED' | 'AUTHORITY_UNAVAILABLE' }
   | { status: 'UNAVAILABLE'; data: null; message: string }
 
