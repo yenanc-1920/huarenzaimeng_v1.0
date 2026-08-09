@@ -10,7 +10,10 @@ spring:
       minimum-idle: 0
       connection-timeout: 10000
   flyway:
-    enabled: true
+    # Cloud hosting performs an immediate TCP probe. Boot's default Flyway
+    # initializer runs before Tomcat listens, so release migration is started
+    # explicitly by an ApplicationRunner after port 8080 is bound.
+    enabled: false
     url: ${HZ_DATASOURCE_URL}
     user: ${SPRING_FLYWAY_USER}
     password: ${SPRING_FLYWAY_PASSWORD}
