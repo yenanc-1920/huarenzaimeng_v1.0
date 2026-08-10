@@ -9,14 +9,11 @@ import org.springframework.stereotype.Component;
 final class BuyerAuthConfigurationValidator {
     BuyerAuthConfigurationValidator(
             @Value("${hz.buyer-auth.enabled:false}") boolean enabled,
-            @Value("${hz.buyer-auth.trusted-ingress:}") String ingress,
-            @Value("${hz.buyer-auth.expected-appid-digest:}") String appidDigest,
             @Value("${hz.buyer-auth.identity-pepper:}") String pepper,
-            @Value("${hz.buyer-auth.ingress-hmac-secret:}") String ingressSecret) {
+            @Value("${hz.buyer-auth.code-pepper:}") String codePepper,
+            @Value("${hz.buyer-auth.provider-mode:disabled}") String providerMode) {
         if (!enabled) return;
-        if (!"WECHAT_CLOUD_HOSTING_HMAC_V1".equals(ingress)
-                || !appidDigest.matches("[0-9a-f]{64}") || pepper.length() < 32
-                || ingressSecret.length() < 32 || ingressSecret.equals(pepper)) {
+        if (!"fake-only".equals(providerMode) || pepper.length() < 32 || codePepper.length() < 32 || codePepper.equals(pepper)) {
             throw new IllegalStateException("BUYER_AUTH_CONFIGURATION_INCOMPLETE");
         }
     }
