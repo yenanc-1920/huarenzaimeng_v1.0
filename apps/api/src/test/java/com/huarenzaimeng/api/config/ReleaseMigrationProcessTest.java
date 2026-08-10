@@ -3,6 +3,7 @@ package com.huarenzaimeng.api.config;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
@@ -32,13 +33,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReleaseMigrationProcessTest {
     @Test void webPortListensAndHttpStaysClosedWhileMigrationRunnerBlocks() throws Exception {
         int port = availablePort();
+        CountDownLatch applicationStarted = new CountDownLatch(1);
         CountDownLatch migrationStarted = new CountDownLatch(1);
         CountDownLatch allowMigrationToFinish = new CountDownLatch(1);
-        TestApplication.latches(migrationStarted, allowMigrationToFinish);
+        TestApplication.latches(applicationStarted, migrationStarted, allowMigrationToFinish);
 
         CompletableFuture<ConfigurableApplicationContext> startup = CompletableFuture.supplyAsync(() -> {
             SpringApplication application = new SpringApplication(TestApplication.class);
             application.setAdditionalProfiles("release-mysql");
+            application.addListeners(event -> {
+                if (event instanceof ApplicationStartedEvent) applicationStarted.countDown();
+            });
             return application.run("--server.port=" + port, "--logging.level.root=OFF");
         });
 
@@ -188,14 +193,18 @@ class ReleaseMigrationProcessTest {
     @Import(ReleaseMigrationGateFilter.class)
     static class TestApplication {
         private static volatile CountDownLatch started;
+        private static volatile CountDownLatch applicationStarted;
         private static volatile CountDownLatch finish;
 
-        static void latches(CountDownLatch migrationStarted, CountDownLatch allowMigrationToFinish) {
+        static void latches(CountDownLatch bootStarted, CountDownLatch migrationStarted,
+                            CountDownLatch allowMigrationToFinish) {
+            applicationStarted = bootStarted;
             started = migrationStarted;
             finish = allowMigrationToFinish;
         }
 
         static void clearLatches() {
+            applicationStarted = null;
             started = null;
             finish = null;
         }
@@ -206,6 +215,9 @@ class ReleaseMigrationProcessTest {
 
         @Bean ApplicationRunner blockingMigrationRunner(ReleaseMigrationState state) {
             return args -> {
+                if (applicationStarted.getCount() != 0) {
+                    throw new IllegalStateException("APPLICATION_STARTED_EVENT_NOT_PUBLISHED_BEFORE_RUNNER");
+                }
                 started.countDown();
                 if (!finish.await(20, TimeUnit.SECONDS)) throw new IllegalStateException("TEST_MIGRATION_TIMEOUT");
                 state.ready();

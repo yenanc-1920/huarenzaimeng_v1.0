@@ -92,8 +92,8 @@ class MigrationAndConfigContractTest {
                 .contains(".dataSource(url, user, password)");
         String migrationRunner = source("src/main/java/com/huarenzaimeng/api/config/ReleaseFlywayMigrationRunner.java");
         assertThat(migrationRunner).contains("implements ApplicationRunner")
-                .contains("flyway.validate();")
                 .contains("flyway.migrate();")
+                .doesNotContain("flyway.validate();")
                 .contains("throw failure;");
         String explicitDataSource = source("src/main/java/com/huarenzaimeng/api/config/ReleaseMysqlDataSourceConfig.java");
         assertThat(explicitDataSource).contains("@Profile(\"release-mysql\")")

@@ -19,7 +19,8 @@ class ReleaseMigrationStartupContractTest {
                 .doesNotContain("SPRING_DATASOURCE_PASSWORD: ${SPRING_FLYWAY_PASSWORD}");
         assertThat(configuration).contains("Flyway.configure()", ".dataSource(url, user, password)")
                 .doesNotContain("System.out", "logger.", "printStackTrace");
-        assertThat(runner).contains("implements ApplicationRunner", "flyway.validate();", "flyway.migrate();")
+        assertThat(runner).contains("implements ApplicationRunner", "flyway.migrate();")
+                .doesNotContain("flyway.validate();")
                 .contains("state.failed();", "throw failure;");
         assertThat(gate).contains("@Order(Ordered.HIGHEST_PRECEDENCE)", "SC_SERVICE_UNAVAILABLE")
                 .doesNotContain("shouldNotFilter");

@@ -11,14 +11,13 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 
 class ReleaseFlywayMigrationRunnerTest {
-    @Test void validatesThenMigratesBeforeOpeningTheGate() throws Exception {
+    @Test void migratesBeforeOpeningTheGate() throws Exception {
         Flyway flyway = mock(Flyway.class);
         ReleaseMigrationState state = new ReleaseMigrationState();
 
         new ReleaseFlywayMigrationRunner(flyway, state).run(new DefaultApplicationArguments());
 
         var order = inOrder(flyway);
-        order.verify(flyway).validate();
         order.verify(flyway).migrate();
         assertThat(state.phase()).isEqualTo(ReleaseMigrationState.Phase.READY);
     }
@@ -26,7 +25,7 @@ class ReleaseFlywayMigrationRunnerTest {
     @Test void leavesGateClosedAndPropagatesMigrationFailure() {
         Flyway flyway = mock(Flyway.class);
         IllegalStateException failure = new IllegalStateException("synthetic migration failure");
-        doThrow(failure).when(flyway).validate();
+        doThrow(failure).when(flyway).migrate();
         ReleaseMigrationState state = new ReleaseMigrationState();
 
         assertThatThrownBy(() -> new ReleaseFlywayMigrationRunner(flyway, state)
