@@ -78,11 +78,23 @@ class MigrationAndConfigContractTest {
                 .contains("enabled: false");
         assertThat(release).contains("mode: mysql")
                 .contains("${HZ_DATASOURCE_URL}")
+                .contains("${SPRING_FLYWAY_USER}")
                 .contains("${SPRING_DATASOURCE_PASSWORD}")
                 .contains("${SPRING_FLYWAY_PASSWORD}")
                 .contains("test-access-token: ${HZ_TEST_ACCESS_TOKEN:}")
                 .contains("content-token: ${HZ_CONTENT_ADMIN_TOKEN:}")
-                .contains("enabled: true");
+                .contains("enabled: false");
+        String controlledFlyway = source("src/main/java/com/huarenzaimeng/api/config/ReleaseFlywayConfiguration.java");
+        assertThat(controlledFlyway).contains("@Profile(\"release-mysql\")")
+                .contains("@Value(\"${spring.flyway.user}\")")
+                .contains("@Value(\"${spring.flyway.password}\")")
+                .contains("Flyway.configure()")
+                .contains(".dataSource(url, user, password)");
+        String migrationRunner = source("src/main/java/com/huarenzaimeng/api/config/ReleaseFlywayMigrationRunner.java");
+        assertThat(migrationRunner).contains("implements ApplicationRunner")
+                .contains("flyway.validate();")
+                .contains("flyway.migrate();")
+                .contains("throw failure;");
         String explicitDataSource = source("src/main/java/com/huarenzaimeng/api/config/ReleaseMysqlDataSourceConfig.java");
         assertThat(explicitDataSource).contains("@Profile(\"release-mysql\")")
                 .contains("@Value(\"${HZ_DATASOURCE_URL}\")")
