@@ -26,6 +26,13 @@ hz:
     bootstrap-enabled: ${HZ_ADMIN_BOOTSTRAP_ENABLED:false}
     bootstrap-token: ${HZ_ADMIN_BOOTSTRAP_TOKEN:}
     session-hours: ${HZ_ADMIN_SESSION_HOURS:8}
+  buyer-auth:
+    enabled: ${HZ_BUYER_AUTH_ENABLED:false}
+    trusted-ingress: ${HZ_BUYER_AUTH_TRUSTED_INGRESS:}
+    ingress-hmac-secret: ${HZ_BUYER_AUTH_INGRESS_HMAC_SECRET:}
+    expected-appid-digest: ${HZ_BUYER_AUTH_APPID_DIGEST:}
+    identity-pepper: ${HZ_BUYER_AUTH_IDENTITY_PEPPER:}
+    session-hours: ${HZ_BUYER_AUTH_SESSION_HOURS:8}
   # Test-only credentials are forbidden in the production release profile.
   test-access-token: ${HZ_TEST_ACCESS_TOKEN:}
   project-auth:

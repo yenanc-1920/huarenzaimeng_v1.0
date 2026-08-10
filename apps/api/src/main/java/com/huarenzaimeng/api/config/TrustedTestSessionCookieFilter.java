@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.slf4j.Logger;
@@ -20,6 +21,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
 @Component
+@Profile("!release-mysql & (mock | test)")
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public final class TrustedTestSessionCookieFilter extends OncePerRequestFilter {
     private static final Logger LOG = LoggerFactory.getLogger(TrustedTestSessionCookieFilter.class);
