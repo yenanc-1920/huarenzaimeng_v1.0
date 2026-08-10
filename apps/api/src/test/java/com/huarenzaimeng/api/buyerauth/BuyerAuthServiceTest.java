@@ -1,8 +1,11 @@
 package com.huarenzaimeng.api.buyerauth;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import jakarta.servlet.FilterChain;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HexFormat;
@@ -49,6 +52,42 @@ class BuyerAuthServiceTest {
         assertThat(store.audit.requestId()).doesNotContain("openid", "secret");
     }
 
+    @Test void disabledModeRejectsPreloadedValidSessionBeforeStoreReadAndBuyerProjection() throws Exception {
+        CapturingStore store = new CapturingStore();
+        store.activeBuyer = Optional.of(new BuyerAuthStore.AuthenticatedBuyer("buyer-id", "BUYER-synthetic"));
+        BuyerAuthService service = new BuyerAuthService(store, false, "", "", 8);
+
+        assertThat(service.authenticate("synthetic-valid-old-token")).isEmpty();
+        assertThat(store.readCount).isZero();
+        assertThat(store.writeCount).isZero();
+
+        BuyerSessionFilter filter = new BuyerSessionFilter(service);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/buyer-api/v1/orders");
+        request.addHeader("Authorization", "Bearer synthetic-valid-old-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        int[] downstreamCalls = {0};
+        FilterChain downstream = (ignoredRequest, ignoredResponse) -> downstreamCalls[0]++;
+
+        filter.doFilter(request, response, downstream);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(request.getAttribute(BuyerSessionFilter.BUYER)).isNull();
+        assertThat(downstreamCalls[0]).isZero();
+        assertThat(store.readCount).isZero();
+        assertThat(store.writeCount).isZero();
+    }
+
+    @Test void enabledModeStillAuthenticatesPreloadedValidSession() {
+        CapturingStore store = new CapturingStore();
+        BuyerAuthStore.AuthenticatedBuyer buyer = new BuyerAuthStore.AuthenticatedBuyer("buyer-id", "BUYER-synthetic");
+        store.activeBuyer = Optional.of(buyer);
+        BuyerAuthService service = new BuyerAuthService(store, true, hmac(APPID), PEPPER, 8);
+
+        assertThat(service.authenticate("synthetic-valid-old-token")).contains(buyer);
+        assertThat(store.readCount).isOne();
+        assertThat(store.writeCount).isZero();
+    }
+
     private static String hmac(String value) {
         try {
             Mac mac=Mac.getInstance("HmacSHA256");
@@ -58,12 +97,13 @@ class BuyerAuthServiceTest {
     }
 
     private static final class CapturingStore implements BuyerAuthStore {
-        int writeCount; String subjectDigest; String tokenDigest; Instant issuedAt; Instant expiresAt; Audit audit;
+        int readCount; int writeCount; String subjectDigest; String tokenDigest; Instant issuedAt; Instant expiresAt; Audit audit;
+        Optional<AuthenticatedBuyer> activeBuyer = Optional.empty();
         @Override public Identity establishIdentityAndSession(String appidDigest,String subjectDigest,String subjectRef,
                 String sessionId,String tokenDigest,Instant issuedAt,Instant expiresAt,Audit audit) {
             writeCount++; this.subjectDigest=subjectDigest; this.tokenDigest=tokenDigest; this.issuedAt=issuedAt;this.expiresAt=expiresAt;this.audit=audit;
             return new Identity("buyer-id",subjectRef);
         }
-        @Override public Optional<AuthenticatedBuyer> findActiveSession(String tokenDigest,Instant now){return Optional.empty();}
+        @Override public Optional<AuthenticatedBuyer> findActiveSession(String tokenDigest,Instant now){readCount++; return activeBuyer;}
     }
 }

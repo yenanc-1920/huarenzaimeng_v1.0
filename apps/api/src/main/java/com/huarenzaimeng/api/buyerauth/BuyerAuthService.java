@@ -40,7 +40,7 @@ final class BuyerAuthService {
         return new SessionResult(token,identity.subjectRef(),now.plus(ttl));
     }
     Optional<BuyerAuthStore.AuthenticatedBuyer> authenticate(String token) {
-        return token==null||token.isBlank()?Optional.empty():store.findActiveSession(sha256(token),Instant.now());
+        return !enabled||token==null||token.isBlank()?Optional.empty():store.findActiveSession(sha256(token),Instant.now());
     }
     private String hmac(String value){try{Mac mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(pepper,"HmacSHA256"));return HexFormat.of().formatHex(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException("BUYER_IDENTITY_DIGEST_UNAVAILABLE");}}
     private static String sha256(String v){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException(e);}}
