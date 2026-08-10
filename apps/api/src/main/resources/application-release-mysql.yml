@@ -34,9 +34,13 @@ hz:
     mode: disabled
     fixture-mode: no-default
   p021:
-    # Enable only for the isolated huarenzaimeng_it_vnext integration deployment.
+    # Formal release is fail-closed. Test-readonly belongs in an isolated test profile/service.
     mode: ${HZ_P021_MODE:disabled}
     fixture-mode: no-default
+  a110:
+    mode: disabled
+  life-content:
+    mode: disabled
   temporal-overview:
     mode: disabled
   persistence:
