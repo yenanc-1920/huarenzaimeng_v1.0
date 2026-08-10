@@ -19,7 +19,10 @@ button:focus-visible, select:focus-visible, [tabindex="0"]:focus-visible { outli
 .brand strong { font-size: 20px; color: #d8422f; }
 .brand span { font-size: 14px; color: #667085; }
 .topbar-actions { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: flex-end; }
-.environment, .trusted-role { padding: 7px 11px; border-radius: 999px; background: #fff4df; color: #80500b; font-size: 13px; }
+.environment, .trusted-role, .data-origin { padding: 7px 11px; border-radius: 999px; background: #fff4df; color: #80500b; font-size: 13px; }
+.data-origin { background: #eef4ff; color: #315fa4; }
+.logout-button { min-height: 38px; padding: 0 14px; border: 1px solid #b8c8df; border-radius: 9px; background: #fff; color: #244f88; cursor: pointer; }
+.logout-button:disabled { cursor: wait; opacity: .7; }
 .topbar label { display: flex; align-items: center; gap: 8px; color: #667085; font-size: 13px; }
 .topbar select { padding: 0 32px 0 12px; border: 1px solid #d9dfe8; border-radius: 8px; background: #fff; color: #24314d; }
 .app-shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: calc(100vh - 72px); }
@@ -115,6 +118,11 @@ button:focus-visible, select:focus-visible, [tabindex="0"]:focus-visible { outli
 }
 
 .login-required { min-height: calc(100vh - 180px); display: grid; place-items: center; padding: 40px; }
+.standalone-login { min-height: 100vh; background: linear-gradient(145deg, #eef4ff, #f8fafc 55%, #fff7ea); }
+.auth-check { min-height: 100vh; padding: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: #f3f6fb; }
+.auth-check > img { width: 64px; height: 64px; margin-bottom: 26px; border-radius: 16px; }
+.auth-check h1 { margin: 22px 0 8px; font-size: 26px; }
+.auth-check p { margin: 0; color: #68748a; }
 .login-card { width: min(100%, 460px); padding: 48px; border: 1px solid var(--line); border-radius: 28px; background: #fff; box-shadow: 0 24px 64px rgba(26,52,94,.12); text-align: center; }
 .login-card img { width: 88px; height: 88px; }
 .login-card h1 { margin: 16px 0 12px; font-size: 32px; }

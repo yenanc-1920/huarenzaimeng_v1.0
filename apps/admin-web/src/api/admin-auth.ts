@@ -12,6 +12,7 @@ async function jsonRequest(path: string, body: object, headers: Record<string, s
 }
 
 export const loginAdmin = (username: string, password: string) => jsonRequest('/login', { username, password })
+export const logoutAdmin = () => jsonRequest('/logout', {})
 
 export async function initializationStatus(): Promise<'AVAILABLE' | 'CLOSED'> {
   const response = await fetch(`${ADMIN_AUTH_PATH}/initialization`, { credentials: 'include', headers: { Accept: 'application/json' } })
