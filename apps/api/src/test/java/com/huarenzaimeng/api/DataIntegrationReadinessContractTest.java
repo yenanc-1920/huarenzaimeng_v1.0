@@ -97,16 +97,87 @@ class DataIntegrationReadinessContractTest {
     }
 
     @Test void fixed_manifest_is_ordinal_and_matches_every_source_file() throws Exception {
-        var manifest = java.nio.file.Path.of("manifests/DATA-INTEGRATION-01-readonly-challenge.txt");
+        var repoRoot = resolveRepositoryRoot(java.nio.file.Path.of("").toAbsolutePath());
+        var moduleRoot = repoRoot.resolve("apps/api");
+        assertThat(resolveRepositoryRoot(repoRoot)).isEqualTo(repoRoot);
+        assertThat(resolveRepositoryRoot(moduleRoot)).isEqualTo(repoRoot);
+
+        var manifest = moduleRoot.resolve("manifests/DATA-INTEGRATION-01-readonly-challenge.txt");
         var lines = java.nio.file.Files.readAllLines(manifest, java.nio.charset.StandardCharsets.UTF_8);
         assertThat(lines).hasSize(5).isSorted();
         for (String line : lines) {
             String[] fields = line.split("\\|", -1);
             assertThat(fields).hasSize(2);
-            byte[] bytes = java.nio.file.Files.readAllBytes(java.nio.file.Path.of("../..", fields[0]).normalize());
+            byte[] bytes = java.nio.file.Files.readAllBytes(repoRoot.resolve(fields[0]).normalize());
             String actual = HexFormat.of().withUpperCase().formatHex(
                     java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
             assertThat(actual).isEqualTo(fields[1]);
+        }
+    }
+
+    @Test void repository_root_resolution_rejects_zero_candidates() throws Exception {
+        var fixture = java.nio.file.Files.createTempDirectory("data-root-zero-");
+        try {
+            assertThat(org.assertj.core.api.Assertions.catchThrowable(
+                    () -> resolveRepositoryRoot(fixture)))
+                    .isInstanceOf(IOException.class)
+                    .hasMessage("PROJECT_ROOT_RESOLUTION_FAILED");
+        } finally {
+            deleteFixture(fixture);
+        }
+        assertThat(java.nio.file.Files.exists(fixture)).isFalse();
+    }
+
+    @Test void repository_root_resolution_rejects_nested_multiple_candidates() throws Exception {
+        var fixture = java.nio.file.Files.createTempDirectory("data-root-multiple-");
+        try {
+            var outer = fixture.resolve("outer");
+            var nested = outer.resolve("apps/api/nested");
+            java.nio.file.Files.createDirectories(outer.resolve("apps/api"));
+            java.nio.file.Files.createFile(outer.resolve("pom.xml"));
+            java.nio.file.Files.createFile(outer.resolve("apps/api/pom.xml"));
+            java.nio.file.Files.createDirectories(nested.resolve("apps/api"));
+            java.nio.file.Files.createFile(nested.resolve("pom.xml"));
+            java.nio.file.Files.createFile(nested.resolve("apps/api/pom.xml"));
+
+            assertThat(org.assertj.core.api.Assertions.catchThrowable(
+                    () -> resolveRepositoryRoot(nested.resolve("apps/api"))))
+                    .isInstanceOf(IOException.class)
+                    .hasMessage("PROJECT_ROOT_RESOLUTION_FAILED");
+        } finally {
+            deleteFixture(fixture);
+        }
+        assertThat(java.nio.file.Files.exists(fixture)).isFalse();
+    }
+
+    private static java.nio.file.Path resolveRepositoryRoot(java.nio.file.Path start) throws IOException {
+        var candidates = new java.util.LinkedHashSet<java.nio.file.Path>();
+        for (var current = start.toRealPath(); current != null; current = current.getParent()) {
+            if (java.nio.file.Files.isRegularFile(current.resolve("pom.xml"))
+                    && java.nio.file.Files.isRegularFile(current.resolve("apps/api/pom.xml"))) {
+                candidates.add(current);
+            }
+            if (current.endsWith(java.nio.file.Path.of("apps", "api"))) {
+                var parent = current.getParent();
+                var repository = parent == null ? null : parent.getParent();
+                if (repository != null
+                        && java.nio.file.Files.isRegularFile(current.resolve("pom.xml"))
+                        && java.nio.file.Files.isRegularFile(repository.resolve("pom.xml"))) {
+                    candidates.add(repository);
+                }
+            }
+        }
+        if (candidates.size() != 1) {
+            throw new IOException("PROJECT_ROOT_RESOLUTION_FAILED");
+        }
+        return candidates.iterator().next();
+    }
+
+    private static void deleteFixture(java.nio.file.Path root) throws IOException {
+        try (var paths = java.nio.file.Files.walk(root)) {
+            for (var path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                java.nio.file.Files.delete(path);
+            }
         }
     }
 
