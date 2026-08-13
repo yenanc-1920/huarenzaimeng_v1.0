@@ -20,6 +20,7 @@ COPY pom.xml ./
 COPY modules/core/pom.xml modules/core/pom.xml
 COPY apps/api/pom.xml apps/api/pom.xml
 COPY apps/worker/pom.xml apps/worker/pom.xml
+COPY tools/SurefireSafeFailureSummary.java tools/SurefireSafeFailureSummary.java
 
 RUN mvn -B -ntp -s .mvn/settings.xml -pl apps/api -am dependency:go-offline
 
@@ -30,7 +31,7 @@ COPY apps/api/Invoke-P021OrderDetailEvidenceFinalRun.ps1 apps/api/Invoke-P021Ord
 COPY apps/api/Invoke-P021TestReadonlyIntegrationFinalRun.ps1 apps/api/Invoke-P021TestReadonlyIntegrationFinalRun.ps1
 COPY apps/miniapp/scripts/collect-p021-it-page-actual.ps1 apps/miniapp/scripts/collect-p021-it-page-actual.ps1
 
-RUN mvn -B -ntp -s .mvn/settings.xml -pl apps/api -am clean test
+RUN log=/tmp/maven-test.log; trap 'rm -f "$log"' EXIT HUP INT TERM; set +e; mvn -B -ntp -s .mvn/settings.xml -pl apps/api -am clean test -Dsurefire.useFile=true -Dsurefire.redirectTestOutputToFile=true -Dsurefire.printSummary=false >"$log" 2>&1; status=$?; set -e; rm -f "$log"; trap - EXIT HUP INT TERM; if [ "$status" -ne 0 ]; then set +e; summary=$(java tools/SurefireSafeFailureSummary.java modules/core/target/surefire-reports apps/api/target/surefire-reports 2>/dev/null); summary_status=$?; set -e; if [ "$summary_status" -eq 0 ]; then printf '%s\n' "$summary"; else echo 'SAFE_SUREFIRE_SUMMARY_ERROR SUMMARIZER_FAILED'; fi; exit "$status"; fi; echo MAVEN_TESTS_PASSED
 RUN mvn -B -ntp -s .mvn/settings.xml -pl apps/api -am package -DskipTests
 
 FROM eclipse-temurin:17-jre-jammy
