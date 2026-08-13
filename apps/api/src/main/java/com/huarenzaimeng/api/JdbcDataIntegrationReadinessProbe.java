@@ -38,7 +38,11 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
     private static final String EXPECTED_DATABASE = "huarenzaimeng_it_vnext";
     private static final Pattern SHA256 = Pattern.compile("[A-F0-9]{64}");
     private static final Pattern MIGRATION = Pattern.compile("(?:^|/)V(\\d+)__[^/]+\\.(?:sql|class)$");
-    private static final Pattern GRANT = Pattern.compile("^GRANT (.+) ON (.+) TO .+$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern GRANT = Pattern.compile(
+            "^GRANT (.+) ON (.+) TO (?:`(?:``|[^`])*`|'(?:''|[^'])*')@(?:`(?:``|[^`])*`|'(?:''|[^'])*')$",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern GRANT_OPTION = Pattern.compile("\\s+WITH\\s+GRANT\\s+OPTION\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final int MAX_GRANT_ROWS = 16;
     private static final Set<String> APP_REQUIRED = Set.of("SELECT", "INSERT", "UPDATE", "DELETE");
     private static final Set<String> FLYWAY_REQUIRED = Set.of(
             "SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "INDEX", "REFERENCES");
@@ -87,8 +91,8 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
                         this::discoverMigrations);
                 BackupSummary backup = at(DataIntegrationReadinessStageException.Stage.BACKUP_STATUS, this::backup);
                 boolean ready = "MYSQL_5_7_MATCHED".equals(engineStatus)
-                        && "MATCHED".equals(applicationGrant.status())
-                        && "MATCHED".equals(flywayGrant.status())
+                        && applicationGrant.grantBoundarySatisfied()
+                        && flywayGrant.grantBoundarySatisfied()
                         && "MATCHED".equals(flywaySummary.status())
                         && "UNIQUE_V1_TO_V11".equals(discovery.status())
                         && "PRESENT".equals(backup.referenceStatus())
@@ -149,31 +153,54 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
     private static GrantSummary grants(Connection connection, String principalClass,
                                        Set<String> required) throws SQLException {
         List<String> raw = rows(connection, "SHOW GRANTS FOR CURRENT_USER()");
-        TreeSet<String> canonical = new TreeSet<>();
-        Set<String> databasePrivileges = new HashSet<>();
-        boolean forbidden = false;
+        int usage = 0;
+        int unknown = 0;
+        boolean parserCompatible = true;
+        boolean confirmedUnapproved = false;
+        boolean expectedRequiredDuplicate = false;
+        Set<String> expectedFound = new HashSet<>();
+        Set<String> seenAtoms = new HashSet<>();
         for (String value : raw) {
+            if (raw.size() > MAX_GRANT_ROWS || GRANT_OPTION.matcher(value).find()) {
+                unknown++; parserCompatible = false; continue;
+            }
             Matcher matcher = GRANT.matcher(value.trim());
-            if (!matcher.matches()) { forbidden = true; continue; }
+            if (!matcher.matches()) { unknown++; parserCompatible = false; continue; }
             String scope = matcher.group(2).replace("`", "").toUpperCase(Locale.ROOT);
             TreeSet<String> privileges = new TreeSet<>();
             for (String privilege : matcher.group(1).split(",")) privileges.add(privilege.trim().toUpperCase(Locale.ROOT));
-            if ("*.*".equals(scope) && privileges.equals(Set.of("USAGE"))) {
-                canonical.add("USAGE|*.*");
-            } else if ((EXPECTED_DATABASE.toUpperCase(Locale.ROOT) + ".*").equals(scope)) {
-                databasePrivileges.addAll(privileges);
-                canonical.add(String.join(",", privileges) + "|" + EXPECTED_DATABASE + ".*");
-            } else {
-                forbidden = true;
-                canonical.add(String.join(",", privileges) + "|UNEXPECTED_SCOPE");
+            if (privileges.isEmpty()) { unknown++; parserCompatible = false; continue; }
+            for (String privilege : privileges) {
+                String atom = scope + "|" + privilege;
+                boolean usageAtom = "*.*".equals(scope) && "USAGE".equals(privilege);
+                if (usageAtom) usage++;
+                if (!seenAtoms.add(atom)) {
+                    if ((EXPECTED_DATABASE.toUpperCase(Locale.ROOT) + ".*").equals(scope)
+                            && required.contains(privilege)) expectedRequiredDuplicate = true;
+                    unknown++;
+                    continue;
+                }
+                if (!usageAtom && (EXPECTED_DATABASE.toUpperCase(Locale.ROOT) + ".*").equals(scope)
+                        && required.contains(privilege)) {
+                    expectedFound.add(privilege);
+                } else if (!usageAtom) {
+                    unknown++;
+                    confirmedUnapproved = true;
+                }
             }
         }
-        boolean requiredPresent = databasePrivileges.containsAll(required);
-        boolean unexpectedPrivileges = !required.containsAll(databasePrivileges);
-        boolean forbiddenAbsent = !forbidden && !unexpectedPrivileges;
-        String status = requiredPresent && forbiddenAbsent ? "MATCHED" : "MISMATCH";
-        return new GrantSummary(principalClass, status, sha256(String.join("\n", canonical)),
-                raw.size(), requiredPresent, forbiddenAbsent);
+        boolean usageExact = usage == 1;
+        boolean requiredComplete = expectedFound.size() == required.size();
+        boolean requiredExact = requiredComplete && !confirmedUnapproved && !expectedRequiredDuplicate;
+        int platformAdditionalCount = 0;
+        boolean platformApprovedOnly = true;
+        boolean unknownAbsent = unknown == 0;
+        boolean adjustment = parserCompatible && (usage == 0 || !requiredComplete || confirmedUnapproved);
+        boolean boundary = usageExact && requiredComplete && requiredExact && platformApprovedOnly
+                && unknownAbsent && parserCompatible;
+        return new GrantSummary(usage, usageExact, expectedFound.size(), requiredComplete, requiredExact,
+                platformAdditionalCount, platformApprovedOnly, unknown, unknownAbsent, parserCompatible,
+                adjustment, boundary);
     }
 
     private static FlywaySummary flyway(Connection connection) throws SQLException {

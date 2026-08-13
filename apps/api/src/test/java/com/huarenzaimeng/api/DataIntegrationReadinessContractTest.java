@@ -209,6 +209,94 @@ class DataIntegrationReadinessContractTest {
         assertThat(writes).hasValue(0);
     }
 
+    @Test void exact_application_and_flyway_grants_classify_with_conserved_safe_counts() throws Exception {
+        var application = classifyGrants("APPLICATION", Set.of("SELECT", "INSERT", "UPDATE", "DELETE"), List.of(
+                "GRANT USAGE ON *.* TO `CANARY_APP`@`CANARY_HOST`",
+                "GRANT SELECT, INSERT ON `huarenzaimeng_it_vnext`.* TO `CANARY_APP`@`CANARY_HOST`",
+                "GRANT UPDATE, DELETE ON `huarenzaimeng_it_vnext`.* TO `CANARY_APP`@`CANARY_HOST`"));
+        var flyway = classifyGrants("FLYWAY", Set.of("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "INDEX", "REFERENCES"), List.of(
+                "GRANT USAGE ON *.* TO `CANARY_FLYWAY`@`CANARY_HOST`",
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON `huarenzaimeng_it_vnext`.* TO `CANARY_FLYWAY`@`CANARY_HOST`",
+                "GRANT CREATE, ALTER, INDEX, REFERENCES ON `huarenzaimeng_it_vnext`.* TO `CANARY_FLYWAY`@`CANARY_HOST`"));
+
+        assertMatched(application, 4);
+        assertMatched(flyway, 8);
+        assertThat(application.toString() + flyway).doesNotContain("CANARY", "huarenzaimeng_it_vnext", "SELECT");
+    }
+
+    @Test void missing_usage_duplicate_extra_and_empty_allowlist_fail_closed_with_independent_semantics() throws Exception {
+        Set<String> required = Set.of("SELECT", "INSERT", "UPDATE", "DELETE");
+        var missingUsage = classifyGrants("APPLICATION", required, List.of(
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON `huarenzaimeng_it_vnext`.* TO `u`@`h`"));
+        assertThat(missingUsage.usageCount()).isZero();
+        assertThat(missingUsage.usageExact()).isFalse();
+        assertThat(missingUsage.parserCompatible()).isTrue();
+        assertThat(missingUsage.permissionAdjustmentRequired()).isTrue();
+        assertThat(missingUsage.grantBoundarySatisfied()).isFalse();
+
+        var duplicateUsage = classifyGrants("APPLICATION", required, List.of(
+                "GRANT USAGE ON *.* TO `u`@`h`", "GRANT USAGE ON *.* TO `u`@`h`",
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON `huarenzaimeng_it_vnext`.* TO `u`@`h`"));
+        assertThat(duplicateUsage.usageCount()).isEqualTo(2);
+        assertThat(duplicateUsage.usageExact()).isFalse();
+        assertThat(duplicateUsage.unknownCount()).isEqualTo(1);
+        assertThat(duplicateUsage.parserCompatible()).isTrue();
+        assertThat(duplicateUsage.grantBoundarySatisfied()).isFalse();
+
+        var duplicateRequired = classifyGrants("APPLICATION", required, List.of(
+                "GRANT USAGE ON *.* TO `u`@`h`",
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON `huarenzaimeng_it_vnext`.* TO `u`@`h`",
+                "GRANT SELECT ON `huarenzaimeng_it_vnext`.* TO `u`@`h`"));
+        assertThat(duplicateRequired.expectedRequiredCount()).isEqualTo(4);
+        assertThat(duplicateRequired.expectedRequiredComplete()).isTrue();
+        assertThat(duplicateRequired.expectedRequiredExact()).isFalse();
+        assertThat(duplicateRequired.unknownCount()).isEqualTo(1);
+        assertThat(duplicateRequired.unknownAbsent()).isFalse();
+        assertThat(duplicateRequired.grantBoundarySatisfied()).isFalse();
+
+        var extra = classifyGrants("APPLICATION", required, List.of(
+                "GRANT USAGE ON *.* TO `u`@`h`",
+                "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE ON `huarenzaimeng_it_vnext`.* TO `u`@`h`"));
+        assertThat(extra.platformAdditionalCount()).isZero();
+        assertThat(extra.platformAdditionalApprovedOnly()).isTrue();
+        assertThat(extra.unknownCount()).isEqualTo(1);
+        assertThat(extra.permissionAdjustmentRequired()).isTrue();
+        assertThat(extra.grantBoundarySatisfied()).isFalse();
+        assertThat(extra.toString()).doesNotContain("CREATE", "huarenzaimeng_it_vnext");
+    }
+
+    @Test void parser_incompatibility_is_unknown_without_permission_adjustment_advice() throws Exception {
+        Set<String> required = Set.of("SELECT", "INSERT", "UPDATE", "DELETE");
+        for (var grants : List.of(
+                List.of("GRANT CANARY_ROLE TO `CANARY_USER`@`CANARY_HOST`"),
+                List.of("GRANT USAGE ON *.* TO `u`@`h` WITH GRANT OPTION"),
+                java.util.stream.IntStream.range(0, 17).mapToObj(i -> "GRANT CANARY_" + i + " TO `u`@`h`").toList())) {
+            var result = classifyGrants("APPLICATION", required, grants);
+            assertThat(result.unknownCount()).isPositive();
+            assertThat(result.unknownAbsent()).isFalse();
+            assertThat(result.parserCompatible()).isFalse();
+            assertThat(result.permissionAdjustmentRequired()).isFalse();
+            assertThat(result.grantBoundarySatisfied()).isFalse();
+            assertThat(result.toString()).doesNotContain("CANARY", "GRANT OPTION");
+        }
+    }
+
+    @Test void public_grant_response_is_isomorphic_fixed_counts_and_booleans_only() {
+        var response = new DataIntegrationReadinessService(() -> snapshot(true)).read();
+        var fields = Arrays.stream(response.applicationGrant().getClass().getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName).toList();
+        assertThat(fields).containsExactly("usageCount", "usageExact", "expectedRequiredCount",
+                "expectedRequiredComplete", "expectedRequiredExact", "platformAdditionalCount",
+                "platformAdditionalApprovedOnly", "unknownCount", "unknownAbsent", "parserCompatible",
+                "permissionAdjustmentRequired", "grantBoundarySatisfied");
+        assertThat(response.flywayGrant().getClass()).isEqualTo(response.applicationGrant().getClass());
+        assertThat(fields).noneMatch(name -> name.toLowerCase(java.util.Locale.ROOT).contains("granttext")
+                || name.toLowerCase(java.util.Locale.ROOT).contains("canonical")
+                || name.toLowerCase(java.util.Locale.ROOT).contains("scope")
+                || name.toLowerCase(java.util.Locale.ROOT).contains("account")
+                || name.toLowerCase(java.util.Locale.ROOT).contains("host"));
+    }
+
     @Test void fixed_manifest_is_ordinal_and_matches_every_source_file() throws Exception {
         var repoRoot = resolveRepositoryRoot(java.nio.file.Path.of("").toAbsolutePath());
         var moduleRoot = repoRoot.resolve("apps/api");
@@ -307,6 +395,52 @@ class DataIntegrationReadinessContractTest {
                 });
     }
 
+    private static DataIntegrationReadinessProbe.GrantSummary classifyGrants(
+            String roleCode, Set<String> required, List<String> rows) throws Exception {
+        AtomicInteger writes = new AtomicInteger();
+        Connection connection = (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(),
+                new Class<?>[] {Connection.class}, (proxy, method, arguments) -> {
+                    if (method.getName().equals("createStatement")) return grantStatement(rows, writes);
+                    return defaultValue(method.getReturnType());
+                });
+        var method = JdbcDataIntegrationReadinessProbe.class.getDeclaredMethod(
+                "grants", Connection.class, String.class, Set.class);
+        method.setAccessible(true);
+        var result = (DataIntegrationReadinessProbe.GrantSummary) method.invoke(null, connection, roleCode, required);
+        assertThat(writes).hasValue(0);
+        return result;
+    }
+
+    private static Statement grantStatement(List<String> rows, AtomicInteger writes) {
+        return (Statement) Proxy.newProxyInstance(Statement.class.getClassLoader(),
+                new Class<?>[] {Statement.class}, (proxy, method, arguments) -> {
+                    if (method.getName().equals("executeQuery")) {
+                        assertThat(arguments[0]).isEqualTo("SHOW GRANTS FOR CURRENT_USER()");
+                        return schemaResult(rows);
+                    }
+                    if (method.getName().equals("execute") || method.getName().equals("executeUpdate")) {
+                        writes.incrementAndGet();
+                        throw new AssertionError("GRANT_CLASSIFICATION_WRITE_NOT_ALLOWED");
+                    }
+                    return defaultValue(method.getReturnType());
+                });
+    }
+
+    private static void assertMatched(DataIntegrationReadinessProbe.GrantSummary value, int requiredCount) {
+        assertThat(value.usageCount()).isEqualTo(1);
+        assertThat(value.usageExact()).isTrue();
+        assertThat(value.expectedRequiredCount()).isEqualTo(requiredCount);
+        assertThat(value.expectedRequiredComplete()).isTrue();
+        assertThat(value.expectedRequiredExact()).isTrue();
+        assertThat(value.platformAdditionalCount()).isZero();
+        assertThat(value.platformAdditionalApprovedOnly()).isTrue();
+        assertThat(value.unknownCount()).isZero();
+        assertThat(value.unknownAbsent()).isTrue();
+        assertThat(value.parserCompatible()).isTrue();
+        assertThat(value.permissionAdjustmentRequired()).isFalse();
+        assertThat(value.grantBoundarySatisfied()).isTrue();
+    }
+
     private static Statement schemaStatement(List<String> queries, AtomicInteger writes,
                                              boolean unexpectedNull) {
         return (Statement) Proxy.newProxyInstance(Statement.class.getClassLoader(),
@@ -391,8 +525,12 @@ class DataIntegrationReadinessContractTest {
 
     private static DataIntegrationReadinessProbe.Snapshot snapshot(boolean ready) {
         String status = ready ? "MATCHED" : "MISMATCH";
-        var app = new DataIntegrationReadinessProbe.GrantSummary("APPLICATION", status, "A".repeat(64), 2, ready, ready);
-        var flywayGrant = new DataIntegrationReadinessProbe.GrantSummary("FLYWAY", status, "B".repeat(64), 2, ready, ready);
+        var app = ready
+                ? new DataIntegrationReadinessProbe.GrantSummary(1, true, 4, true, true, 0, true, 0, true, true, false, true)
+                : new DataIntegrationReadinessProbe.GrantSummary(0, false, 0, false, false, 0, true, 0, true, true, true, false);
+        var flywayGrant = ready
+                ? new DataIntegrationReadinessProbe.GrantSummary(1, true, 8, true, true, 0, true, 0, true, true, false, true)
+                : new DataIntegrationReadinessProbe.GrantSummary(0, false, 0, false, false, 0, true, 0, true, true, true, false);
         var flyway = new DataIntegrationReadinessProbe.FlywaySummary(status, 11, "11", ready, "C".repeat(64));
         var schema = new DataIntegrationReadinessProbe.SchemaSummary(20, 100, 40, 8, "D".repeat(64));
         var discovery = new DataIntegrationReadinessProbe.MigrationDiscovery(

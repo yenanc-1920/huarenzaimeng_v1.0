@@ -14,16 +14,28 @@ final class DataIntegrationReadinessService {
         DataIntegrationReadinessProbe.Snapshot value = probe.inspect();
         return new Response(value.ready() ? "READY" : "NOT_READY", "DATA_INTEGRATION_DB_READINESS",
                 value.serviceArtifactIdentity(), value.databaseIdentity(), value.databaseEngineStatus(),
-                value.applicationGrant(), value.flywayGrant(), value.flyway(), value.schema(),
+                publicGrant(value.applicationGrant()), publicGrant(value.flywayGrant()), value.flyway(), value.schema(),
                 value.migrationDiscovery(), value.backup());
+    }
+
+    private static PublicGrantSummary publicGrant(DataIntegrationReadinessProbe.GrantSummary value) {
+        return new PublicGrantSummary(value.usageCount(), value.usageExact(), value.expectedRequiredCount(),
+                value.expectedRequiredComplete(), value.expectedRequiredExact(), value.platformAdditionalCount(),
+                value.platformAdditionalApprovedOnly(), value.unknownCount(), value.unknownAbsent(),
+                value.parserCompatible(), value.permissionAdjustmentRequired(), value.grantBoundarySatisfied());
     }
 
     record Response(String status, String projectCode, String serviceArtifactIdentity,
                     String databaseIdentity, String databaseEngineStatus,
-                    DataIntegrationReadinessProbe.GrantSummary applicationGrant,
-                    DataIntegrationReadinessProbe.GrantSummary flywayGrant,
+                    PublicGrantSummary applicationGrant, PublicGrantSummary flywayGrant,
                     DataIntegrationReadinessProbe.FlywaySummary flyway,
                     DataIntegrationReadinessProbe.SchemaSummary schema,
                     DataIntegrationReadinessProbe.MigrationDiscovery migrationDiscovery,
                     DataIntegrationReadinessProbe.BackupSummary backup) {}
+
+    record PublicGrantSummary(int usageCount, boolean usageExact, int expectedRequiredCount,
+                              boolean expectedRequiredComplete, boolean expectedRequiredExact,
+                              int platformAdditionalCount, boolean platformAdditionalApprovedOnly,
+                              int unknownCount, boolean unknownAbsent, boolean parserCompatible,
+                              boolean permissionAdjustmentRequired, boolean grantBoundarySatisfied) {}
 }
