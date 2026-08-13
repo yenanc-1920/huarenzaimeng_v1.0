@@ -13,6 +13,25 @@ import java.util.Map;
 
 @Mapper
 interface FlowMapper {
+    @Select("SELECT environment,evidence_level,authority_state FROM hz_order WHERE project_subject_ref=#{subject} AND order_ref=#{orderRef} FOR UPDATE")
+    Map<String,Object> selectOrderAuthorityForUpdate(@Param("subject") String subject,@Param("orderRef") String orderRef);
+    @Insert("""
+            INSERT INTO hz_state_advance_authority_fact
+              (aggregate_ref, command_id, environment, evidence_level, authorization_ref, target_transition,
+               evidence_ref, authority_state, created_at)
+            VALUES (#{aggregateRef}, #{commandId}, #{environment}, #{evidenceLevel}, #{authorizationRef},
+                    #{targetTransition}, #{evidenceRef}, #{authorityState}, #{createdAt})
+            """)
+    int insertStateAdvanceAuthorityFact(@Param("aggregateRef") String aggregateRef,
+                                        @Param("commandId") String commandId,
+                                        @Param("environment") String environment,
+                                        @Param("evidenceLevel") String evidenceLevel,
+                                        @Param("authorizationRef") String authorizationRef,
+                                        @Param("targetTransition") String targetTransition,
+                                        @Param("evidenceRef") String evidenceRef,
+                                        @Param("authorityState") String authorityState,
+                                        @Param("createdAt") Timestamp createdAt);
+
     @Select("""
             SELECT content_ref, title, summary, category, ownership_mode, source_category, source_ref,
                    verification_scope, verified_by, verified_at, valid_until, aggregate_version,

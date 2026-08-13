@@ -43,6 +43,8 @@ class InMemoryFlowStore implements FlowStore {
     private final Set<String> refundFacts = ConcurrentHashMap.newKeySet();
     private final Set<String> localLedgerFacts = ConcurrentHashMap.newKeySet();
     private final Set<String> ledgerEntries = ConcurrentHashMap.newKeySet();
+    private final Map<String, StateAdvanceCommand> stateAdvanceAuthorityFacts = new ConcurrentHashMap<>();
+    private final Map<String, StateAdvanceGate.AggregateIdentity> aggregateIdentities = new ConcurrentHashMap<>();
     private final Set<String> externalCalls = ConcurrentHashMap.newKeySet();
 
     @Override
@@ -101,6 +103,8 @@ class InMemoryFlowStore implements FlowStore {
                 quote.totalAmountMinor(), quote.currency(), 1L, 1L,
                 MockFlowService.CREATE_PAYMENT_INTENT_ACTION);
         orders.put(subjectKey(projectSubjectRef, orderRef), order);
+        aggregateIdentities.put(subjectKey(projectSubjectRef,orderRef),new StateAdvanceGate.AggregateIdentity(
+                StateAdvanceAuthority.Environment.LOCAL_SYNTHETIC,StateAdvanceAuthority.EvidenceLevel.L1,"NON_PRODUCTION"));
         OrderBinding binding = new OrderBinding(command.canonicalFingerprint(), orderRef);
         orderBusinessKeys.put(subjectKey(projectSubjectRef, command.semanticActionKey()), binding);
         orderCommandKeys.put(subjectKey(projectSubjectRef, command.commandId()), binding);
@@ -235,8 +239,7 @@ class InMemoryFlowStore implements FlowStore {
                 byCommand.requestFingerprint(), byCommand.paymentIntentRef(), PaymentIntentResultState.FOUND, null);
     }
 
-    @Override
-    public synchronized OrderProjection transitionOrder(String projectSubjectRef, String orderRef,
+    private OrderProjection applyAuthorizedTransition(String projectSubjectRef, String orderRef,
                                                         CommandIdentity command, long expectedProjectionVersion,
                                                         long expectedAggregateVersion,
                                                         UnaryOperator<OrderProjection> transition) {
@@ -255,6 +258,21 @@ class InMemoryFlowStore implements FlowStore {
         record(projectSubjectRef, command, orderRef);
         return updated;
     }
+
+    @Override
+    public synchronized OrderProjection transitionOrderAuthorized(String projectSubjectRef, String orderRef,
+            StateAdvanceCommand advance, long expectedProjectionVersion, long expectedAggregateVersion,
+            UnaryOperator<OrderProjection> transition) {
+        StateAdvanceGate.AggregateIdentity identity=aggregateIdentities.get(subjectKey(projectSubjectRef,orderRef));
+        StateAdvanceGate.verify(orderRef,identity,advance);
+        String factKey=subjectKey(projectSubjectRef,orderRef+":"+advance.command().commandId());
+        OrderProjection result=applyAuthorizedTransition(projectSubjectRef, orderRef, advance.command(), expectedProjectionVersion,
+                expectedAggregateVersion, transition);
+        stateAdvanceAuthorityFacts.putIfAbsent(factKey,advance);
+        return result;
+    }
+
+    synchronized long stateAdvanceAuthorityFactCountForTest(){return stateAdvanceAuthorityFacts.size();}
 
     private CommandRecord replay(String subject, CommandIdentity command) {
         String commandScope = subjectKey(subject, command.commandId());

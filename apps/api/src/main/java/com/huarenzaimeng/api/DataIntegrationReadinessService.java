@@ -14,8 +14,10 @@ final class DataIntegrationReadinessService {
         DataIntegrationReadinessProbe.Snapshot value = probe.inspect();
         return new Response(value.ready() ? "READY" : "NOT_READY", "DATA_INTEGRATION_DB_READINESS",
                 value.serviceArtifactIdentity(), value.databaseIdentity(), value.databaseEngineStatus(),
-                publicGrant(value.applicationGrant()), publicGrant(value.flywayGrant()), value.flyway(), value.schema(),
-                value.migrationDiscovery(), value.backup());
+                publicGrant(value.applicationGrant()), publicGrant(value.flywayGrant()),
+                new GrantUnknownBreakdown(value.applicationGrantUnknownBreakdown(), value.flywayGrantUnknownBreakdown()),
+                value.flyway(), value.schema(),
+                value.migrationDiscovery(), value.migrationOracle(), value.backup());
     }
 
     private static PublicGrantSummary publicGrant(DataIntegrationReadinessProbe.GrantSummary value) {
@@ -28,9 +30,11 @@ final class DataIntegrationReadinessService {
     record Response(String status, String projectCode, String serviceArtifactIdentity,
                     String databaseIdentity, String databaseEngineStatus,
                     PublicGrantSummary applicationGrant, PublicGrantSummary flywayGrant,
+                    GrantUnknownBreakdown grantUnknownBreakdown,
                     DataIntegrationReadinessProbe.FlywaySummary flyway,
                     DataIntegrationReadinessProbe.SchemaSummary schema,
                     DataIntegrationReadinessProbe.MigrationDiscovery migrationDiscovery,
+                    DataIntegrationReadinessProbe.MigrationOracleSummary migrationOracle,
                     DataIntegrationReadinessProbe.BackupSummary backup) {}
 
     record PublicGrantSummary(int usageCount, boolean usageExact, int expectedRequiredCount,
@@ -38,4 +42,7 @@ final class DataIntegrationReadinessService {
                               int platformAdditionalCount, boolean platformAdditionalApprovedOnly,
                               int unknownCount, boolean unknownAbsent, boolean parserCompatible,
                               boolean permissionAdjustmentRequired, boolean grantBoundarySatisfied) {}
+
+    record GrantUnknownBreakdown(DataIntegrationReadinessProbe.GrantUnknownBreakdown application,
+                                 DataIntegrationReadinessProbe.GrantUnknownBreakdown flyway) {}
 }

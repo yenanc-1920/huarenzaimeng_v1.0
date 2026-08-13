@@ -290,11 +290,68 @@ class DataIntegrationReadinessContractTest {
                 "platformAdditionalApprovedOnly", "unknownCount", "unknownAbsent", "parserCompatible",
                 "permissionAdjustmentRequired", "grantBoundarySatisfied");
         assertThat(response.flywayGrant().getClass()).isEqualTo(response.applicationGrant().getClass());
+        var breakdownFields = Arrays.stream(response.grantUnknownBreakdown().application().getClass().getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName).toList();
+        assertThat(breakdownFields).containsExactly("unexpectedPrivilegeCount", "unexpectedScopeCount",
+                "duplicateRequiredCount", "duplicateUsageCount", "malformedCount", "otherUnknownCount");
+        assertThat(response.grantUnknownBreakdown().flyway().getClass())
+                .isEqualTo(response.grantUnknownBreakdown().application().getClass());
         assertThat(fields).noneMatch(name -> name.toLowerCase(java.util.Locale.ROOT).contains("granttext")
                 || name.toLowerCase(java.util.Locale.ROOT).contains("canonical")
                 || name.toLowerCase(java.util.Locale.ROOT).contains("scope")
                 || name.toLowerCase(java.util.Locale.ROOT).contains("account")
                 || name.toLowerCase(java.util.Locale.ROOT).contains("host"));
+    }
+
+    @Test void unknown_breakdown_is_mutually_exclusive_conserved_and_role_isolated() throws Exception {
+        Set<String> app = Set.of("SELECT", "INSERT", "UPDATE", "DELETE");
+        var privilege = classify("APPLICATION", app, List.of(
+                "GRANT USAGE ON *.* TO `u`@`h`", "GRANT CREATE ON `huarenzaimeng_it_vnext`.* TO `u`@`h`"));
+        assertBreakdown(privilege, 1, 0, 0, 0, 0, 0);
+        var scope = classify("APPLICATION", app, List.of(
+                "GRANT USAGE ON *.* TO `u`@`h`", "GRANT SELECT ON `other_db`.* TO `u`@`h`"));
+        assertBreakdown(scope, 0, 1, 0, 0, 0, 0);
+        var duplicateRequired = classify("APPLICATION", app, List.of(
+                "GRANT USAGE ON *.* TO `u`@`h`",
+                "GRANT SELECT, INSERT, UPDATE, DELETE ON `huarenzaimeng_it_vnext`.* TO `u`@`h`",
+                "GRANT SELECT ON `huarenzaimeng_it_vnext`.* TO `u`@`h`"));
+        assertBreakdown(duplicateRequired, 0, 0, 1, 0, 0, 0);
+        var duplicateUsage = classify("APPLICATION", app, List.of(
+                "GRANT USAGE ON *.* TO `u`@`h`", "GRANT USAGE ON *.* TO `u`@`h`"));
+        assertBreakdown(duplicateUsage, 0, 0, 0, 1, 0, 0);
+        var malformed = classify("APPLICATION", app, List.of("GRANT CANARY_ROLE TO `u`@`h`"));
+        assertBreakdown(malformed, 0, 0, 0, 0, 1, 0);
+        assertThat(malformed.summary().permissionAdjustmentRequired()).isFalse();
+        var priorityAndOther = classify("APPLICATION", app, List.of(
+                "GRANT USAGE ON *.* TO `u`@`h`",
+                "GRANT CREATE ON `huarenzaimeng_it_vnext`.* TO `u`@`h`",
+                "GRANT CREATE ON `huarenzaimeng_it_vnext`.* TO `u`@`h`"));
+        assertBreakdown(priorityAndOther, 1, 0, 0, 0, 0, 1);
+        assertThat(priorityAndOther.summary().permissionAdjustmentRequired()).isTrue();
+
+        var flyway = classify("FLYWAY", Set.of("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "INDEX", "REFERENCES"),
+                List.of("GRANT USAGE ON *.* TO `u`@`h`", "GRANT EXECUTE ON `huarenzaimeng_it_vnext`.* TO `u`@`h`"));
+        assertBreakdown(flyway, 1, 0, 0, 0, 0, 0);
+        assertThat(privilege.toString() + scope + malformed + flyway)
+                .doesNotContain("CANARY", "other_db", "CREATE", "EXECUTE", "huarenzaimeng_it_vnext");
+    }
+
+    @Test void grant_row_limit_fails_once_before_parsing_for_seventeen_and_large_inputs() throws Exception {
+        Set<String> required = Set.of("SELECT", "INSERT", "UPDATE", "DELETE");
+        for (int size : List.of(17, 100_000)) {
+            List<String> rows = java.util.Collections.nCopies(size,
+                    "GRANT CANARY_SECRET ON `CANARY_SCOPE`.* TO `CANARY_USER`@`CANARY_HOST`");
+            var value = classify("APPLICATION", required, rows);
+            assertThat(value.summary().usageCount()).isZero();
+            assertThat(value.summary().expectedRequiredCount()).isZero();
+            assertThat(value.summary().unknownCount()).isEqualTo(1);
+            assertThat(value.summary().unknownAbsent()).isFalse();
+            assertThat(value.summary().parserCompatible()).isFalse();
+            assertThat(value.summary().permissionAdjustmentRequired()).isFalse();
+            assertThat(value.summary().grantBoundarySatisfied()).isFalse();
+            assertBreakdown(value, 0, 0, 0, 0, 1, 0);
+            assertThat(value.toString()).doesNotContain("CANARY", "SECRET", "SCOPE", "USER", "HOST");
+        }
     }
 
     @Test void fixed_manifest_is_ordinal_and_matches_every_source_file() throws Exception {
@@ -367,6 +424,9 @@ class DataIntegrationReadinessContractTest {
                     candidates.add(repository);
                 }
             }
+            if (!candidates.isEmpty() && java.nio.file.Files.exists(current.resolve(".git"))) {
+                break;
+            }
         }
         if (candidates.size() != 1) {
             throw new IOException("PROJECT_ROOT_RESOLUTION_FAILED");
@@ -397,6 +457,11 @@ class DataIntegrationReadinessContractTest {
 
     private static DataIntegrationReadinessProbe.GrantSummary classifyGrants(
             String roleCode, Set<String> required, List<String> rows) throws Exception {
+        return classify(roleCode, required, rows).summary();
+    }
+
+    private static TestGrantClassification classify(
+            String roleCode, Set<String> required, List<String> rows) throws Exception {
         AtomicInteger writes = new AtomicInteger();
         Connection connection = (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(),
                 new Class<?>[] {Connection.class}, (proxy, method, arguments) -> {
@@ -406,10 +471,31 @@ class DataIntegrationReadinessContractTest {
         var method = JdbcDataIntegrationReadinessProbe.class.getDeclaredMethod(
                 "grants", Connection.class, String.class, Set.class);
         method.setAccessible(true);
-        var result = (DataIntegrationReadinessProbe.GrantSummary) method.invoke(null, connection, roleCode, required);
+        Object result = method.invoke(null, connection, roleCode, required);
+        var summaryMethod = result.getClass().getDeclaredMethod("summary");
+        var breakdownMethod = result.getClass().getDeclaredMethod("breakdown");
+        summaryMethod.setAccessible(true);
+        breakdownMethod.setAccessible(true);
         assertThat(writes).hasValue(0);
-        return result;
+        return new TestGrantClassification(
+                (DataIntegrationReadinessProbe.GrantSummary) summaryMethod.invoke(result),
+                (DataIntegrationReadinessProbe.GrantUnknownBreakdown) breakdownMethod.invoke(result));
     }
+
+    private static void assertBreakdown(TestGrantClassification value, int privilege, int scope,
+                                        int requiredDuplicate, int usageDuplicate, int malformed, int other) {
+        var breakdown = value.breakdown();
+        assertThat(breakdown.unexpectedPrivilegeCount()).isEqualTo(privilege);
+        assertThat(breakdown.unexpectedScopeCount()).isEqualTo(scope);
+        assertThat(breakdown.duplicateRequiredCount()).isEqualTo(requiredDuplicate);
+        assertThat(breakdown.duplicateUsageCount()).isEqualTo(usageDuplicate);
+        assertThat(breakdown.malformedCount()).isEqualTo(malformed);
+        assertThat(breakdown.otherUnknownCount()).isEqualTo(other);
+        assertThat(breakdown.total()).isEqualTo(value.summary().unknownCount());
+    }
+
+    private record TestGrantClassification(DataIntegrationReadinessProbe.GrantSummary summary,
+                                           DataIntegrationReadinessProbe.GrantUnknownBreakdown breakdown) {}
 
     private static Statement grantStatement(List<String> rows, AtomicInteger writes) {
         return (Statement) Proxy.newProxyInstance(Statement.class.getClassLoader(),
@@ -531,14 +617,19 @@ class DataIntegrationReadinessContractTest {
         var flywayGrant = ready
                 ? new DataIntegrationReadinessProbe.GrantSummary(1, true, 8, true, true, 0, true, 0, true, true, false, true)
                 : new DataIntegrationReadinessProbe.GrantSummary(0, false, 0, false, false, 0, true, 0, true, true, true, false);
-        var flyway = new DataIntegrationReadinessProbe.FlywaySummary(status, 11, "11", ready, "C".repeat(64));
+        var flyway = new DataIntegrationReadinessProbe.FlywaySummary(status, 12, "12", ready, "C".repeat(64));
         var schema = new DataIntegrationReadinessProbe.SchemaSummary(20, 100, 40, 8, "D".repeat(64));
         var discovery = new DataIntegrationReadinessProbe.MigrationDiscovery(
-                ready ? "UNIQUE_V1_TO_V11" : "MIGRATION_DISCOVERY_MISMATCH", 11, "11", "E".repeat(64));
+                ready ? "UNIQUE_V1_TO_V12" : "MIGRATION_DISCOVERY_MISMATCH", 12, "12", "E".repeat(64));
+        var oracle = new DataIntegrationReadinessProbe.MigrationOracleSummary(
+                ready ? "POST_V12" : "NO_GO_PARTIAL_OR_DRIFT", ready);
         var backup = new DataIntegrationReadinessProbe.BackupSummary(ready ? "PRESENT" : "ABSENT",
                 ready ? "PRESENT" : "ABSENT");
         return new DataIntegrationReadinessProbe.Snapshot("ARTIFACT_SHA256:" + "F".repeat(64),
                 "huarenzaimeng_it_vnext|TENCENT64.site|*|server-uuid", ready ? "MYSQL_5_7_MATCHED" : "DATABASE_IDENTITY_OR_VERSION_MISMATCH",
-                app, flywayGrant, flyway, schema, discovery, backup, ready);
+                app, flywayGrant,
+                new DataIntegrationReadinessProbe.GrantUnknownBreakdown(0, 0, 0, 0, 0, 0),
+                new DataIntegrationReadinessProbe.GrantUnknownBreakdown(0, 0, 0, 0, 0, 0),
+                flyway, schema, discovery, oracle, backup, ready);
     }
 }

@@ -23,6 +23,9 @@ public class ReleaseFlywayConfiguration {
             @Value("${spring.flyway.connect-retries:0}") int connectRetries,
             @Value("${spring.flyway.validate-on-migrate:true}") boolean validateOnMigrate,
             @Value("${spring.flyway.baseline-on-migrate:false}") boolean baselineOnMigrate) {
+        if (connectRetries != 0) {
+            throw new IllegalStateException("FLYWAY_CONNECT_RETRIES_MUST_BE_ZERO");
+        }
         return Flyway.configure()
                 .dataSource(url, user, password)
                 .locations(locations.split(","))
@@ -33,7 +36,11 @@ public class ReleaseFlywayConfiguration {
     }
 
     @Bean
-    ReleaseFlywayMigrationRunner releaseFlywayMigrationRunner(Flyway releaseFlyway, ReleaseMigrationState state) {
-        return new ReleaseFlywayMigrationRunner(releaseFlyway, state);
+    ReleaseFlywayMigrationRunner releaseFlywayMigrationRunner(
+            Flyway releaseFlyway,
+            ReleaseMigrationState state,
+            @Value("${hz.data-integration.expected-database-name}") String expectedDatabaseName,
+            @Value("${hz.data-integration.expected-server-uuid}") String expectedServerUuid) {
+        return new ReleaseFlywayMigrationRunner(releaseFlyway, state, expectedDatabaseName, expectedServerUuid);
     }
 }

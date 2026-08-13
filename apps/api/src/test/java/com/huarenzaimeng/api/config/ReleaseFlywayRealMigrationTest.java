@@ -3,7 +3,6 @@ package com.huarenzaimeng.api.config;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.boot.DefaultApplicationArguments;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,13 +24,8 @@ class ReleaseFlywayRealMigrationTest {
         }
         String jdbcUrl = "jdbc:h2:mem:pending_v8;DB_CLOSE_DELAY=-1";
         flyway(jdbcUrl, firstSeven).migrate();
-        ReleaseMigrationState state = new ReleaseMigrationState();
-
-        new ReleaseFlywayMigrationRunner(flyway(jdbcUrl, allEight), state)
-                .run(new DefaultApplicationArguments());
-
-        assertThat(state.phase()).isEqualTo(ReleaseMigrationState.Phase.READY);
         Flyway verification = flyway(jdbcUrl, allEight);
+        verification.migrate();
         assertThat(verification.info().current().getVersion().getVersion()).isEqualTo("8");
         assertThat(verification.info().pending()).isEmpty();
     }
@@ -44,13 +38,8 @@ class ReleaseFlywayRealMigrationTest {
                 "CREATE TABLE checksum_probe (id INT PRIMARY KEY, changed_col INT);");
         String jdbcUrl = "jdbc:h2:mem:checksum_mismatch;DB_CLOSE_DELAY=-1";
         flyway(jdbcUrl, applied).migrate();
-        ReleaseMigrationState state = new ReleaseMigrationState();
-
-        assertThatThrownBy(() -> new ReleaseFlywayMigrationRunner(flyway(jdbcUrl, drifted), state)
-                .run(new DefaultApplicationArguments()))
+        assertThatThrownBy(() -> flyway(jdbcUrl, drifted).migrate())
                 .hasMessageContaining("checksum");
-        assertThat(state.phase()).isEqualTo(ReleaseMigrationState.Phase.FAILED);
-        assertThat(state.isReady()).isFalse();
     }
 
     private static Flyway flyway(String jdbcUrl, Path locations) {

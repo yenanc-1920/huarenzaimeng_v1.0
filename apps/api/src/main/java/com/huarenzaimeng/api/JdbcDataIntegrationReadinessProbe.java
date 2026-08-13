@@ -79,26 +79,35 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
                 String engineStatus = identityMatched && version != null && version.startsWith("5.7.")
                         ? "MYSQL_5_7_MATCHED" : "DATABASE_IDENTITY_OR_VERSION_MISMATCH";
 
-                GrantSummary applicationGrant = at(DataIntegrationReadinessStageException.Stage.APP_GRANTS,
+                GrantClassification applicationClassification = at(DataIntegrationReadinessStageException.Stage.APP_GRANTS,
                         () -> grants(application, "APPLICATION", APP_REQUIRED));
-                GrantSummary flywayGrant = at(DataIntegrationReadinessStageException.Stage.FLYWAY_GRANTS,
+                GrantClassification flywayClassification = at(DataIntegrationReadinessStageException.Stage.FLYWAY_GRANTS,
                         () -> grants(flyway, "FLYWAY", FLYWAY_REQUIRED));
+                GrantSummary applicationGrant = applicationClassification.summary();
+                GrantSummary flywayGrant = flywayClassification.summary();
                 FlywaySummary flywaySummary = at(DataIntegrationReadinessStageException.Stage.FLYWAY_HISTORY,
                         () -> flyway(application));
                 SchemaSummary schemaSummary = at(DataIntegrationReadinessStageException.Stage.SCHEMA,
                         () -> schema(application));
                 MigrationDiscovery discovery = at(DataIntegrationReadinessStageException.Stage.MIGRATION_DISCOVERY,
                         this::discoverMigrations);
+                DataMigrationOracleVerifier.State oracleState = at(DataIntegrationReadinessStageException.Stage.SCHEMA,
+                        () -> DataMigrationOracleVerifier.verify(application, EXPECTED_DATABASE,
+                                required("hz.data-integration.expected-server-uuid")));
+                MigrationOracleSummary oracle = new MigrationOracleSummary(oracleState.name(),
+                        oracleState == DataMigrationOracleVerifier.State.POST_V12);
                 BackupSummary backup = at(DataIntegrationReadinessStageException.Stage.BACKUP_STATUS, this::backup);
                 boolean ready = "MYSQL_5_7_MATCHED".equals(engineStatus)
                         && applicationGrant.grantBoundarySatisfied()
                         && flywayGrant.grantBoundarySatisfied()
                         && "MATCHED".equals(flywaySummary.status())
-                        && "UNIQUE_V1_TO_V11".equals(discovery.status())
+                        && "UNIQUE_V1_TO_V12".equals(discovery.status())
+                        && oracle.terminalMatched()
                         && "PRESENT".equals(backup.referenceStatus())
                         && "PRESENT".equals(backup.restoreEvidenceStatus());
                 return new Snapshot(runtimeIdentity(), databaseIdentity, engineStatus,
-                        applicationGrant, flywayGrant, flywaySummary, schemaSummary, discovery, backup, ready);
+                        applicationGrant, flywayGrant, applicationClassification.breakdown(),
+                        flywayClassification.breakdown(), flywaySummary, schemaSummary, discovery, oracle, backup, ready);
             } finally {
                 safeRollback(application);
                 safeRollback(flyway);
@@ -150,33 +159,52 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
         }
     }
 
-    private static GrantSummary grants(Connection connection, String principalClass,
-                                       Set<String> required) throws SQLException {
+    private static GrantClassification grants(Connection connection, String principalClass,
+                                        Set<String> required) throws SQLException {
         List<String> raw = rows(connection, "SHOW GRANTS FOR CURRENT_USER()");
+        if (raw.size() > MAX_GRANT_ROWS) {
+            return new GrantClassification(
+                    new GrantSummary(0, false, 0, false, false, 0, true,
+                            1, false, false, false, false),
+                    new GrantUnknownBreakdown(0, 0, 0, 0, 1, 0));
+        }
         int usage = 0;
         int unknown = 0;
         boolean parserCompatible = true;
         boolean confirmedUnapproved = false;
         boolean expectedRequiredDuplicate = false;
+        int unexpectedPrivilege = 0;
+        int unexpectedScope = 0;
+        int duplicateRequired = 0;
+        int duplicateUsage = 0;
+        int malformed = 0;
+        int otherUnknown = 0;
         Set<String> expectedFound = new HashSet<>();
         Set<String> seenAtoms = new HashSet<>();
         for (String value : raw) {
-            if (raw.size() > MAX_GRANT_ROWS || GRANT_OPTION.matcher(value).find()) {
-                unknown++; parserCompatible = false; continue;
+            if (GRANT_OPTION.matcher(value).find()) {
+                unknown++; malformed++; parserCompatible = false; continue;
             }
             Matcher matcher = GRANT.matcher(value.trim());
-            if (!matcher.matches()) { unknown++; parserCompatible = false; continue; }
+            if (!matcher.matches()) { unknown++; malformed++; parserCompatible = false; continue; }
             String scope = matcher.group(2).replace("`", "").toUpperCase(Locale.ROOT);
             TreeSet<String> privileges = new TreeSet<>();
             for (String privilege : matcher.group(1).split(",")) privileges.add(privilege.trim().toUpperCase(Locale.ROOT));
-            if (privileges.isEmpty()) { unknown++; parserCompatible = false; continue; }
+            if (privileges.isEmpty()) { unknown++; malformed++; parserCompatible = false; continue; }
             for (String privilege : privileges) {
                 String atom = scope + "|" + privilege;
                 boolean usageAtom = "*.*".equals(scope) && "USAGE".equals(privilege);
                 if (usageAtom) usage++;
                 if (!seenAtoms.add(atom)) {
                     if ((EXPECTED_DATABASE.toUpperCase(Locale.ROOT) + ".*").equals(scope)
-                            && required.contains(privilege)) expectedRequiredDuplicate = true;
+                            && required.contains(privilege)) {
+                        expectedRequiredDuplicate = true;
+                        duplicateRequired++;
+                    } else if (usageAtom) {
+                        duplicateUsage++;
+                    } else {
+                        otherUnknown++;
+                    }
                     unknown++;
                     continue;
                 }
@@ -186,6 +214,11 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
                 } else if (!usageAtom) {
                     unknown++;
                     confirmedUnapproved = true;
+                    if (!(EXPECTED_DATABASE.toUpperCase(Locale.ROOT) + ".*").equals(scope)) {
+                        unexpectedScope++;
+                    } else {
+                        unexpectedPrivilege++;
+                    }
                 }
             }
         }
@@ -195,13 +228,25 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
         int platformAdditionalCount = 0;
         boolean platformApprovedOnly = true;
         boolean unknownAbsent = unknown == 0;
-        boolean adjustment = parserCompatible && (usage == 0 || !requiredComplete || confirmedUnapproved);
+        GrantUnknownBreakdown breakdown = new GrantUnknownBreakdown(unexpectedPrivilege, unexpectedScope,
+                duplicateRequired, duplicateUsage, malformed, otherUnknown);
+        boolean classificationMatched = breakdown.total() == unknown;
+        boolean adjustment = parserCompatible && classificationMatched
+                && (usage == 0 || !requiredComplete || confirmedUnapproved
+                || duplicateRequired > 0 || duplicateUsage > 0 || unexpectedScope > 0 || unexpectedPrivilege > 0);
         boolean boundary = usageExact && requiredComplete && requiredExact && platformApprovedOnly
-                && unknownAbsent && parserCompatible;
-        return new GrantSummary(usage, usageExact, expectedFound.size(), requiredComplete, requiredExact,
+                && unknownAbsent && parserCompatible && classificationMatched;
+        GrantSummary summary = new GrantSummary(usage, usageExact, expectedFound.size(), requiredComplete, requiredExact,
                 platformAdditionalCount, platformApprovedOnly, unknown, unknownAbsent, parserCompatible,
                 adjustment, boundary);
+        if (!classificationMatched) {
+            summary = new GrantSummary(usage, usageExact, expectedFound.size(), requiredComplete, false,
+                    platformAdditionalCount, platformApprovedOnly, unknown, unknownAbsent, false, false, false);
+        }
+        return new GrantClassification(summary, breakdown);
     }
+
+    private record GrantClassification(GrantSummary summary, GrantUnknownBreakdown breakdown) {}
 
     private static FlywaySummary flyway(Connection connection) throws SQLException {
         List<String> lines = new ArrayList<>();
@@ -213,7 +258,7 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
         }
         String current = lines.isEmpty() ? null : lines.get(lines.size() - 1).split("\\|", -1)[1];
         boolean success = !lines.isEmpty() && lines.stream().allMatch(line -> line.endsWith("|true"));
-        String status = success && "11".equals(current) ? "MATCHED" : "MISMATCH";
+        String status = success && "12".equals(current) && lines.size() == 12 ? "MATCHED" : "MISMATCH";
         return new FlywaySummary(status, lines.size(), current, success, sha256(String.join("\n", lines)));
     }
 
@@ -248,9 +293,9 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
         } catch (Exception exception) {
             return new MigrationDiscovery("DISCOVERY_UNAVAILABLE", 0, null, sha256("DISCOVERY_UNAVAILABLE"));
         }
-        boolean exact = versions.size() == 11;
-        for (int version = 1; version <= 11; version++) exact &= versions.getOrDefault(version, 0) == 1;
-        return new MigrationDiscovery(exact ? "UNIQUE_V1_TO_V11" : "MIGRATION_DISCOVERY_MISMATCH",
+        boolean exact = versions.size() == 12;
+        for (int version = 1; version <= 12; version++) exact &= versions.getOrDefault(version, 0) == 1;
+        return new MigrationDiscovery(exact ? "UNIQUE_V1_TO_V12" : "MIGRATION_DISCOVERY_MISMATCH",
                 versions.size(), versions.isEmpty() ? null : Integer.toString(versions.keySet().stream().max(Integer::compareTo).orElseThrow()),
                 sha256(String.join("\n", entries)));
     }

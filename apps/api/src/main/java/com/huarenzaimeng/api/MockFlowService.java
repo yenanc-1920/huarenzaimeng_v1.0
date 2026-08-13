@@ -389,7 +389,9 @@ public class MockFlowService {
                                                 long expectedAggregateVersion) {
         CommandIdentity command = command(commandId, idempotencyKey, "POST:/api/v1/orders/{orderRef}/mock-payment",
                 orderRef, "MOCK_PAYMENT:" + orderRef, projectSubjectRef, orderRef);
-        OrderProjection updated = store.transitionOrder(projectSubjectRef, orderRef, command, expectedProjectionVersion,
+        StateAdvanceCommand authority=StateAdvanceAuthorityResolver.resolveControlledLocal(command,orderRef,
+                "MOCK_PAYMENT","EVIDENCE-LOCAL-MOCK-PAYMENT",Instant.now(clock));
+        OrderProjection updated = store.transitionOrderAuthorized(projectSubjectRef, orderRef, authority, expectedProjectionVersion,
                 expectedAggregateVersion, current -> {
                     if (current.paymentState().equals("CONFIRMED")) return current;
                     if (current.orderState() != OrderState.AWAITING_PAYMENT) {
@@ -407,7 +409,9 @@ public class MockFlowService {
                                                long expectedAggregateVersion, MnpState postPaymentMnpState) {
         CommandIdentity command = command(commandId, idempotencyKey, "POST:/api/v1/orders/{orderRef}/mock-topup",
                 orderRef, "MOCK_TOPUP:" + orderRef, projectSubjectRef, orderRef, postPaymentMnpState.name());
-        OrderProjection updated = store.transitionOrder(projectSubjectRef, orderRef, command, expectedProjectionVersion,
+        StateAdvanceCommand authority=StateAdvanceAuthorityResolver.resolveControlledLocal(command,orderRef,
+                "MOCK_TOPUP","EVIDENCE-LOCAL-MOCK-TOPUP",Instant.now(clock));
+        OrderProjection updated = store.transitionOrderAuthorized(projectSubjectRef, orderRef, authority, expectedProjectionVersion,
                 expectedAggregateVersion, current -> {
                     if (!current.paymentState().equals("CONFIRMED")) {
                         throw new FlowRejectedException("PAYMENT_NOT_CONFIRMED");

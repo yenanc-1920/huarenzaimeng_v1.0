@@ -1,0 +1,47 @@
+PHASE|POST_V12
+TARGET|12
+H|V1:1|V1:1|V30:create core transaction tables|V3:SQL|V38:V1__create_core_transaction_tables.sql|V11:-1896449417|V1:1
+H|V1:2|V1:2|V54:add subject scoped commands versions and worker tables|V3:SQL|V62:V2__add_subject_scoped_commands_versions_and_worker_tables.sql|V11:-1245037175|V1:1
+H|V1:3|V1:3|V35:add self operated directory content|V3:SQL|V43:V3__add_self_operated_directory_content.sql|V10:1131454171|V1:1
+H|V1:4|V1:4|V41:add versioned operator and preset catalog|V3:SQL|V49:V4__add_versioned_operator_and_preset_catalog.sql|V10:1092243477|V1:1
+H|V1:5|V1:5|V39:tighten order command idempotency scope|V3:SQL|V47:V5__tighten_order_command_idempotency_scope.sql|V10:1256830628|V1:1
+H|V1:6|V1:6|V34:add local synthetic payment intent|V3:SQL|V42:V6__add_local_synthetic_payment_intent.sql|V11:-1545485610|V1:1
+H|V1:7|V1:7|V32:add order detail read projection|V3:SQL|V40:V7__add_order_detail_read_projection.sql|V10:1275221693|V1:1
+H|V1:8|V1:8|V24:add admin authentication|V3:SQL|V32:V8__add_admin_authentication.sql|V11:-1532219487|V1:1
+H|V1:9|V1:9|V24:add buyer authentication|V3:SQL|V32:V9__add_buyer_authentication.sql|V10:1684585297|V1:1
+H|V2:10|V2:10|V40:add code2session attempt and idle expiry|V3:SQL|V49:V10__add_code2session_attempt_and_idle_expiry.sql|V10:1771621816|V1:1
+H|V2:11|V2:11|V35:add state advance authority columns|V3:SQL|V44:V11__add_state_advance_authority_columns.sql|V10:1605370441|V1:1
+H|V2:12|V2:12|V35:create state advance authority fact|V3:SQL|V44:V12__create_state_advance_authority_fact.sql|V10:-119925275|V1:1
+C|V8:hz_order|V1:1|V9:order_ref|V11:varchar(64)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V8:hz_order|V1:2|V19:project_subject_ref|V12:varchar(128)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V8:hz_order|V1:3|V9:quote_ref|V11:varchar(64)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V8:hz_order|V1:4|V11:order_state|V11:varchar(32)|V2:NO|N|V0:|V7:utf8mb4|V18:utf8mb4_unicode_ci
+C|V8:hz_order|V1:5|V13:payment_state|V11:varchar(32)|V2:NO|N|V0:|V7:utf8mb4|V18:utf8mb4_unicode_ci
+C|V8:hz_order|V1:6|V20:upstream_debit_state|V11:varchar(32)|V2:NO|N|V0:|V7:utf8mb4|V18:utf8mb4_unicode_ci
+C|V8:hz_order|V1:7|V14:delivery_state|V11:varchar(32)|V2:NO|N|V0:|V7:utf8mb4|V18:utf8mb4_unicode_ci
+C|V8:hz_order|V1:8|V12:refund_state|V11:varchar(32)|V2:NO|N|V0:|V7:utf8mb4|V18:utf8mb4_unicode_ci
+C|V8:hz_order|V1:9|V18:projection_version|V19:bigint(20) unsigned|V2:NO|V1:0|V0:|N|N
+C|V8:hz_order|V2:10|V17:aggregate_version|V19:bigint(20) unsigned|V2:NO|V1:1|V0:|N|N
+C|V8:hz_order|V2:11|V14:allowed_action|V11:varchar(64)|V3:YES|N|V0:|V7:utf8mb4|V18:utf8mb4_unicode_ci
+C|V8:hz_order|V2:12|V10:created_at|V11:datetime(3)|V2:NO|N|V0:|N|N
+C|V8:hz_order|V2:13|V10:updated_at|V11:datetime(3)|V2:NO|N|V0:|N|N
+C|V8:hz_order|V2:14|V11:environment|V11:varchar(32)|V2:NO|V15:LOCAL_SYNTHETIC|V0:|V5:ascii|V9:ascii_bin
+C|V8:hz_order|V2:15|V14:evidence_level|V10:varchar(8)|V2:NO|V2:L1|V0:|V5:ascii|V9:ascii_bin
+C|V8:hz_order|V2:16|V15:authority_state|V11:varchar(24)|V2:NO|V14:NON_PRODUCTION|V0:|V5:ascii|V9:ascii_bin
+C|V31:hz_state_advance_authority_fact|V1:1|V17:authority_fact_id|V19:bigint(20) unsigned|V2:NO|N|V14:auto_increment|N|N
+C|V31:hz_state_advance_authority_fact|V1:2|V13:aggregate_ref|V11:varchar(64)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V31:hz_state_advance_authority_fact|V1:3|V10:command_id|V11:varchar(96)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V31:hz_state_advance_authority_fact|V1:4|V11:environment|V11:varchar(32)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V31:hz_state_advance_authority_fact|V1:5|V14:evidence_level|V10:varchar(8)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V31:hz_state_advance_authority_fact|V1:6|V17:authorization_ref|V11:varchar(96)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V31:hz_state_advance_authority_fact|V1:7|V17:target_transition|V11:varchar(64)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V31:hz_state_advance_authority_fact|V1:8|V12:evidence_ref|V12:varchar(128)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V31:hz_state_advance_authority_fact|V1:9|V15:authority_state|V11:varchar(24)|V2:NO|N|V0:|V5:ascii|V9:ascii_bin
+C|V31:hz_state_advance_authority_fact|V2:10|V10:created_at|V11:datetime(3)|V2:NO|N|V0:|N|N
+I|V8:hz_order|V7:PRIMARY|V1:0|V1:1|V9:order_ref
+I|V31:hz_state_advance_authority_fact|V7:PRIMARY|V1:0|V1:1|V17:authority_fact_id
+I|V31:hz_state_advance_authority_fact|V26:uq_state_advance_authority|V1:0|V1:1|V13:aggregate_ref
+I|V31:hz_state_advance_authority_fact|V26:uq_state_advance_authority|V1:0|V1:2|V10:command_id
+F|V8:hz_order|V17:fk_hz_order_quote|V1:1|V9:quote_ref|V8:hz_quote|V9:quote_ref|V8:RESTRICT|V8:RESTRICT
+F|V31:hz_state_advance_authority_fact|V32:fk_state_advance_authority_order|V1:1|V13:aggregate_ref|V8:hz_order|V9:order_ref|V8:RESTRICT|V8:RESTRICT
+PAYLOAD_SHA256|A0305BB9E506EA8CE1C6269D62C33D7EF92E203B993F30700D11017940770801

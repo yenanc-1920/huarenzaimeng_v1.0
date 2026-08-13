@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.TransactionDefinition;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -281,35 +282,77 @@ class MyBatisFlowStore implements FlowStore {
     }
 
     @Override
-    public OrderProjection transitionOrder(String subject, String orderRef, CommandIdentity command,
-                                           long expectedProjectionVersion, long expectedAggregateVersion,
-                                           UnaryOperator<OrderProjection> transition) {
+    public OrderProjection transitionOrderAuthorized(String subject, String orderRef, StateAdvanceCommand advance,
+            long expectedProjectionVersion, long expectedAggregateVersion,
+            UnaryOperator<OrderProjection> transition) {
         try {
-            OrderProjection result = transactions.execute(status -> {
-                CommandRow replay = findCommand(subject, command, true);
-                if (replay != null) return requireOrder(subject, replay.resourceRef());
-                OrderProjection current = requireOrder(subject, orderRef);
-                if (current.projectionVersion() != expectedProjectionVersion) {
-                    throw new FlowRejectedException("PROJECTION_VERSION_CONFLICT");
-                }
-                if (current.aggregateVersion() != expectedAggregateVersion) {
-                    throw new FlowRejectedException("AGGREGATE_VERSION_CONFLICT");
-                }
-                OrderProjection updated = transition.apply(current);
-                int changed = mapper.updateOrder(subject, orderRef, updated.orderState().name(),
-                        updated.paymentState(), updated.upstreamDebitState(), updated.deliveryState(),
-                        updated.refundState(), updated.nextAction(), updated.projectionVersion(),
-                        updated.aggregateVersion(), expectedAggregateVersion, Timestamp.from(Instant.now()));
-                if (changed != 1) throw new FlowRejectedException("AGGREGATE_VERSION_CONFLICT");
-                insertCommand(subject, command, orderRef);
-                mapper.insertOutbox(orderRef + ":aggregate:" + updated.aggregateVersion(), orderRef,
-                        updated.projectionVersion(), updated.aggregateVersion(), Timestamp.from(Instant.now()));
-                return updated;
-            });
-            if (result == null) throw new IllegalStateException("transition transaction returned no result");
-            return result;
-        } catch (DuplicateKeyException race) {
-            return replayAfterRace(subject, command);
+        OrderProjection result = stateAdvanceWrites().execute(status -> {
+            Map<String,Object> identity=mapper.selectOrderAuthorityForUpdate(subject,orderRef);
+            if(identity==null)throw new FlowRejectedException("STATE_ADVANCE_AGGREGATE_IDENTITY_MISSING");
+            StateAdvanceGate.verify(orderRef,new StateAdvanceGate.AggregateIdentity(
+                    StateAdvanceAuthority.Environment.valueOf(string(identity,"environment")),
+                    StateAdvanceAuthority.EvidenceLevel.valueOf(string(identity,"evidence_level")),
+                    string(identity,"authority_state")),advance);
+            CommandRow replay = findCommand(subject, advance.command(), true);
+            if (replay != null) return requireOrder(subject, replay.resourceRef());
+            OrderProjection current = requireOrder(subject, orderRef);
+            if (current.projectionVersion()!=expectedProjectionVersion || current.aggregateVersion()!=expectedAggregateVersion)
+                throw new FlowRejectedException("AGGREGATE_VERSION_CONFLICT");
+            OrderProjection updated=transition.apply(current);
+            int changed=mapper.updateOrder(subject,orderRef,updated.orderState().name(),updated.paymentState(),
+                    updated.upstreamDebitState(),updated.deliveryState(),updated.refundState(),updated.nextAction(),
+                    updated.projectionVersion(),updated.aggregateVersion(),expectedAggregateVersion,Timestamp.from(advance.decisionInstant()));
+            if(changed!=1)throw new FlowRejectedException("AGGREGATE_VERSION_CONFLICT");
+            var a=advance.authority();
+            if(mapper.insertStateAdvanceAuthorityFact(orderRef,advance.command().commandId(),a.environment().name(),a.evidenceLevel().name(),
+                    a.authorizationRef(),advance.targetTransition(),advance.evidenceRef(),"NON_PRODUCTION",
+                    Timestamp.from(advance.decisionInstant()))!=1)throw new FlowRejectedException("AUTHORITY_FACT_WRITE_FAILED");
+            insertCommand(subject,advance.command(),orderRef);
+            mapper.insertOutbox(orderRef+":aggregate:"+updated.aggregateVersion(),orderRef,updated.projectionVersion(),
+                    updated.aggregateVersion(),Timestamp.from(advance.decisionInstant()));
+            return updated;
+        });
+        if(result==null)throw new IllegalStateException("authorized transition returned no result");
+        return result;
+        } catch (DuplicateKeyException duplicate) {
+            StateAdvanceConcurrentResult classification = canonicalReads().execute(status ->
+                    classifyStateAdvanceDuplicate(subject, orderRef, advance.command()));
+            if (classification == StateAdvanceConcurrentResult.REPLAYED) return requireOrder(subject, orderRef);
+            throw new FlowRejectedException(classification == null
+                    ? StateAdvanceConcurrentResult.CONCURRENT_RESULT_UNKNOWN.name() : classification.name());
+        }
+    }
+
+    private TransactionTemplate stateAdvanceWrites() {
+        if (transactions.getTransactionManager() == null) return transactions;
+        TransactionTemplate template = new TransactionTemplate(transactions.getTransactionManager());
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template;
+    }
+
+    private TransactionTemplate canonicalReads() {
+        if (transactions.getTransactionManager() == null) return transactions;
+        TransactionTemplate template = new TransactionTemplate(transactions.getTransactionManager());
+        template.setReadOnly(true);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template;
+    }
+
+    private StateAdvanceConcurrentResult classifyStateAdvanceDuplicate(String subject, String orderRef,
+                                                                        CommandIdentity command) {
+        try {
+            CommandRow canonical = findCommand(subject, command, false);
+            if (canonical == null) return StateAdvanceConcurrentResult.CONCURRENT_RESULT_UNKNOWN;
+            if (canonical.resourceRef() == null || canonical.fingerprint() == null
+                    || canonical.semanticActionKey() == null || canonical.commandId() == null)
+                return StateAdvanceConcurrentResult.STORAGE_INTEGRITY_CONFLICT;
+            if (!orderRef.equals(canonical.resourceRef())) return StateAdvanceConcurrentResult.STORAGE_INTEGRITY_CONFLICT;
+            return canonical.matches(command) ? StateAdvanceConcurrentResult.REPLAYED
+                    : StateAdvanceConcurrentResult.IDEMPOTENCY_CONFLICT;
+        } catch (FlowRejectedException conflictingKeys) {
+            return StateAdvanceConcurrentResult.IDEMPOTENCY_CONFLICT;
+        } catch (RuntimeException unreadable) {
+            return StateAdvanceConcurrentResult.CONCURRENT_RESULT_UNKNOWN;
         }
     }
 

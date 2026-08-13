@@ -109,7 +109,8 @@ class OrderCreationMigrationContractTest {
         CommandIdentity payment = new CommandIdentity("CMD-EFFECT-PAY", "IDEM-EFFECT-PAY",
                 "POST:/api/v1/orders/{orderRef}/mock-payment", order.orderRef(),
                 "MOCK_PAYMENT:" + order.orderRef(), "D".repeat(64));
-        OrderProjection paid = store.transitionOrder(subject, order.orderRef(), payment, 1L, 1L,
+        OrderProjection paid = store.transitionOrderAuthorized(subject, order.orderRef(),
+                StateAdvanceAuthorityResolver.resolveControlledLocal(payment,order.orderRef(),"MOCK_PAYMENT","EVIDENCE-LOCAL-TEST-PAYMENT",Instant.parse("2026-08-03T00:00:00Z")), 1L, 1L,
                 current -> new OrderProjection(current.orderRef(), current.quoteRef(), OrderState.PAYMENT_CONFIRMED,
                         "CONFIRMED", current.upstreamDebitState(), current.deliveryState(), current.refundState(),
                         current.totalAmountMinor(), current.currency(), 2L, 2L, "REQUEST_MOCK_TOPUP"));
@@ -121,7 +122,8 @@ class OrderCreationMigrationContractTest {
         CommandIdentity topup = new CommandIdentity("CMD-EFFECT-TOPUP", "IDEM-EFFECT-TOPUP",
                 "POST:/api/v1/orders/{orderRef}/mock-topup", order.orderRef(),
                 "MOCK_TOPUP:" + order.orderRef(), "E".repeat(64));
-        store.transitionOrder(subject, order.orderRef(), topup, paid.projectionVersion(), paid.aggregateVersion(),
+        store.transitionOrderAuthorized(subject, order.orderRef(),
+                StateAdvanceAuthorityResolver.resolveControlledLocal(topup,order.orderRef(),"MOCK_TOPUP","EVIDENCE-LOCAL-TEST-TOPUP",Instant.parse("2026-08-03T00:00:00Z")), paid.projectionVersion(), paid.aggregateVersion(),
                 current -> new OrderProjection(current.orderRef(), current.quoteRef(), OrderState.COMPLETED,
                         current.paymentState(), "CONFIRMED", "CONFIRMED", current.refundState(),
                         current.totalAmountMinor(), current.currency(), 3L, 3L, "NONE"));

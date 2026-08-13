@@ -31,7 +31,7 @@ interface FlowStore {
 
     void recordPaymentIntentReviewSignal(PaymentIntentReviewSignalInput input);
 
-    OrderProjection transitionOrder(String projectSubjectRef, String orderRef, CommandIdentity command,
-                                    long expectedProjectionVersion, long expectedAggregateVersion,
-                                    UnaryOperator<OrderProjection> transition);
+    OrderProjection transitionOrderAuthorized(String projectSubjectRef, String orderRef, StateAdvanceCommand command,
+                                               long expectedProjectionVersion, long expectedAggregateVersion,
+                                               UnaryOperator<OrderProjection> transition);
 }

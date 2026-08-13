@@ -19,7 +19,9 @@ class ReleaseFlywayWiringTest {
                     "spring.flyway.password", "synthetic-not-a-real-secret",
                     "spring.flyway.connect-retries", "0",
                     "spring.flyway.validate-on-migrate", "true",
-                    "spring.flyway.baseline-on-migrate", "false"
+                    "spring.flyway.baseline-on-migrate", "false",
+                    "hz.data-integration.expected-database-name", "huarenzaimeng_it_vnext",
+                    "hz.data-integration.expected-server-uuid", "00000000-0000-0000-0000-000000000001"
             )));
             context.register(ReleaseFlywayConfiguration.class);
             context.refresh();
