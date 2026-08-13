@@ -24,6 +24,15 @@ public final class ReleaseMigrationGateFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return path.equals("/actuator/health")
+                || path.equals("/actuator/health/liveness")
+                || path.equals("/actuator/health/readiness")
+                || path.equals("/admin-read/v1/data-integration/readiness");
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         if (!state.isReady()) {
