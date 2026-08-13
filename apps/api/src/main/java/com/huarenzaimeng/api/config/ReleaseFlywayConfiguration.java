@@ -2,6 +2,7 @@ package com.huarenzaimeng.api.config;
 
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -36,6 +37,7 @@ public class ReleaseFlywayConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "hz.data-integration.migration-enabled", havingValue = "true")
     ReleaseFlywayMigrationRunner releaseFlywayMigrationRunner(
             Flyway releaseFlyway,
             ReleaseMigrationState state,
