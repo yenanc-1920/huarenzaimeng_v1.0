@@ -11,6 +11,13 @@ import java.util.HexFormat;
 import java.util.Arrays;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -162,6 +169,46 @@ class DataIntegrationReadinessContractTest {
         assertThat(responseFields).doesNotContain("username", "jdbcUrl", "password", "path");
     }
 
+    @Test void schema_queries_encode_nullable_mysql_metadata_without_collisions_and_are_read_only() throws Exception {
+        List<String> queries = new ArrayList<>();
+        AtomicInteger writes = new AtomicInteger();
+        Connection connection = schemaConnection(queries, writes, false);
+
+        var method = JdbcDataIntegrationReadinessProbe.class.getDeclaredMethod("schema", Connection.class);
+        method.setAccessible(true);
+        var summary = (DataIntegrationReadinessProbe.SchemaSummary) method.invoke(null, connection);
+
+        assertThat(queries).hasSize(4);
+        assertThat(queries.get(0)).contains(
+                "CASE WHEN engine IS NULL THEN 'N' ELSE CONCAT('V',CHAR_LENGTH(engine),':',engine) END",
+                "CASE WHEN table_collation IS NULL THEN 'N' ELSE CONCAT('V',CHAR_LENGTH(table_collation),':',table_collation) END");
+        assertThat(queries.get(1)).contains(
+                "CASE WHEN column_default IS NULL THEN 'N' ELSE CONCAT('V',CHAR_LENGTH(column_default),':',column_default) END",
+                "CASE WHEN collation_name IS NULL THEN 'N' ELSE CONCAT('V',CHAR_LENGTH(collation_name),':',collation_name) END");
+        assertThat(queries.get(1)).doesNotContain("COALESCE(column_default,'<NULL>')");
+        assertThat(summary.tableCount()).isEqualTo(1);
+        assertThat(summary.columnCount()).isEqualTo(2);
+        assertThat(summary.indexCount()).isEqualTo(1);
+        assertThat(summary.foreignKeyCount()).isEqualTo(1);
+        assertThat(writes).hasValue(0);
+    }
+
+    @Test void unexpected_jdbc_null_from_any_schema_query_fails_with_fixed_safe_cause() throws Exception {
+        List<String> queries = new ArrayList<>();
+        AtomicInteger writes = new AtomicInteger();
+        Connection connection = schemaConnection(queries, writes, true);
+        var method = JdbcDataIntegrationReadinessProbe.class.getDeclaredMethod("schema", Connection.class);
+        method.setAccessible(true);
+
+        Throwable failure = org.assertj.core.api.Assertions.catchThrowable(() -> method.invoke(null, connection));
+
+        assertThat(failure).isInstanceOf(java.lang.reflect.InvocationTargetException.class);
+        assertThat(failure.getCause()).isInstanceOf(SQLException.class)
+                .hasMessage("DATA_INTEGRATION_SCHEMA_NULL_ROW");
+        assertThat(queries).hasSize(1);
+        assertThat(writes).hasValue(0);
+    }
+
     @Test void fixed_manifest_is_ordinal_and_matches_every_source_file() throws Exception {
         var repoRoot = resolveRepositoryRoot(java.nio.file.Path.of("").toAbsolutePath());
         var moduleRoot = repoRoot.resolve("apps/api");
@@ -245,6 +292,76 @@ class DataIntegrationReadinessContractTest {
                 java.nio.file.Files.delete(path);
             }
         }
+    }
+
+    private static Connection schemaConnection(List<String> queries, AtomicInteger writes,
+                                               boolean unexpectedNull) {
+        return (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(),
+                new Class<?>[] {Connection.class}, (proxy, method, arguments) -> {
+                    if (method.getName().equals("createStatement")) {
+                        return schemaStatement(queries, writes, unexpectedNull);
+                    }
+                    if (method.getName().equals("close")) return null;
+                    if (method.getName().equals("isClosed")) return false;
+                    return defaultValue(method.getReturnType());
+                });
+    }
+
+    private static Statement schemaStatement(List<String> queries, AtomicInteger writes,
+                                             boolean unexpectedNull) {
+        return (Statement) Proxy.newProxyInstance(Statement.class.getClassLoader(),
+                new Class<?>[] {Statement.class}, (proxy, method, arguments) -> {
+                    if (method.getName().equals("executeQuery")) {
+                        String sql = (String) arguments[0];
+                        queries.add(sql);
+                        if (sql.contains("information_schema.tables")) {
+                            return schemaResult(unexpectedNull ? java.util.Collections.singletonList(null)
+                                    : List.of("T|synthetic_view|N|N"));
+                        }
+                        if (sql.contains("information_schema.columns")) {
+                            return schemaResult(List.of(
+                                    "C|synthetic_table|1|amount|int|NO|N||N",
+                                    "C|synthetic_table|2|created_at|timestamp|NO|V0:||N"));
+                        }
+                        if (sql.contains("information_schema.statistics")) {
+                            return schemaResult(List.of("I|synthetic_table|PRIMARY|0|1|id"));
+                        }
+                        if (sql.contains("information_schema.key_column_usage")) {
+                            return schemaResult(List.of("F|child|fk_parent|1|parent_id|parent|id|RESTRICT|RESTRICT"));
+                        }
+                        throw new AssertionError("UNEXPECTED_SCHEMA_QUERY");
+                    }
+                    if (method.getName().equals("execute") || method.getName().equals("executeUpdate")) {
+                        writes.incrementAndGet();
+                        throw new AssertionError("SCHEMA_WRITE_NOT_ALLOWED");
+                    }
+                    if (method.getName().equals("close")) return null;
+                    return defaultValue(method.getReturnType());
+                });
+    }
+
+    private static ResultSet schemaResult(List<String> rows) {
+        AtomicInteger cursor = new AtomicInteger(-1);
+        return (ResultSet) Proxy.newProxyInstance(ResultSet.class.getClassLoader(),
+                new Class<?>[] {ResultSet.class}, (proxy, method, arguments) -> {
+                    if (method.getName().equals("next")) return cursor.incrementAndGet() < rows.size();
+                    if (method.getName().equals("getString")) return rows.get(cursor.get());
+                    if (method.getName().equals("close")) return null;
+                    return defaultValue(method.getReturnType());
+                });
+    }
+
+    private static Object defaultValue(Class<?> type) {
+        if (!type.isPrimitive()) return null;
+        if (type == boolean.class) return false;
+        if (type == byte.class) return (byte) 0;
+        if (type == short.class) return (short) 0;
+        if (type == int.class) return 0;
+        if (type == long.class) return 0L;
+        if (type == float.class) return 0F;
+        if (type == double.class) return 0D;
+        if (type == char.class) return '\0';
+        return null;
     }
 
     private static MockHttpServletRequest trusted() {

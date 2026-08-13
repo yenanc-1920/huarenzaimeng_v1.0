@@ -192,9 +192,9 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
 
     private static SchemaSummary schema(Connection connection) throws SQLException {
         List<String> lines = new ArrayList<>();
-        lines.addAll(rows(connection, "SELECT CONCAT('T|',table_name,'|',engine,'|',table_collation) FROM information_schema.tables WHERE table_schema=DATABASE() ORDER BY table_name"));
+        lines.addAll(rows(connection, "SELECT CONCAT('T|',table_name,'|',CASE WHEN engine IS NULL THEN 'N' ELSE CONCAT('V',CHAR_LENGTH(engine),':',engine) END,'|',CASE WHEN table_collation IS NULL THEN 'N' ELSE CONCAT('V',CHAR_LENGTH(table_collation),':',table_collation) END) FROM information_schema.tables WHERE table_schema=DATABASE() ORDER BY table_name"));
         int tables = lines.size();
-        List<String> columns = rows(connection, "SELECT CONCAT('C|',table_name,'|',ordinal_position,'|',column_name,'|',column_type,'|',is_nullable,'|',COALESCE(column_default,'<NULL>'),'|',extra,'|',collation_name) FROM information_schema.columns WHERE table_schema=DATABASE() ORDER BY table_name,ordinal_position");
+        List<String> columns = rows(connection, "SELECT CONCAT('C|',table_name,'|',ordinal_position,'|',column_name,'|',column_type,'|',is_nullable,'|',CASE WHEN column_default IS NULL THEN 'N' ELSE CONCAT('V',CHAR_LENGTH(column_default),':',column_default) END,'|',extra,'|',CASE WHEN collation_name IS NULL THEN 'N' ELSE CONCAT('V',CHAR_LENGTH(collation_name),':',collation_name) END) FROM information_schema.columns WHERE table_schema=DATABASE() ORDER BY table_name,ordinal_position");
         List<String> indexes = rows(connection, "SELECT CONCAT('I|',table_name,'|',index_name,'|',non_unique,'|',seq_in_index,'|',column_name) FROM information_schema.statistics WHERE table_schema=DATABASE() ORDER BY table_name,index_name,seq_in_index");
         List<String> foreignKeys = rows(connection, "SELECT CONCAT('F|',k.table_name,'|',k.constraint_name,'|',k.ordinal_position,'|',k.column_name,'|',k.referenced_table_name,'|',k.referenced_column_name,'|',r.update_rule,'|',r.delete_rule) FROM information_schema.key_column_usage k JOIN information_schema.referential_constraints r ON r.constraint_schema=k.constraint_schema AND r.constraint_name=k.constraint_name AND r.table_name=k.table_name WHERE k.table_schema=DATABASE() AND k.referenced_table_name IS NOT NULL ORDER BY k.table_name,k.constraint_name,k.ordinal_position");
         lines.addAll(columns); lines.addAll(indexes); lines.addAll(foreignKeys);
@@ -260,7 +260,11 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
     private static List<String> rows(Connection connection, String sql) throws SQLException {
         List<String> values = new ArrayList<>();
         try (Statement statement = connection.createStatement(); ResultSet result = statement.executeQuery(sql)) {
-            while (result.next()) values.add(result.getString(1));
+            while (result.next()) {
+                String value = result.getString(1);
+                if (value == null) throw new SQLException("DATA_INTEGRATION_SCHEMA_NULL_ROW");
+                values.add(value);
+            }
         }
         values.sort(Comparator.naturalOrder());
         return values;
