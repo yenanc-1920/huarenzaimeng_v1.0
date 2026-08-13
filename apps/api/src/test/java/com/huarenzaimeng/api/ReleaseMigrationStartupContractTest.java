@@ -23,6 +23,10 @@ class ReleaseMigrationStartupContractTest {
                 .doesNotContain("flyway.validate();")
                 .contains("state.failed();", "throw failure;");
         assertThat(gate).contains("@Order(Ordered.HIGHEST_PRECEDENCE)", "SC_SERVICE_UNAVAILABLE")
-                .doesNotContain("shouldNotFilter");
+                .contains("path.equals(\"/actuator/health\")",
+                        "path.equals(\"/actuator/health/liveness\")",
+                        "path.equals(\"/actuator/health/readiness\")",
+                        "path.equals(\"/admin-read/v1/data-integration/readiness\")")
+                .doesNotContain("path.startsWith(\"/admin\")");
     }
 }
