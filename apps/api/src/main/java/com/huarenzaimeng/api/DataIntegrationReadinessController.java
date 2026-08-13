@@ -28,10 +28,35 @@ final class DataIntegrationReadinessController {
         }
         try {
             return ResponseEntity.ok().header("Cache-Control", "no-store").body(service.read());
+        } catch (DataIntegrationReadinessStageException unavailable) {
+            return unavailable(safeStage(unavailable.stage()));
         } catch (RuntimeException unavailable) {
-            return ResponseEntity.status(503).header("Cache-Control", "no-store")
-                    .body(new Failure("UNAVAILABLE", "DATA_INTEGRATION_READINESS_UNAVAILABLE", "SAFE_RETRY_MANUAL"));
+            return unavailable("INTERNAL_SAFE");
         }
+    }
+
+    private static ResponseEntity<Failure> unavailable(String stageCode) {
+        return ResponseEntity.status(503).header("Cache-Control", "no-store")
+                .body(new Failure("UNAVAILABLE", "DATA_INTEGRATION_READINESS_UNAVAILABLE",
+                        "SAFE_RETRY_MANUAL", stageCode));
+    }
+
+    private static String safeStage(DataIntegrationReadinessStageException.Stage stage) {
+        if (stage == null) return "INTERNAL_SAFE";
+        return switch (stage) {
+            case APP_CONNECT -> "APP_CONNECT";
+            case FLYWAY_CONNECT -> "FLYWAY_CONNECT";
+            case READ_ONLY_SETUP_APP -> "READ_ONLY_SETUP_APP";
+            case READ_ONLY_SETUP_FLYWAY -> "READ_ONLY_SETUP_FLYWAY";
+            case DB_IDENTITY -> "DB_IDENTITY";
+            case APP_GRANTS -> "APP_GRANTS";
+            case FLYWAY_GRANTS -> "FLYWAY_GRANTS";
+            case FLYWAY_HISTORY -> "FLYWAY_HISTORY";
+            case SCHEMA -> "SCHEMA";
+            case MIGRATION_DISCOVERY -> "MIGRATION_DISCOVERY";
+            case BACKUP_STATUS -> "BACKUP_STATUS";
+            case INTERNAL_SAFE -> "INTERNAL_SAFE";
+        };
     }
 
     private static boolean hasBodySignal(HttpServletRequest request) {
@@ -44,5 +69,5 @@ final class DataIntegrationReadinessController {
         }
     }
 
-    record Failure(String status, String projectCode, String retryClass) {}
+    record Failure(String status, String projectCode, String retryClass, String stageCode) {}
 }

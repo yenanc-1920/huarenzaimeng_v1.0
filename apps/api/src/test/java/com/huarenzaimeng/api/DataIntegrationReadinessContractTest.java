@@ -8,12 +8,78 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.util.Set;
 import java.util.HexFormat;
+import java.util.Arrays;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DataIntegrationReadinessContractTest {
+    @Test void every_fixed_stage_has_one_safe_503_json_mapping_and_no_diagnostic_header() {
+        var expected = Set.of("APP_CONNECT", "FLYWAY_CONNECT", "READ_ONLY_SETUP_APP",
+                "READ_ONLY_SETUP_FLYWAY", "DB_IDENTITY", "APP_GRANTS", "FLYWAY_GRANTS",
+                "FLYWAY_HISTORY", "SCHEMA", "MIGRATION_DISCOVERY", "BACKUP_STATUS", "INTERNAL_SAFE");
+        assertThat(Arrays.stream(DataIntegrationReadinessStageException.Stage.values())
+                .map(Enum::name).collect(java.util.stream.Collectors.toSet())).isEqualTo(expected);
+        AtomicInteger probeCalls = new AtomicInteger();
+        AtomicInteger writeSideEffects = new AtomicInteger();
+
+        for (var stage : DataIntegrationReadinessStageException.Stage.values()) {
+            var controller = new DataIntegrationReadinessController(new DataIntegrationReadinessService(() -> {
+                probeCalls.incrementAndGet();
+                throw new DataIntegrationReadinessStageException(stage);
+            }));
+            var response = controller.read(trusted());
+
+            assertThat(response.getStatusCode().value()).isEqualTo(503);
+            assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
+            assertThat(response.getHeaders().keySet())
+                    .noneMatch(name -> name.toLowerCase(java.util.Locale.ROOT).contains("readiness-stage"));
+            assertThat(response.getBody()).isEqualTo(new DataIntegrationReadinessController.Failure(
+                    "UNAVAILABLE", "DATA_INTEGRATION_READINESS_UNAVAILABLE", "SAFE_RETRY_MANUAL", stage.name()));
+            assertThat(response.getBody().getClass().getRecordComponents())
+                    .extracting(java.lang.reflect.RecordComponent::getName)
+                    .containsExactly("status", "projectCode", "retryClass", "stageCode");
+        }
+        assertThat(probeCalls).hasValue(12);
+        assertThat(writeSideEffects).hasValue(0);
+    }
+
+    @Test void unknown_null_and_dynamic_diagnostics_collapse_to_internal_safe_without_leakage() {
+        AtomicInteger probeCalls = new AtomicInteger();
+        AtomicInteger writeSideEffects = new AtomicInteger();
+        var failures = java.util.List.<DataIntegrationReadinessProbe>of(
+                () -> { probeCalls.incrementAndGet(); throw new DataIntegrationReadinessStageException(null); },
+                () -> { probeCalls.incrementAndGet(); throw new IllegalStateException(
+                        "CANARY jdbc:mysql://user:password@host/db SQLState=999 stack"); });
+
+        for (var probe : failures) {
+            var response = new DataIntegrationReadinessController(
+                    new DataIntegrationReadinessService(probe)).read(trusted());
+            assertThat(response.getStatusCode().value()).isEqualTo(503);
+            assertThat(response.getBody()).isEqualTo(new DataIntegrationReadinessController.Failure(
+                    "UNAVAILABLE", "DATA_INTEGRATION_READINESS_UNAVAILABLE", "SAFE_RETRY_MANUAL", "INTERNAL_SAFE"));
+            assertThat(response.getBody().toString()).doesNotContain(
+                    "CANARY", "jdbc:mysql", "user", "password", "SQLState", "stack");
+            assertThat(response.getHeaders().keySet())
+                    .noneMatch(name -> name.toLowerCase(java.util.Locale.ROOT).contains("readiness-stage"));
+        }
+        var nullStage = new DataIntegrationReadinessStageException(null);
+        assertThat(nullStage.getMessage()).isNull();
+        assertThat(nullStage.getCause()).isNull();
+        assertThat(nullStage.getStackTrace()).isEmpty();
+        assertThat(probeCalls).hasValue(2);
+        assertThat(writeSideEffects).hasValue(0);
+    }
+
+    @Test void successful_response_has_no_stage_code_field() {
+        var response = new DataIntegrationReadinessController(
+                new DataIntegrationReadinessService(() -> snapshot(true))).read(trusted());
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(Arrays.stream(response.getBody().getClass().getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName)).doesNotContain("stageCode");
+    }
+
     @Test void super_admin_receives_safe_summary_without_sensitive_details() {
         DataIntegrationReadinessProbe probe = () -> snapshot(true);
         var controller = new DataIntegrationReadinessController(new DataIntegrationReadinessService(probe));
@@ -104,7 +170,7 @@ class DataIntegrationReadinessContractTest {
 
         var manifest = moduleRoot.resolve("manifests/DATA-INTEGRATION-01-readonly-challenge.txt");
         var lines = java.nio.file.Files.readAllLines(manifest, java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(lines).hasSize(5).isSorted();
+        assertThat(lines).hasSize(6).isSorted();
         for (String line : lines) {
             String[] fields = line.split("\\|", -1);
             assertThat(fields).hasSize(2);

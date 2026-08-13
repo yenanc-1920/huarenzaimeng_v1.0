@@ -52,26 +52,40 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
     }
 
     @Override public Snapshot inspect() {
-        try (Connection application = applicationDataSource.getConnection();
-             Connection flyway = flywayDataSource().getConnection()) {
-            prepareReadOnly(application);
-            prepareReadOnly(flyway);
+        Connection application = at(DataIntegrationReadinessStageException.Stage.APP_CONNECT,
+                applicationDataSource::getConnection);
+        try (application) {
+            Connection flyway = at(DataIntegrationReadinessStageException.Stage.FLYWAY_CONNECT,
+                    () -> flywayDataSource().getConnection());
+            try (flyway) {
+            runAt(DataIntegrationReadinessStageException.Stage.READ_ONLY_SETUP_APP,
+                    () -> prepareReadOnly(application));
+            runAt(DataIntegrationReadinessStageException.Stage.READ_ONLY_SETUP_FLYWAY,
+                    () -> prepareReadOnly(flyway));
             try {
-                String databaseIdentity = scalar(application,
-                        "SELECT CONCAT(DATABASE(),'|',@@hostname,'|*|',@@server_uuid)");
-                String version = scalar(application, "SELECT @@version");
+                String[] identity = at(DataIntegrationReadinessStageException.Stage.DB_IDENTITY, () -> new String[] {
+                        scalar(application, "SELECT CONCAT(DATABASE(),'|',@@hostname,'|*|',@@server_uuid)"),
+                        scalar(application, "SELECT @@version")
+                });
+                String databaseIdentity = identity[0];
+                String version = identity[1];
                 boolean identityMatched = databaseIdentity != null
                         && databaseIdentity.startsWith(EXPECTED_DATABASE + "|")
                         && databaseIdentity.split("\\|", -1).length == 4;
                 String engineStatus = identityMatched && version != null && version.startsWith("5.7.")
                         ? "MYSQL_5_7_MATCHED" : "DATABASE_IDENTITY_OR_VERSION_MISMATCH";
 
-                GrantSummary applicationGrant = grants(application, "APPLICATION", APP_REQUIRED);
-                GrantSummary flywayGrant = grants(flyway, "FLYWAY", FLYWAY_REQUIRED);
-                FlywaySummary flywaySummary = flyway(application);
-                SchemaSummary schemaSummary = schema(application);
-                MigrationDiscovery discovery = discoverMigrations();
-                BackupSummary backup = backup();
+                GrantSummary applicationGrant = at(DataIntegrationReadinessStageException.Stage.APP_GRANTS,
+                        () -> grants(application, "APPLICATION", APP_REQUIRED));
+                GrantSummary flywayGrant = at(DataIntegrationReadinessStageException.Stage.FLYWAY_GRANTS,
+                        () -> grants(flyway, "FLYWAY", FLYWAY_REQUIRED));
+                FlywaySummary flywaySummary = at(DataIntegrationReadinessStageException.Stage.FLYWAY_HISTORY,
+                        () -> flyway(application));
+                SchemaSummary schemaSummary = at(DataIntegrationReadinessStageException.Stage.SCHEMA,
+                        () -> schema(application));
+                MigrationDiscovery discovery = at(DataIntegrationReadinessStageException.Stage.MIGRATION_DISCOVERY,
+                        this::discoverMigrations);
+                BackupSummary backup = at(DataIntegrationReadinessStageException.Stage.BACKUP_STATUS, this::backup);
                 boolean ready = "MYSQL_5_7_MATCHED".equals(engineStatus)
                         && "MATCHED".equals(applicationGrant.status())
                         && "MATCHED".equals(flywayGrant.status())
@@ -85,10 +99,29 @@ final class JdbcDataIntegrationReadinessProbe implements DataIntegrationReadines
                 safeRollback(application);
                 safeRollback(flyway);
             }
-        } catch (SQLException exception) {
-            throw new IllegalStateException("DATA_INTEGRATION_READINESS_UNAVAILABLE", exception);
+            }
+        } catch (DataIntegrationReadinessStageException safe) {
+            throw safe;
+        } catch (RuntimeException | SQLException unavailable) {
+            throw new DataIntegrationReadinessStageException(
+                    DataIntegrationReadinessStageException.Stage.INTERNAL_SAFE);
         }
     }
+
+    private static <T> T at(DataIntegrationReadinessStageException.Stage stage,
+                            CheckedSupplier<T> operation) {
+        try { return operation.get(); }
+        catch (DataIntegrationReadinessStageException safe) { throw safe; }
+        catch (Exception unavailable) { throw new DataIntegrationReadinessStageException(stage); }
+    }
+
+    private static void runAt(DataIntegrationReadinessStageException.Stage stage,
+                              CheckedRunnable operation) {
+        at(stage, () -> { operation.run(); return null; });
+    }
+
+    @FunctionalInterface private interface CheckedSupplier<T> { T get() throws Exception; }
+    @FunctionalInterface private interface CheckedRunnable { void run() throws Exception; }
 
     private DataSource flywayDataSource() {
         String url = required("spring.flyway.url");
