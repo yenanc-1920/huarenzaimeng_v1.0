@@ -15,6 +15,21 @@ class BuyerAuthServiceTest {
     private static final String CODE="code-pepper-synthetic-value-32-characters";
     private static final Instant NOW=Instant.parse("2026-08-10T12:00:00Z");
 
+    @Test void releaseMysqlSpringContextSelectsProductionConstructorWithoutDatabaseOrSecret() {
+        try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+            context.getEnvironment().setActiveProfiles("release-mysql");
+            context.registerBean(BuyerAuthStore.class, MemoryStore::new);
+            context.registerBean(WechatCode2SessionPort.class,
+                    () -> command -> new WechatCode2SessionPort.Unknown("LOCAL_CONTEXT_ONLY"));
+            context.register(BuyerAuthService.class);
+
+            context.refresh();
+
+            assertThat(context.getBean(BuyerAuthService.class)).isNotNull();
+            assertThat(context.getBean(BuyerAuthStore.class)).isInstanceOf(MemoryStore.class);
+        }
+    }
+
     @Test void fakeSuccessCreatesOneSessionWithAbsoluteAndIdleExpiryAndNoRawProviderValues(){
         MemoryStore store=new MemoryStore();FakePort fake=new FakePort(new WechatCode2SessionPort.Success("APP_PRIMARY","provider_subject_synthetic","EVIDENCE-SYNTHETIC"));
         BuyerAuthService service=service(store,fake,true);

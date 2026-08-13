@@ -1,5 +1,6 @@
 package com.huarenzaimeng.api.buyerauth;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ final class BuyerAuthService {
     private final BuyerAuthStore store; private final WechatCode2SessionPort provider; private final boolean enabled;
     private final byte[] pepper; private final Duration absoluteTtl; private final Duration idleTtl;
     private final SecureRandom random; private final Clock clock;
+    @Autowired
     BuyerAuthService(BuyerAuthStore store, @Value("${hz.buyer-auth.enabled:false}") boolean enabled,
                      WechatCode2SessionPort provider,
                      @Value("${hz.buyer-auth.identity-pepper:}") String pepper,
