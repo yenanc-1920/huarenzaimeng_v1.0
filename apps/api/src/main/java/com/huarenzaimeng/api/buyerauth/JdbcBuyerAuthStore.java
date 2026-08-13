@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Repository
 @Profile("release-mysql")
-final class JdbcBuyerAuthStore implements BuyerAuthStore {
+class JdbcBuyerAuthStore implements BuyerAuthStore {
     private final JdbcTemplate jdbc;
     JdbcBuyerAuthStore(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 

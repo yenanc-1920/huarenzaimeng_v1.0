@@ -30,6 +30,44 @@ class BuyerAuthServiceTest {
         }
     }
 
+    @Test void releaseMysqlContextCreatesRealJdbcStoreWithTransactionalCglibAdvisor() {
+        try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+            context.getEnvironment().setActiveProfiles("release-mysql");
+            context.register(TransactionProxyTestConfiguration.class, JdbcBuyerAuthStore.class);
+            context.refresh();
+
+            Object proxy = context.getBean(JdbcBuyerAuthStore.class);
+            assertThat(org.springframework.aop.support.AopUtils.isCglibProxy(proxy)).isTrue();
+            assertThat(org.springframework.aop.support.AopUtils.getTargetClass(proxy))
+                    .isEqualTo(JdbcBuyerAuthStore.class);
+            assertThat(proxy).isInstanceOf(BuyerAuthStore.class);
+            assertThat(((org.springframework.aop.framework.Advised) proxy).getAdvisors())
+                    .anySatisfy(advisor -> assertThat(advisor.getAdvice())
+                            .isInstanceOf(org.springframework.transaction.interceptor.TransactionInterceptor.class));
+            assertThat(org.mockito.Mockito.mockingDetails(
+                    context.getBean(org.springframework.jdbc.core.JdbcTemplate.class)).getInvocations())
+                    .allSatisfy(invocation -> assertThat(invocation.getMethod().getName())
+                            .isNotIn("query", "queryForObject", "queryForList", "update", "execute", "batchUpdate"));
+            org.mockito.Mockito.verifyNoInteractions(context.getBean(javax.sql.DataSource.class));
+            org.mockito.Mockito.verifyNoInteractions(context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        }
+    }
+
+    @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
+    @org.springframework.transaction.annotation.EnableTransactionManagement(proxyTargetClass = true)
+    static class TransactionProxyTestConfiguration {
+        @org.springframework.context.annotation.Bean
+        javax.sql.DataSource dataSource() { return org.mockito.Mockito.mock(javax.sql.DataSource.class); }
+        @org.springframework.context.annotation.Bean
+        org.springframework.jdbc.core.JdbcTemplate jdbcTemplate() {
+            return org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        }
+        @org.springframework.context.annotation.Bean
+        org.springframework.transaction.PlatformTransactionManager transactionManager() {
+            return org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class);
+        }
+    }
+
     @Test void fakeSuccessCreatesOneSessionWithAbsoluteAndIdleExpiryAndNoRawProviderValues(){
         MemoryStore store=new MemoryStore();FakePort fake=new FakePort(new WechatCode2SessionPort.Success("APP_PRIMARY","provider_subject_synthetic","EVIDENCE-SYNTHETIC"));
         BuyerAuthService service=service(store,fake,true);
