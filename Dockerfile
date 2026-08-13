@@ -26,6 +26,7 @@ RUN mvn -B -ntp -s .mvn/settings.xml -pl apps/api -am dependency:go-offline
 
 COPY modules/core/src modules/core/src
 COPY apps/api/src apps/api/src
+COPY apps/api/manifests/DATA-INTEGRATION-01-readonly-challenge.txt apps/api/manifests/DATA-INTEGRATION-01-readonly-challenge.txt
 COPY --from=admin-web-build /workspace/apps/admin-web/dist apps/api/src/main/resources/static
 COPY apps/api/Invoke-P021OrderDetailEvidenceFinalRun.ps1 apps/api/Invoke-P021OrderDetailEvidenceFinalRun.ps1
 COPY apps/api/Invoke-P021TestReadonlyIntegrationFinalRun.ps1 apps/api/Invoke-P021TestReadonlyIntegrationFinalRun.ps1
