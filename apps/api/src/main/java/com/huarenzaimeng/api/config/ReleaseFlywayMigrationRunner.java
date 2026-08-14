@@ -1,54 +1,84 @@
 package com.huarenzaimeng.api.config;
 
-import org.flywaydb.core.Flyway;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
 import com.huarenzaimeng.api.DataMigrationOracleVerifier;
+import java.sql.Connection;
+import org.flywaydb.core.Flyway;
 
-public final class ReleaseFlywayMigrationRunner implements ApplicationRunner {
-    private static final Logger LOG = LoggerFactory.getLogger(ReleaseFlywayMigrationRunner.class);
-    private final Flyway flyway;
-    private final ReleaseMigrationState state;
-    private final String expectedDatabaseName;
-    private final String expectedServerUuid;
-
-    ReleaseFlywayMigrationRunner(Flyway flyway, ReleaseMigrationState state,
-                                  String expectedDatabaseName, String expectedServerUuid) {
-        this.flyway = flyway;
-        this.state = state;
-        if (!DataMigrationOracleVerifier.DEPLOYMENT_DATABASE.equals(expectedDatabaseName)) {
-            throw new IllegalArgumentException("EXPECTED_DATABASE_NAME_INVALID");
-        }
-        this.expectedDatabaseName = expectedDatabaseName;
-        if (expectedServerUuid == null || expectedServerUuid.isBlank()) {
-            throw new IllegalArgumentException("EXPECTED_SERVER_UUID_REQUIRED");
-        }
-        this.expectedServerUuid = expectedServerUuid;
+/** Explicit controlled command; deliberately not an ApplicationRunner or Spring bean. */
+public final class ReleaseFlywayMigrationRunner {
+    interface StageExecutor {
+        Connection openConnection() throws Exception;
+        void migrateTo(String target) throws Exception;
     }
 
-    @Override
-    public void run(ApplicationArguments args) throws Exception {
+    static StageExecutor flywayStages(Flyway base) {
+        return new StageExecutor() {
+            @Override public Connection openConnection() throws Exception {
+                return base.getConfiguration().getDataSource().getConnection();
+            }
+            @Override public void migrateTo(String target) {
+                Flyway.configure().configuration(base.getConfiguration()).target(target).load().migrate();
+            }
+        };
+    }
+
+    private final StageExecutor stages;
+    private final ReleaseMigrationState state;
+    private final ReleaseMigrationAuthorizationStore authorizations;
+    private final ReleaseMigrationRuntimeIdentityProvider identities;
+
+    ReleaseFlywayMigrationRunner(StageExecutor stages, ReleaseMigrationState state,
+                                  ReleaseMigrationAuthorizationStore authorizations,
+                                  ReleaseMigrationRuntimeIdentityProvider identities) {
+        this.stages = stages;
+        this.state = state;
+        this.authorizations = authorizations;
+        this.identities = identities;
+    }
+
+    public void execute() throws Exception {
+        ReleaseMigrationAuthorizationStore.ConsumedAuthorization consumed = null;
         try {
-            LOG.info("RELEASE_MIGRATE_STARTED");
-            try (var connection = flyway.getConfiguration().getDataSource().getConnection()) {
-                if (DataMigrationOracleVerifier.verify(connection, expectedDatabaseName, expectedServerUuid) != DataMigrationOracleVerifier.State.PRE_V10) {
-                    throw new IllegalStateException("MIGRATION_PRE_ORACLE_MISMATCH");
-                }
+            var authorization = authorizations.preview();
+            var identity = identities.current();
+            authorizations.validate(authorization, identity);
+            var preflight = currentOracle(identity);
+            var expectedStart = authorization.startState() == ReleaseMigrationAuthorization.StartState.PRE_V10
+                    ? DataMigrationOracleVerifier.State.PRE_V10 : DataMigrationOracleVerifier.State.MID_V11;
+            if (preflight != expectedStart) throw new IllegalStateException("MIGRATION_START_ORACLE_MISMATCH");
+
+            // Durable single-use consumption is the final action before the first DDL.
+            consumed = authorizations.consume(authorization, identity);
+
+            if (authorization.startState() == ReleaseMigrationAuthorization.StartState.PRE_V10) {
+                stages.migrateTo("11");
+                requireOracle(DataMigrationOracleVerifier.State.MID_V11, "MIGRATION_AFTER_V11_ORACLE_MISMATCH", identity);
             }
-            flyway.migrate();
-            try (var connection = flyway.getConfiguration().getDataSource().getConnection()) {
-                if (DataMigrationOracleVerifier.verify(connection, expectedDatabaseName, expectedServerUuid) != DataMigrationOracleVerifier.State.POST_V12) {
-                    throw new IllegalStateException("MIGRATION_POST_ORACLE_MISMATCH");
-                }
-            }
+
+            stages.migrateTo("12");
+            requireOracle(DataMigrationOracleVerifier.State.POST_V12, "MIGRATION_AFTER_V12_ORACLE_MISMATCH", identity);
+
+            var terminalIdentity = identities.current();
+            authorizations.validate(authorization, terminalIdentity);
+            consumed.seal("SUCCEEDED");
+            consumed.publishReady(terminalIdentity);
             state.ready();
-            LOG.info("RELEASE_MIGRATE_READY");
         } catch (Exception failure) {
             state.failed();
-            LOG.error("RELEASE_MIGRATE_FAILED type={}", failure.getClass().getSimpleName());
+            if (consumed != null) consumed.seal("FAILED");
             throw failure;
+        }
+    }
+
+    private void requireOracle(DataMigrationOracleVerifier.State expected, String code,
+                               ReleaseMigrationAuthorization.ExecutionIdentity identity) throws Exception {
+        if (currentOracle(identity) != expected) throw new IllegalStateException(code);
+    }
+
+    private DataMigrationOracleVerifier.State currentOracle(
+            ReleaseMigrationAuthorization.ExecutionIdentity identity) throws Exception {
+        try (Connection connection = stages.openConnection()) {
+            return DataMigrationOracleVerifier.verify(connection, identity.databaseName(), identity.expectedServerUuid());
         }
     }
 }

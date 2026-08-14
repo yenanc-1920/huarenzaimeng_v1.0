@@ -91,10 +91,10 @@ class MigrationAndConfigContractTest {
                 .contains("Flyway.configure()")
                 .contains(".dataSource(url, user, password)");
         String migrationRunner = source("src/main/java/com/huarenzaimeng/api/config/ReleaseFlywayMigrationRunner.java");
-        assertThat(migrationRunner).contains("implements ApplicationRunner")
-                .contains("flyway.migrate();")
-                .doesNotContain("flyway.validate();")
-                .contains("throw failure;");
+        assertThat(migrationRunner).doesNotContain("implements ApplicationRunner", "flyway.migrate();")
+                .contains("stages.migrateTo(\"11\")", "DataMigrationOracleVerifier.State.MID_V11",
+                        "stages.migrateTo(\"12\")", "DataMigrationOracleVerifier.State.POST_V12",
+                        "authorizations.consume(authorization, identity)", "throw failure;");
         String explicitDataSource = source("src/main/java/com/huarenzaimeng/api/config/ReleaseMysqlDataSourceConfig.java");
         assertThat(explicitDataSource).contains("@Profile(\"release-mysql\")")
                 .contains("@Value(\"${HZ_DATASOURCE_URL}\")")

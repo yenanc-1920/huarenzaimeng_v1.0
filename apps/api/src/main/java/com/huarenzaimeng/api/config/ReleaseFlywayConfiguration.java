@@ -2,10 +2,11 @@ package com.huarenzaimeng.api.config;
 
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import java.time.Clock;
+import javax.sql.DataSource;
 
 @Configuration(proxyBeanMethods = false)
 @Profile("release-mysql")
@@ -37,12 +38,12 @@ public class ReleaseFlywayConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "hz.data-integration.migration-enabled", havingValue = "true")
-    ReleaseFlywayMigrationRunner releaseFlywayMigrationRunner(
-            Flyway releaseFlyway,
-            ReleaseMigrationState state,
-            @Value("${hz.data-integration.expected-database-name}") String expectedDatabaseName,
-            @Value("${hz.data-integration.expected-server-uuid}") String expectedServerUuid) {
-        return new ReleaseFlywayMigrationRunner(releaseFlyway, state, expectedDatabaseName, expectedServerUuid);
+    ReleaseMigrationReadyVerifier releaseMigrationReadyVerifier(Flyway releaseFlyway,
+            DataSource dataSource, ReleaseMigrationState state) {
+        var store = ReleaseMigrationAuthorizationStore.fixed(Clock.systemUTC());
+        var identities = new ReleaseMigrationRuntimeIdentityProvider(dataSource, releaseFlyway);
+        return new ReleaseMigrationReadyVerifier(store, identities,
+                ReleaseFlywayMigrationRunner.flywayStages(releaseFlyway), state);
     }
+
 }

@@ -6,8 +6,10 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.core.env.MapPropertySource;
 
 import java.util.Map;
+import javax.sql.DataSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class ReleaseFlywayWiringTest {
     @Test void releaseProfileKeepsMigrationRunnerDisabledByDefaultWithoutExpectedIdentity() {
@@ -24,7 +26,7 @@ class ReleaseFlywayWiringTest {
         }
     }
 
-    @Test void releaseProfileWiresManualFlywayRunnerAndClosedGateWithoutConnecting() {
+    @Test void migrationEnabledAloneStillCannotCreateOrRunTheControlledCommand() {
         try (AnnotationConfigApplicationContext context = releaseContext(Map.of(
                     "spring.flyway.url", "jdbc:mysql://127.0.0.1:1/not_connected",
                     "spring.flyway.user", "synthetic_migrator",
@@ -38,7 +40,7 @@ class ReleaseFlywayWiringTest {
             ))) {
 
             assertThat(context.getBean(Flyway.class)).isNotNull();
-            assertThat(context.getBean(ReleaseFlywayMigrationRunner.class)).isNotNull();
+            assertThat(context.getBeansOfType(ReleaseFlywayMigrationRunner.class)).isEmpty();
             assertThat(context.getBean(ReleaseMigrationState.class).phase())
                     .isEqualTo(ReleaseMigrationState.Phase.MIGRATING);
         }
@@ -49,6 +51,7 @@ class ReleaseFlywayWiringTest {
         context.getEnvironment().setActiveProfiles("release-mysql");
         context.getEnvironment().getPropertySources()
                 .addFirst(new MapPropertySource("testReleaseFlyway", properties));
+        context.getBeanFactory().registerSingleton("dataSource", mock(DataSource.class));
         context.register(ReleaseFlywayConfiguration.class);
         context.refresh();
         return context;

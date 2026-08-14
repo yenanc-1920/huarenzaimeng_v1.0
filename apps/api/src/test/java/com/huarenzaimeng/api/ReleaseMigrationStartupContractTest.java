@@ -20,9 +20,10 @@ class ReleaseMigrationStartupContractTest {
                 .doesNotContain("SPRING_DATASOURCE_PASSWORD: ${SPRING_FLYWAY_PASSWORD}");
         assertThat(configuration).contains("Flyway.configure()", ".dataSource(url, user, password)")
                 .doesNotContain("System.out", "logger.", "printStackTrace");
-        assertThat(runner).contains("implements ApplicationRunner", "flyway.migrate();")
-                .doesNotContain("flyway.validate();")
-                .contains("state.failed();", "throw failure;");
+        assertThat(runner).doesNotContain("implements ApplicationRunner", "flyway.migrate();")
+                .contains("stages.migrateTo(\"11\")", "DataMigrationOracleVerifier.State.MID_V11",
+                        "stages.migrateTo(\"12\")", "DataMigrationOracleVerifier.State.POST_V12",
+                        "authorizations.consume(authorization, identity)", "state.failed();", "throw failure;");
         assertThat(gate).contains("@Order(Ordered.HIGHEST_PRECEDENCE)", "SC_SERVICE_UNAVAILABLE")
                 .contains("\"/actuator/health\"",
                         "\"/actuator/health/liveness\"",
