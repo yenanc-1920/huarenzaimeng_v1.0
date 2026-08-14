@@ -13,6 +13,7 @@ class ReleaseMigrationStartupContractTest {
         String configuration = Files.readString(Path.of("src/main/java/com/huarenzaimeng/api/config/ReleaseFlywayConfiguration.java"));
         String runner = Files.readString(Path.of("src/main/java/com/huarenzaimeng/api/config/ReleaseFlywayMigrationRunner.java"));
         String gate = Files.readString(Path.of("src/main/java/com/huarenzaimeng/api/config/ReleaseMigrationGateFilter.java"));
+        String adminAuth = Files.readString(Path.of("src/main/java/com/huarenzaimeng/api/adminauth/AdminAuthController.java"));
 
         assertThat(yaml).contains("flyway:\n    #", "enabled: false")
                 .contains("user: ${SPRING_FLYWAY_USER}", "password: ${SPRING_FLYWAY_PASSWORD}")
@@ -28,7 +29,10 @@ class ReleaseMigrationStartupContractTest {
                         "\"/actuator/health/readiness\"",
                         "\"/admin-read/v1/data-integration/readiness\"")
                 .contains("shouldNotFilterAsyncDispatch()", "shouldNotFilterErrorDispatch()",
-                        "DispatcherType.REQUEST", "Cache-Control", "no-store")
+                        "DispatcherType.REQUEST", "CLOSED_LOGIN_PATH", "application/json",
+                        "Cache-Control", "no-store")
                 .doesNotContain("path.startsWith(\"/admin\")");
+        assertThat(adminAuth).contains("@PostMapping(\"/login\")", "response.addCookie(cookie)",
+                "HZ_ADMIN_SESSION");
     }
 }

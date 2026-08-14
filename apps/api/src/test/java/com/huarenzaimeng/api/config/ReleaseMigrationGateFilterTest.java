@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doAnswer;
 
 class ReleaseMigrationGateFilterTest {
     private final ReleaseMigrationState state = new ReleaseMigrationState();
@@ -46,6 +47,42 @@ class ReleaseMigrationGateFilterTest {
         filter.doFilter(request, response, chain);
 
         verify(chain).doFilter(request, response);
+    }
+
+    @Test void allowsOnlyBoundedJsonLoginPostAndPreservesControllerCookieChain() throws Exception {
+        MockHttpServletRequest request = jsonLoginRequest("{\"username\":\"admin\",\"password\":\"test-only\"}");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+        doAnswer(invocation -> {
+            ((jakarta.servlet.http.HttpServletResponse) invocation.getArgument(1))
+                    .addHeader("Set-Cookie", "HZ_ADMIN_SESSION=downstream-controller; HttpOnly; Secure; SameSite=Strict");
+            return null;
+        }).when(chain).doFilter(request, response);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        assertThat(response.getHeader("Set-Cookie")).startsWith("HZ_ADMIN_SESSION=");
+    }
+
+    @Test void rejectsEveryNonCanonicalLoginPostBeforeControllerChain() throws Exception {
+        java.util.List<MockHttpServletRequest> invalid = new java.util.ArrayList<>();
+        invalid.add(jsonRequest("POST", "/admin-auth/v1/bootstrap", "{}"));
+        invalid.add(jsonRequest("PUT", "/admin-auth/v1/login", "{}"));
+        MockHttpServletRequest query = jsonLoginRequest("{}"); query.setQueryString("x=1"); invalid.add(query);
+        MockHttpServletRequest wrongType = jsonLoginRequest("{}"); wrongType.setContentType("text/plain"); invalid.add(wrongType);
+        MockHttpServletRequest transfer = jsonLoginRequest("{}"); transfer.addHeader("Transfer-Encoding", "chunked"); invalid.add(transfer);
+        invalid.add(jsonLoginRequest(""));
+        invalid.add(jsonLoginRequest("x".repeat(4097)));
+
+        for (MockHttpServletRequest request : invalid) {
+            FilterChain chain = mock(FilterChain.class);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(request, response, chain);
+            assertThat(response.getStatus()).isEqualTo(503);
+            assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+            verifyNoInteractions(chain);
+        }
     }
 
     @Test void blocksBusinessPathsBeforeMigrationIsReady() throws Exception {
@@ -123,6 +160,17 @@ class ReleaseMigrationGateFilterTest {
         filter.doFilter(request, response, chain);
 
         verify(chain).doFilter(request, response);
+    }
+
+    private static MockHttpServletRequest jsonLoginRequest(String body) {
+        return jsonRequest("POST", "/admin-auth/v1/login", body);
+    }
+
+    private static MockHttpServletRequest jsonRequest(String method, String path, String body) {
+        MockHttpServletRequest request = new MockHttpServletRequest(method, path);
+        request.setContentType("application/json");
+        request.setContent(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return request;
     }
 
 }

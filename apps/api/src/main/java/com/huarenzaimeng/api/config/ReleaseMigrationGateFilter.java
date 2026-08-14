@@ -19,6 +19,8 @@ import java.util.Set;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public final class ReleaseMigrationGateFilter extends OncePerRequestFilter {
     static final String NOT_READY_BODY = "{\"status\":\"SERVICE_STARTING\"}";
+    private static final String CLOSED_LOGIN_PATH = "/admin-auth/v1/login";
+    private static final long CLOSED_LOGIN_MAX_BYTES = 4096;
     private static final Set<String> CLOSED_GET_ALLOWLIST = Set.of(
             "/actuator/health",
             "/actuator/health/liveness",
@@ -68,13 +70,8 @@ public final class ReleaseMigrationGateFilter extends OncePerRequestFilter {
 
     private static boolean closedRequestIsAllowed(HttpServletRequest request) throws IOException {
         if (request.getDispatcherType() != DispatcherType.REQUEST) return false;
-        if (!"GET".equals(request.getMethod())) return false;
         if (request.getQueryString() != null) return false;
         if (request.getHeader("Transfer-Encoding") != null) return false;
-        // This is a transport-metadata gate only: ordinary browser GETs normally have no
-        // Content-Length (-1). Do not inspect or consume the request body here.
-        long contentLength = request.getContentLengthLong();
-        if (contentLength != -1 && contentLength != 0) return false;
 
         String contextPath = request.getContextPath();
         String servletPath = request.getServletPath();
@@ -83,6 +80,18 @@ public final class ReleaseMigrationGateFilter extends OncePerRequestFilter {
         if (!contextPath.isEmpty()) return false;
         String path = servletPath.isEmpty() ? requestUri : servletPath;
         if (!requestUri.equals(path)) return false;
-        return CLOSED_GET_ALLOWLIST.contains(path);
+
+        long contentLength = request.getContentLengthLong();
+        if ("GET".equals(request.getMethod())) {
+            // This is a transport-metadata gate only: ordinary browser GETs normally have no
+            // Content-Length (-1). Do not inspect or consume the request body here.
+            return (contentLength == -1 || contentLength == 0) && CLOSED_GET_ALLOWLIST.contains(path);
+        }
+        if ("POST".equals(request.getMethod()) && CLOSED_LOGIN_PATH.equals(path)) {
+            return contentLength > 0
+                    && contentLength <= CLOSED_LOGIN_MAX_BYTES
+                    && "application/json".equalsIgnoreCase(request.getContentType());
+        }
+        return false;
     }
 }
