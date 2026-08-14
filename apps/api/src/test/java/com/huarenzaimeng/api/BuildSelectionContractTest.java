@@ -34,7 +34,9 @@ class BuildSelectionContractTest {
                 .contains("npm run test:contracts && npm run build")
                 .contains("COPY --from=admin-web-build /workspace/apps/admin-web/dist apps/api/src/main/resources/static")
                 .contains("USER 10001:10001")
-                .contains("--chown=10001:10001");
+                .contains("--chown=10001:10001")
+                .contains("ENTRYPOINT [\"java\", \"-Dloader.main=com.huarenzaimeng.api.FlywayV12FunctionVerificationLauncher\", \"-cp\", \"/app/app.jar\", \"org.springframework.boot.loader.launch.PropertiesLauncher\"]")
+                .doesNotContain("ENTRYPOINT [\"java\", \"-jar\", \"/app/app.jar\"]");
         assertThat(Files.readString(PROJECT_ROOT.resolve("apps/api/src/main/java/com/huarenzaimeng/api/MockFlowController.java")))
                 .contains("@Profile({\"mock\", \"test\"})");
     }
