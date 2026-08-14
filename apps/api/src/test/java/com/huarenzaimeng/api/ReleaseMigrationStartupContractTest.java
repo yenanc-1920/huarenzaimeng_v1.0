@@ -23,10 +23,12 @@ class ReleaseMigrationStartupContractTest {
                 .doesNotContain("flyway.validate();")
                 .contains("state.failed();", "throw failure;");
         assertThat(gate).contains("@Order(Ordered.HIGHEST_PRECEDENCE)", "SC_SERVICE_UNAVAILABLE")
-                .contains("path.equals(\"/actuator/health\")",
-                        "path.equals(\"/actuator/health/liveness\")",
-                        "path.equals(\"/actuator/health/readiness\")",
-                        "path.equals(\"/admin-read/v1/data-integration/readiness\")")
+                .contains("\"/actuator/health\"",
+                        "\"/actuator/health/liveness\"",
+                        "\"/actuator/health/readiness\"",
+                        "\"/admin-read/v1/data-integration/readiness\"")
+                .contains("shouldNotFilterAsyncDispatch()", "shouldNotFilterErrorDispatch()",
+                        "DispatcherType.REQUEST", "Cache-Control", "no-store")
                 .doesNotContain("path.startsWith(\"/admin\")");
     }
 }

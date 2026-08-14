@@ -1,6 +1,7 @@
 package com.huarenzaimeng.api.config;
 
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,12 +12,24 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Set;
 
 @Component
 @Profile("release-mysql")
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public final class ReleaseMigrationGateFilter extends OncePerRequestFilter {
     static final String NOT_READY_BODY = "{\"status\":\"SERVICE_STARTING\"}";
+    private static final Set<String> CLOSED_GET_ALLOWLIST = Set.of(
+            "/actuator/health",
+            "/actuator/health/liveness",
+            "/actuator/health/readiness",
+            "/admin-read/v1/data-integration/readiness",
+            "/admin/login",
+            "/admin/initialize",
+            "/index.html",
+            "/assets/index-DnCFE54m.js",
+            "/assets/index-F1aN-GtB.css",
+            "/assets/logo-C5G5A9bI.png");
     private final ReleaseMigrationState state;
 
     ReleaseMigrationGateFilter(ReleaseMigrationState state) {
@@ -25,24 +38,50 @@ public final class ReleaseMigrationGateFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI().substring(request.getContextPath().length());
-        return path.equals("/actuator/health")
-                || path.equals("/actuator/health/liveness")
-                || path.equals("/actuator/health/readiness")
-                || path.equals("/admin-read/v1/data-integration/readiness");
+        return state.isReady();
+    }
+
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
+    @Override
+    protected boolean shouldNotFilterErrorDispatch() {
+        return false;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        if (!state.isReady()) {
-            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
-            response.setContentType("application/json");
-            response.setCharacterEncoding("UTF-8");
-            response.setHeader("Retry-After", "5");
-            response.getWriter().write(NOT_READY_BODY);
+        if (closedRequestIsAllowed(request)) {
+            chain.doFilter(request, response);
             return;
         }
-        chain.doFilter(request, response);
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader("Retry-After", "5");
+        response.setHeader("Cache-Control", "no-store");
+        response.getWriter().write(NOT_READY_BODY);
+    }
+
+    private static boolean closedRequestIsAllowed(HttpServletRequest request) throws IOException {
+        if (request.getDispatcherType() != DispatcherType.REQUEST) return false;
+        if (!"GET".equals(request.getMethod())) return false;
+        if (request.getQueryString() != null) return false;
+        if (request.getHeader("Transfer-Encoding") != null) return false;
+        // A closed gate admits only a request whose Servlet framing proves an empty body.
+        // Unknown length (-1) and streaming/delayed bodies are not evidence of emptiness.
+        if (request.getContentLengthLong() != 0) return false;
+
+        String contextPath = request.getContextPath();
+        String servletPath = request.getServletPath();
+        String requestUri = request.getRequestURI();
+        if (contextPath == null || servletPath == null || requestUri == null) return false;
+        if (!contextPath.isEmpty()) return false;
+        String path = servletPath.isEmpty() ? requestUri : servletPath;
+        if (!requestUri.equals(path)) return false;
+        return CLOSED_GET_ALLOWLIST.contains(path);
     }
 }
