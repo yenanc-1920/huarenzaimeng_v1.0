@@ -1,0 +1,2 @@
+apps/api/src/main/java/com/huarenzaimeng/api/FlywayV12FunctionVerificationLauncher.java|A9445C1930DEA3A3B03B026BB2567960B9731F1E7D2B094CAF6EFB4AC31B5CAA
+apps/api/src/test/java/com/huarenzaimeng/api/FlywayV12FunctionVerificationLauncherTest.java|AC30C8183538A17F25BF010412BEAEF0FA2CFDD9190FB400C558B5F75F63C8FE
