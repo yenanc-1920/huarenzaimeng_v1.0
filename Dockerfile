@@ -54,4 +54,4 @@ ENV SPRING_PROFILES_ACTIVE=mock
 EXPOSE 8080
 
 USER 10001:10001
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-Dloader.main=com.huarenzaimeng.api.FlywayV12FunctionVerificationLauncher", "-cp", "/app/app.jar", "org.springframework.boot.loader.launch.PropertiesLauncher"]

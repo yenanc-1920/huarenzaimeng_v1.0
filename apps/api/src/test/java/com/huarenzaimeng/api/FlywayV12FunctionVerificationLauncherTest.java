@@ -95,6 +95,11 @@ class FlywayV12FunctionVerificationLauncherTest {
         FlywayV12FunctionVerificationLauncher.requireExpectedDatabase(connection);
     }
 
+    @Test void targetDatabaseIsExactIntegrationTestDatabase() {
+        assertThat(FlywayV12FunctionVerificationLauncher.EXPECTED_DATABASE)
+                .isEqualTo("huarenzaimeng_it_vnext");
+    }
+
     @Test void minimalPreRequiresAllV11AndV12ObjectsAbsent() {
         var snapshot = new FlywayV12FunctionVerificationLauncher.StructureSnapshot(
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);

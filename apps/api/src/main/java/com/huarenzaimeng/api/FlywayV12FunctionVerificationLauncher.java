@@ -22,7 +22,7 @@ import org.springframework.context.annotation.Profile;
 /** Temporary, non-web entry used only to verify V1-V12 against one isolated database. */
 public final class FlywayV12FunctionVerificationLauncher {
     static final String ENABLED_PROPERTY = "hz.data-integration.flyway-v12-function-verification-enabled";
-    static final String EXPECTED_DATABASE = "hz_flyway_v12_20260814";
+    static final String EXPECTED_DATABASE = "huarenzaimeng_it_vnext";
     private static final String[] SCRIPTS = {
             "V1__create_core_transaction_tables.sql",
             "V2__add_subject_scoped_commands_versions_and_worker_tables.sql",
