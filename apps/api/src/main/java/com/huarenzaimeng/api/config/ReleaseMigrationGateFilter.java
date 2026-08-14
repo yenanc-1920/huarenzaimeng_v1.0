@@ -71,9 +71,10 @@ public final class ReleaseMigrationGateFilter extends OncePerRequestFilter {
         if (!"GET".equals(request.getMethod())) return false;
         if (request.getQueryString() != null) return false;
         if (request.getHeader("Transfer-Encoding") != null) return false;
-        // A closed gate admits only a request whose Servlet framing proves an empty body.
-        // Unknown length (-1) and streaming/delayed bodies are not evidence of emptiness.
-        if (request.getContentLengthLong() != 0) return false;
+        // This is a transport-metadata gate only: ordinary browser GETs normally have no
+        // Content-Length (-1). Do not inspect or consume the request body here.
+        long contentLength = request.getContentLengthLong();
+        if (contentLength != -1 && contentLength != 0) return false;
 
         String contextPath = request.getContextPath();
         String servletPath = request.getServletPath();

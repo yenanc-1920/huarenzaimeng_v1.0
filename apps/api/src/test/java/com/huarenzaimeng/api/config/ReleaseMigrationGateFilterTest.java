@@ -2,8 +2,6 @@ package com.huarenzaimeng.api.config;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.DispatcherType;
-import jakarta.servlet.ReadListener;
-import jakarta.servlet.ServletInputStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -17,7 +15,7 @@ class ReleaseMigrationGateFilterTest {
     private final ReleaseMigrationState state = new ReleaseMigrationState();
     private final ReleaseMigrationGateFilter filter = new ReleaseMigrationGateFilter(state);
 
-    @Test void allowsOnlyOperationalReadinessPathsBeforeMigrationIsReady() throws Exception {
+    @Test void allowsExactBrowserShapedGetAllowlistWithoutContentLength() throws Exception {
         for (String path : java.util.List.of(
                 "/actuator/health",
                 "/actuator/health/liveness",
@@ -31,7 +29,6 @@ class ReleaseMigrationGateFilterTest {
                 "/assets/logo-C5G5A9bI.png")) {
             FilterChain chain = mock(FilterChain.class);
             MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
-            request.setContent(new byte[0]);
             MockHttpServletResponse response = new MockHttpServletResponse();
 
             filter.doFilter(request, response, chain);
@@ -40,28 +37,15 @@ class ReleaseMigrationGateFilterTest {
         }
     }
 
-    @Test void rejectsUnknownLengthEvenWhenAvailableIsZero() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin/login") {
-            @Override public long getContentLengthLong() { return -1; }
-            @Override public ServletInputStream getInputStream() {
-                return delayedStream();
-            }
-        };
+    @Test void allowsExactAllowlistGetWithExplicitZeroContentLength() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin/login");
+        request.setContent(new byte[0]);
+        FilterChain chain = mock(FilterChain.class);
+        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        assertClosedWithoutChain(request);
-    }
+        filter.doFilter(request, response, chain);
 
-    @Test void rejectsDelayedBodyBeforeItCanArrive() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin/login") {
-            @Override public long getContentLengthLong() { return -1; }
-            @Override public ServletInputStream getInputStream() {
-                return delayedStream();
-            }
-        };
-        assertThat(request.getInputStream().available()).isZero();
-        assertThat(request.getInputStream().isFinished()).isFalse();
-
-        assertClosedWithoutChain(request);
+        verify(chain).doFilter(request, response);
     }
 
     @Test void blocksBusinessPathsBeforeMigrationIsReady() throws Exception {
@@ -141,22 +125,4 @@ class ReleaseMigrationGateFilterTest {
         verify(chain).doFilter(request, response);
     }
 
-    private void assertClosedWithoutChain(MockHttpServletRequest request) throws Exception {
-        FilterChain chain = mock(FilterChain.class);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        filter.doFilter(request, response, chain);
-        assertThat(response.getStatus()).isEqualTo(503);
-        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
-        verifyNoInteractions(chain);
-    }
-
-    private static ServletInputStream delayedStream() {
-        return new ServletInputStream() {
-            @Override public boolean isFinished() { return false; }
-            @Override public boolean isReady() { return false; }
-            @Override public void setReadListener(ReadListener readListener) { }
-            @Override public int available() { return 0; }
-            @Override public int read() { return 'x'; }
-        };
-    }
 }
