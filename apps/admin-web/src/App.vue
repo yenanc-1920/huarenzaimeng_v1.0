@@ -44,7 +44,9 @@ if (import.meta.env.DEV) {
 }
 
 const pages: Array<{ id: PageId; label: string; description: string }> = [
-  { id: 'A120', label: '内容核验', description: '查看来源、责任、历史版本和展示状态' },
+  { id: 'A120', label: '审核中心', description: '查看来源、责任、历史版本、投诉和上下架状态' },
+  { id: 'A121', label: '黄页管理', description: '查看黄页条目的完整摘要、类别、来源、版本和有效期' },
+  { id: 'A122', label: '资讯管理', description: '查看生活提醒与节日资讯的完整摘要和发布信息' },
   { id: 'A130', label: '商品与运营商', description: '按职责查看互斥的目录或财务候选字段' },
   { id: 'A140', label: '订单与退款', description: '按职责查看互斥的客服或财务只读摘要' },
 ]

@@ -20,6 +20,8 @@ const isNullableRfc3339 = (value: unknown) => value === null || isRfc3339(value)
 const itemKeyMap = {
   'A100:CS': ['supportRef', 'subjectLabel', 'statusLabel', 'maskedPhone', 'nextReviewLabel', 'noteStatusLabel', 'escalationStatusLabel'],
   'A120:CONTENT': ['contentRef', 'title', 'sourceLabel', 'reviewLabel', 'complaintLabel', 'visibilityLabel', 'ownerLabel', 'historyLabel', 'removalLabel'],
+  'A121:CONTENT': ['contentRef', 'title', 'summary', 'category', 'sourceLabel', 'statusLabel', 'versionLabel', 'verifiedAtLabel', 'validUntilLabel', 'updatedAtLabel'],
+  'A122:CONTENT': ['contentRef', 'title', 'summary', 'category', 'sourceLabel', 'statusLabel', 'versionLabel', 'verifiedAtLabel', 'validUntilLabel', 'updatedAtLabel'],
   'A130:CONTENT': ['catalogRef', 'displayName', 'operatorLabel', 'categoryLabel', 'contentStatusLabel', 'saleReviewLabel'],
   'A130:FIN': ['catalogRef', 'displayName', 'denominationLabel', 'currencyLabel', 'priceCostCandidateLabel', 'validityLabel', 'supportBatchLabel', 'financeReviewLabel'],
   'A140:CS': ['orderRef', 'maskedPhone', 'userStatusLabel', 'totalLabel', 'updatedLabel'],

@@ -11,10 +11,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @Profile("release-mysql")
 class AdminReadService {
+    private static final Set<String> NEWS_CATEGORIES = Set.of("LIFE_REMINDER", "HOLIDAY_EXPLANATION");
     private final ContentService content;
     private final AdminReadMapper mapper;
     private final Clock clock;
@@ -26,10 +28,24 @@ class AdminReadService {
     AdminProjection read(String pageId) {
         return switch (pageId) {
             case "A120" -> contentProjection();
+            case "A121" -> managedContentProjection("A121", false);
+            case "A122" -> managedContentProjection("A122", true);
             case "A130" -> catalogProjection();
             case "A140" -> orderProjection();
             default -> null;
         };
+    }
+
+    private AdminProjection managedContentProjection(String pageId, boolean news) {
+        List<DirectoryContent> source = content.internalList().items().stream()
+                .filter(value -> NEWS_CATEGORIES.contains(value.category()) == news).toList();
+        List<ManagedContentItem> items = source.stream().map(value -> new ManagedContentItem(
+                value.contentRef(), value.title(), value.summary(), value.category(), sourceLabel(value),
+                reviewLabel(value), Long.toString(value.version()),
+                value.verifiedAt() == null ? "尚未核验" : value.verifiedAt().toString(),
+                value.validUntil() == null ? "未设置" : value.validUntil().toString(), value.updatedAt().toString())).toList();
+        long version = source.stream().mapToLong(DirectoryContent::version).max().orElse(0);
+        return new AdminProjection("ADMIN_READ_V1", (news ? "NEWS-V" : "DIRECTORY-V") + version, pageId, "CONTENT", items);
     }
 
     private AdminProjection contentProjection() {
@@ -128,6 +144,9 @@ class AdminReadService {
     record AdminProjection(String schemaVersion, String projectionVersion, String pageId, String role, Object items) {}
     record A120Item(String contentRef, String title, String sourceLabel, String reviewLabel, String complaintLabel,
                     String visibilityLabel, String ownerLabel, String historyLabel, String removalLabel) {}
+    record ManagedContentItem(String contentRef, String title, String summary, String category, String sourceLabel,
+                              String statusLabel, String versionLabel, String verifiedAtLabel,
+                              String validUntilLabel, String updatedAtLabel) {}
     record A130FinanceItem(String catalogRef, String displayName, String denominationLabel, String currencyLabel,
                            String priceCostCandidateLabel, String validityLabel, String supportBatchLabel,
                            String financeReviewLabel) {}

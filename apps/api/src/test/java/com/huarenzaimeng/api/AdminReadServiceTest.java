@@ -43,6 +43,20 @@ class AdminReadServiceTest {
         assertThat(((AdminReadService.A130FinanceItem) ((List<?>) result.items()).get(0)).denominationLabel()).isEqualTo("BDT 100.00");
     }
 
+    @Test void directoryAndNewsPagesExposeFullStoredContentByCategory() {
+        DirectoryContent directory = new DirectoryContent("DIR-1", "孟加拉生活服务", "黄页完整摘要", "DIRECTORY",
+                "SELF_OPERATED_CHINA_COMPANY", "SELF_RESEARCH", "SRC-DIR", "NAME_ONLY", "EDITOR-1",
+                now.minusSeconds(60), now.plusSeconds(3600), 2, ContentState.PUBLISHED, false, now, List.of());
+        DirectoryContent news = new DirectoryContent("NEWS-1", "节日提醒", "资讯完整摘要", "LIFE_REMINDER",
+                "SELF_OPERATED_CHINA_COMPANY", "SELF_RESEARCH", "SRC-NEWS", "NAME_ONLY", "EDITOR-1",
+                now.minusSeconds(60), now.plusSeconds(3600), 4, ContentState.PUBLISHED, false, now, List.of());
+        when(content.internalList()).thenReturn(new ContentPage<>(List.of(directory, news), 2));
+        AdminReadService.AdminProjection directoryResult = service.read("A121");
+        AdminReadService.AdminProjection newsResult = service.read("A122");
+        assertThat(((AdminReadService.ManagedContentItem) ((List<?>) directoryResult.items()).get(0)).summary()).isEqualTo("黄页完整摘要");
+        assertThat(((AdminReadService.ManagedContentItem) ((List<?>) newsResult.items()).get(0)).summary()).isEqualTo("资讯完整摘要");
+    }
+
     @Test void orderProjectionUsesMaskedPhoneAndReadableStoredState() {
         when(mapper.selectAdminOrders()).thenReturn(List.of(Map.ofEntries(
                 Map.entry("order_ref", "ORDER-1"), Map.entry("order_state", "AWAITING_PAYMENT"),

@@ -36,6 +36,16 @@ const projections: AdminPageProjection[] = [
   },
   {
     ...base,
+    pageId: 'A121', role: 'CONTENT',
+    items: [{ contentRef: 'DIR-DEMO-1', title: '黄页示例条目', summary: '用于界面预览的黄页完整摘要。', category: 'DIRECTORY', sourceLabel: 'SELF_RESEARCH / DIR-SOURCE-1', statusLabel: '已发布', versionLabel: '1', verifiedAtLabel: '2026-08-15T00:00:00Z', validUntilLabel: '2027-08-15T00:00:00Z', updatedAtLabel: '2026-08-15T00:00:00Z' }],
+  },
+  {
+    ...base,
+    pageId: 'A122', role: 'CONTENT',
+    items: [{ contentRef: 'NEWS-DEMO-1', title: '资讯示例条目', summary: '用于界面预览的生活资讯完整摘要。', category: 'LIFE_REMINDER', sourceLabel: 'SELF_RESEARCH / NEWS-SOURCE-1', statusLabel: '已发布', versionLabel: '1', verifiedAtLabel: '2026-08-15T00:00:00Z', validUntilLabel: '2027-08-15T00:00:00Z', updatedAtLabel: '2026-08-15T00:00:00Z' }],
+  },
+  {
+    ...base,
     pageId: 'A130',
     role: 'FIN',
     items: [

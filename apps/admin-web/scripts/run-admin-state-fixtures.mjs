@@ -14,11 +14,11 @@ const deferred = () => {
   return { promise, resolve, reject }
 }
 
-const allowedRole = { A100: 'CS', A110: 'FIN', A120: 'CONTENT', A130: 'FIN', A140: 'FIN' }
-const deniedRole = { A100: 'CONTENT', A110: 'CONTENT', A120: 'CS', A130: 'CS', A140: 'CONTENT' }
+const allowedRole = { A100: 'CS', A110: 'FIN', A120: 'CONTENT', A121: 'CONTENT', A122: 'CONTENT', A130: 'FIN', A140: 'FIN' }
+const deniedRole = { A100: 'CONTENT', A110: 'CONTENT', A120: 'CS', A121: 'CS', A122: 'CS', A130: 'CS', A140: 'CONTENT' }
 const pageFixtures = []
 
-for (const pageId of ['A100', 'A110', 'A120', 'A130', 'A140']) {
+for (const pageId of ['A100', 'A110', 'A120', 'A121', 'A122', 'A130', 'A140']) {
   const ready = await loadAdminPage('BUILTIN_SYNTHETIC', pageId, allowedRole[pageId])
   assert.equal(ready.status, 'READY')
 

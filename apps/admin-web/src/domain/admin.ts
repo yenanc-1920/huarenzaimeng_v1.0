@@ -1,4 +1,4 @@
-export type PageId = 'A100' | 'A110' | 'A120' | 'A130' | 'A140'
+export type PageId = 'A100' | 'A110' | 'A120' | 'A121' | 'A122' | 'A130' | 'A140'
 export type AdminRole = 'CS' | 'CONTENT' | 'FIN'
 export type AdminDataMode = 'BUILTIN_SYNTHETIC' | 'PROJECT_API_PROXY'
 
@@ -22,6 +22,11 @@ export interface ContentReviewSummary {
   ownerLabel: string
   historyLabel: string
   removalLabel: string
+}
+
+export interface ManagedContentSummary {
+  contentRef: string; title: string; summary: string; category: string; sourceLabel: string
+  statusLabel: string; versionLabel: string; verifiedAtLabel: string; validUntilLabel: string; updatedAtLabel: string
 }
 
 export interface CatalogContentSummary {
@@ -137,6 +142,8 @@ interface ProjectionBase {
 export type AdminPageProjection =
   | (ProjectionBase & { pageId: 'A100'; role: 'CS'; items: SupportCaseSummary[] })
   | (ProjectionBase & { pageId: 'A120'; role: 'CONTENT'; items: ContentReviewSummary[] })
+  | (ProjectionBase & { pageId: 'A121'; role: 'CONTENT'; items: ManagedContentSummary[] })
+  | (ProjectionBase & { pageId: 'A122'; role: 'CONTENT'; items: ManagedContentSummary[] })
   | (ProjectionBase & { pageId: 'A130'; role: 'CONTENT'; items: CatalogContentSummary[] })
   | (ProjectionBase & { pageId: 'A130'; role: 'FIN'; items: CatalogFinanceSummary[] })
   | (ProjectionBase & { pageId: 'A140'; role: 'CS'; items: SupportOrderSummary[] })
@@ -154,5 +161,6 @@ export const pageRoleAllowed = (pageId: PageId, role: AdminRole) =>
   (pageId === 'A100' && role === 'CS')
   || (pageId === 'A110' && (role === 'CS' || role === 'FIN'))
   || (pageId === 'A120' && role === 'CONTENT')
+  || ((pageId === 'A121' || pageId === 'A122') && role === 'CONTENT')
   || (pageId === 'A130' && (role === 'CONTENT' || role === 'FIN'))
   || (pageId === 'A140' && (role === 'CS' || role === 'FIN'))

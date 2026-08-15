@@ -27,6 +27,7 @@ const readUnavailable = read('src/components/ReadUnavailable.vue')
 const a100 = read('src/components/workspaces/A100Workspace.vue')
 const a110 = read('src/components/workspaces/A110Workspace.vue')
 const a120 = read('src/components/workspaces/A120Workspace.vue')
+const managedContent = read('src/components/workspaces/ManagedContentWorkspace.vue')
 const a130 = read('src/components/workspaces/A130Workspace.vue')
 const a140 = read('src/components/workspaces/A140Workspace.vue')
 const p021AdminAdapter = read('src/api/admin-order-detail.ts')
@@ -46,6 +47,10 @@ for (const id of ['UX-A100', 'UX-A110', 'UX-A120', 'UX-A130', 'UX-A140']) {
 assert.match(workspace, /A100Workspace/)
 assert.match(workspace, /A110Workspace/)
 assert.match(workspace, /A120Workspace/)
+assert.match(workspace, /ManagedContentWorkspace/)
+assert.match(app, /黄页管理/)
+assert.match(app, /资讯管理/)
+assert.match(app, /审核中心/)
 assert.match(workspace, /A130Workspace/)
 assert.match(workspace, /A140Workspace/)
 assert.match(app, /status: 'LOADING', data: null/)
@@ -127,7 +132,7 @@ assert.match(adapter, /A110_ROOT_KEYS = \['requestRef', 'viewState', 'projectCod
 assert.match(adapter, /exactKeys\(value, A110_ROOT_KEYS\)/)
 assert.doesNotMatch(adapter.slice(adapter.indexOf('export function parseA110ReadResponse'), adapter.indexOf('export const parseAdminPageProjection')), /CONTENT/)
 
-for (const variant of ['A100:CS', 'A120:CONTENT', 'A130:CONTENT', 'A130:FIN', 'A140:CS', 'A140:FIN']) {
+for (const variant of ['A100:CS', 'A120:CONTENT', 'A121:CONTENT', 'A122:CONTENT', 'A130:CONTENT', 'A130:FIN', 'A140:CS', 'A140:FIN']) {
   assert.match(adapter, new RegExp(`'${variant}'`), `${variant} mapper missing`)
 }
 for (const deniedVariant of ['A130:CS', 'A140:CONTENT']) {
@@ -147,6 +152,9 @@ assert.match(a100, /escalationStatusLabel/)
 assert.match(a120, /ownerLabel/)
 assert.match(a120, /historyLabel/)
 assert.match(a120, /removalLabel/)
+assert.match(managedContent, /selected\.summary/)
+assert.match(managedContent, /verifiedAtLabel/)
+assert.match(managedContent, /validUntilLabel/)
 assert.match(a120, /写操作资格为 0/)
 assert.match(a110, /data-page-id="UX-A110"/)
 assert.match(a110, /W \{\{ factNames\[code\] \}\}|\{\{ code \}\} \{\{ factNames\[code\] \}\}/)
