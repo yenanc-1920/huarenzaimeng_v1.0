@@ -82,6 +82,20 @@ public class MockFlowService {
         return project(projectSubjectRef, store.createOrder(projectSubjectRef, quote, command).order());
     }
 
+    List<OrderProjection> listOrders(String projectSubjectRef) { return store.listOrders(projectSubjectRef); }
+    OrderProjection requireOrder(String projectSubjectRef, String orderRef) { return store.requireOrder(projectSubjectRef, orderRef); }
+    ProjectProjection projectOrder(String projectSubjectRef, String orderRef) { return project(projectSubjectRef, store.requireOrder(projectSubjectRef, orderRef)); }
+
+    PaymentIntentResponse createDevelopmentPaymentIntent(BuyerAuthorization authorization, String orderRef,
+            String creationPrecondition, String commandId, String idempotencyKey,
+            long expectedProjectionVersion, long expectedAggregateVersion) {
+        installPaymentEligibilityDecisionForTest(authorization.environment(), authorization.projectSubjectRef(),
+                orderRef, authorization.authorizationEvidenceVersion(), PaymentEligibilityDecisionStatus.ELIGIBLE,
+                clock.instant().plus(10, ChronoUnit.MINUTES));
+        return createLocalSyntheticPaymentIntent(authorization, orderRef, creationPrecondition, commandId,
+                idempotencyKey, expectedProjectionVersion, expectedAggregateVersion);
+    }
+
     OrderCreationResponse createLocalSyntheticOrder(BuyerAuthorization authorization, String quoteRef,
                                                      String orderCreationPrecondition, String commandId,
                                                      String idempotencyKey) {

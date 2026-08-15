@@ -33,6 +33,15 @@ final class BuyerAuthController {
     }
     @PostMapping(value="/wechat/session",consumes=MediaType.ALL_VALUE) ResponseEntity<?> unsupportedMediaType(){return failure(400,"LOGIN_REQUEST_INVALID","NEW_CODE_REQUIRED",null);}
 
+    @GetMapping("/session") ResponseEntity<?> current(HttpServletRequest request){
+        if(request.getQueryString()!=null||request.getContentLengthLong()>0)return ResponseEntity.badRequest().body(Map.of("status","REJECTED","projectCode","SESSION_REQUEST_INVALID"));
+        String header=request.getHeader("Authorization");String token=header!=null&&header.startsWith("Bearer ")?header.substring(7):null;
+        return auth.authenticate(token).<ResponseEntity<?>>map(principal->ResponseEntity.ok()
+                .header("Cache-Control","no-store").body(Map.of("outcome","ACCEPTED","projectCode","BUYER_SESSION_READY",
+                        "subjectRef",principal.subjectRef(),"sessionRef",principal.sessionRef(),"role","BUYER")))
+                .orElseGet(()->ResponseEntity.status(401).body(Map.of("outcome","REJECTED","projectCode","BUYER_SESSION_UNAVAILABLE")));
+    }
+
     @PostMapping("/session/logout") ResponseEntity<?> logout(HttpServletRequest request){
         if(request.getQueryString()!=null||request.getContentLengthLong()>0)return ResponseEntity.badRequest().body(Map.of("status","REJECTED","projectCode","LOGOUT_REQUEST_INVALID"));
         String header=request.getHeader("Authorization");String token=header!=null&&header.startsWith("Bearer ")?header.substring(7):null;

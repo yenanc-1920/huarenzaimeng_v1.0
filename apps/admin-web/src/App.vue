@@ -10,6 +10,7 @@ import AdminInitialization from './components/AdminInitialization.vue'
 import LoginRequired from './components/LoginRequired.vue'
 import ReadUnavailable from './components/ReadUnavailable.vue'
 import P021AdminOrderDetail from './components/P021AdminOrderDetail.vue'
+import AdminOrderSandboxDetail from './components/AdminOrderSandboxDetail.vue'
 import type { AdminReadState, AdminRole, PageId } from './domain/admin'
 
 const activePage = ref<PageId>('A120')
@@ -20,6 +21,9 @@ const resolvedMode = resolveAdminDataMode(import.meta.env.VITE_ADMIN_DATA_MODE, 
 const readState = ref<AdminReadState>({ status: 'LOADING', data: null, message: '正在读取只读数据' })
 const authResolved = ref(false)
 const loggingOut = ref(false)
+const selectedOrderRef = ref<string | null>(null)
+const icpFiling = import.meta.env.VITE_ICP_FILING?.trim() || 'ICP备案号待补充（开发样例）'
+const publicSecurityFiling = import.meta.env.VITE_PUBLIC_SECURITY_FILING?.trim() || '公安备案号待补充（开发样例）'
 const readController = createAdminReadController((state) => { readState.value = state })
 const p021ItEntry = (() => {
   if (!import.meta.env.DEV) return null
@@ -100,6 +104,10 @@ function safeNavigate(pageId: 'A100' | 'A140') {
   activePage.value = pageId
 }
 
+function selectOrder(orderRef: string) {
+  selectedOrderRef.value = orderRef
+}
+
 watch([activePage, () => (isSynthetic.value ? previewRole.value : 'TRUSTED_ROLE')], refresh, { immediate: true })
 </script>
 
@@ -155,9 +163,11 @@ watch([activePage, () => (isSynthetic.value ? previewRole.value : 'TRUSTED_ROLE'
         <ReadUnavailable v-else-if="readState.status === 'UNAVAILABLE'" :message="readState.message" @retry="refresh" />
         <template v-else>
           <p class="sr-only" role="status" aria-live="polite" :data-read-state="readState.data.items.length === 0 ? 'READY_EMPTY' : 'READY'">{{ readState.data.items.length === 0 ? '只读数据读取完成，当前没有可查看记录' : `只读数据读取完成，共 ${readState.data.items.length} 条记录` }}</p>
-          <AdminWorkspace :projection="readState.data" @navigate="safeNavigate" />
+          <AdminOrderSandboxDetail v-if="activePage==='A140' && selectedOrderRef" :order-ref="selectedOrderRef" @close="selectedOrderRef=null" />
+          <AdminWorkspace v-else :projection="readState.data" @navigate="safeNavigate" @select-order="selectOrder" />
         </template>
       </main>
     </div>
+    <footer class="compliance-footer" aria-label="备案信息"><span>{{ icpFiling }}</span><span>{{ publicSecurityFiling }}</span></footer>
   </div>
 </template>

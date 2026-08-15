@@ -116,6 +116,10 @@ class MyBatisFlowStore implements FlowStore {
         return order(row);
     }
 
+    @Override public List<OrderProjection> listOrders(String subject) {
+        return mapper.selectOrders(subject).stream().map(MyBatisFlowStore::order).toList();
+    }
+
     @Override
     public PaymentIntentCreateResult createPaymentIntent(String subject, PaymentIntentDraft draft,
                                                           CommandIdentity command,

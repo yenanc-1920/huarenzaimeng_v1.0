@@ -4,6 +4,7 @@ import com.huarenzaimeng.core.OrderProjection;
 import com.huarenzaimeng.core.Quote;
 
 import java.util.function.UnaryOperator;
+import java.util.List;
 
 interface FlowStore {
     Quote createQuote(String projectSubjectRef, Quote quote, CommandIdentity command);
@@ -17,6 +18,8 @@ interface FlowStore {
     OrderCreateResult createOrder(String projectSubjectRef, Quote quote, CommandIdentity command);
 
     OrderProjection requireOrder(String projectSubjectRef, String orderRef);
+
+    List<OrderProjection> listOrders(String projectSubjectRef);
 
     PaymentIntentCreateResult createPaymentIntent(String projectSubjectRef, PaymentIntentDraft draft,
                                                   CommandIdentity command, long expectedProjectionVersion,

@@ -7,7 +7,7 @@ import A130Workspace from './workspaces/A130Workspace.vue'
 import A140Workspace from './workspaces/A140Workspace.vue'
 
 defineProps<{ projection: AdminPageProjection }>()
-defineEmits<{ navigate: [pageId: 'A100' | 'A140'] }>()
+defineEmits<{ navigate: [pageId: 'A100' | 'A140']; selectOrder: [orderRef: string] }>()
 </script>
 
 <template>
@@ -15,5 +15,5 @@ defineEmits<{ navigate: [pageId: 'A100' | 'A140'] }>()
   <A110Workspace v-else-if="projection.pageId === 'A110'" :projection="projection" @navigate="$emit('navigate', $event)" />
   <A120Workspace v-else-if="projection.pageId === 'A120'" :projection="projection" />
   <A130Workspace v-else-if="projection.pageId === 'A130'" :projection="projection" />
-  <A140Workspace v-else :projection="projection" />
+  <A140Workspace v-else :projection="projection" @select-order="$emit('selectOrder', $event)" />
 </template>

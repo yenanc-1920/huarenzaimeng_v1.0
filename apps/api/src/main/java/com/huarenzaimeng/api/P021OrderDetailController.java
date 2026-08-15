@@ -4,6 +4,7 @@ import com.huarenzaimeng.api.config.TestAccessTokenFilter;
 import com.huarenzaimeng.api.config.TrustedTestSessionCookieFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,7 @@ import java.util.List;
 import static com.huarenzaimeng.api.P021OrderDetailDomain.Response;
 
 @RestController
+@Profile({"mock", "test"})
 @RequestMapping("/api/v1/orders")
 final class P021OrderDetailController {
     private final P021OrderDetailService service;

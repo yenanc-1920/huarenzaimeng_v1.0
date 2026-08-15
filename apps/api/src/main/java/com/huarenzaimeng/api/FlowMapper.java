@@ -287,6 +287,18 @@ interface FlowMapper {
                    o.aggregate_version, o.allowed_action
             FROM hz_order o JOIN hz_quote q
               ON q.project_subject_ref=o.project_subject_ref AND q.quote_ref=o.quote_ref
+            WHERE o.project_subject_ref=#{subject}
+            ORDER BY o.updated_at DESC, o.order_ref
+            """)
+    java.util.List<Map<String, Object>> selectOrders(@Param("subject") String subject);
+
+    @Select("""
+            SELECT o.order_ref, o.quote_ref, o.order_state, o.payment_state,
+                   o.upstream_debit_state, o.delivery_state, o.refund_state,
+                   q.total_amount_minor, q.total_currency, o.projection_version,
+                   o.aggregate_version, o.allowed_action
+            FROM hz_order o JOIN hz_quote q
+              ON q.project_subject_ref=o.project_subject_ref AND q.quote_ref=o.quote_ref
             WHERE o.project_subject_ref=#{subject} AND o.order_ref=#{orderRef}
             FOR UPDATE
             """)

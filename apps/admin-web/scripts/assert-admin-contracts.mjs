@@ -4,6 +4,7 @@ import { join, relative, resolve } from 'node:path'
 import { A110_READ_PROXY_PATH, loadAdminPage, parseA110ReadResponse, parseAdminPageProjection, resolveAdminDataMode } from '../src/api/admin-read.ts'
 import { getSyntheticA110Response } from '../src/data/synthetic.ts'
 import { loadP021AdminOrderDetail, parseP021AdminResponse } from '../src/api/admin-order-detail.ts'
+import { loadAdminOrderSandbox, parseAdminOrderSandbox } from '../src/api/admin-order-sandbox.ts'
 
 const root = resolve(import.meta.dirname, '..')
 const read = (path) => readFileSync(join(root, path), 'utf8')
@@ -30,6 +31,8 @@ const a130 = read('src/components/workspaces/A130Workspace.vue')
 const a140 = read('src/components/workspaces/A140Workspace.vue')
 const p021AdminAdapter = read('src/api/admin-order-detail.ts')
 const p021AdminDetail = read('src/components/P021AdminOrderDetail.vue')
+const orderSandboxAdapter = read('src/api/admin-order-sandbox.ts')
+const orderSandboxDetail = read('src/components/AdminOrderSandboxDetail.vue')
 const styles = read('src/style.css')
 const viteConfig = read('vite.config.ts')
 const a110VisualEntry = read('scripts/a110-visual-fixture-entry.ts')
@@ -61,6 +64,12 @@ assert.match(app, /试用数据库数据/)
 assert.match(app, /当前读取试用数据库中的持久化记录，不代表真实用户生产数据/)
 assert.match(app, /退出登录/)
 assert.match(app, /logoutAdmin/)
+assert.match(app, /VITE_ICP_FILING/)
+assert.match(app, /ICP备案号待补充（开发样例）/)
+assert.match(app, /公安备案号待补充（开发样例）/)
+assert.match(a140, /详情与 Sandbox 状态/)
+assert.match(orderSandboxDetail, /暂无 Sandbox 充值事实/)
+assert.match(orderSandboxAdapter, /\/admin-read\/v1\/orders\/\$\{encodeURIComponent\(orderRef\)\}\/sandbox-status/)
 assert.match(app, /AdminInitialization/)
 assert.match(app, /@authenticated="authenticated"/)
 assert.match(app, /@click="refresh"/)
@@ -317,5 +326,23 @@ assert.equal(proxyUnauthenticated.status, 'UNAUTHENTICATED')
 assert.equal(proxyUnauthenticated.data, null)
 assert.equal(proxyForbidden.status, 'ACCESS_DENIED')
 assert.equal(proxyForbidden.data, null)
+
+const sandboxRaw = {
+  schemaVersion: 'ADMIN_ORDER_SANDBOX_V1', orderRef: 'ORDER-1', stateCode: 'SUBMITTED',
+  paymentState: 'CONFIRMED', deliveryState: 'PENDING', refundState: 'ABSENT_CONFIRMED',
+  maskedTarget: '01•• •••• 78', totalMinor: 1280, currency: 'BDT', updatedAt: '2026-08-15T00:00:00Z',
+  sandboxTopup: { availability: 'NOT_AVAILABLE', providerTransactionRef: null, providerStatusCode: null, observedAt: null },
+}
+assert.ok(parseAdminOrderSandbox(sandboxRaw))
+assert.equal(parseAdminOrderSandbox({ ...sandboxRaw, extra: true }), null)
+let sandboxRequest
+const sandboxState = await loadAdminOrderSandbox('ORDER-1', async (input, init) => {
+  sandboxRequest = { input: String(input), init }
+  return new Response(JSON.stringify(sandboxRaw), { status: 200, headers: { 'Content-Type': 'application/json' } })
+})
+assert.equal(sandboxState.status, 'READY')
+assert.equal(sandboxRequest.input, '/admin-read/v1/orders/ORDER-1/sandbox-status')
+assert.equal(sandboxRequest.init.method, 'GET')
+assert.equal('body' in sandboxRequest.init, false)
 
 console.log('admin frontend contract assertions: PASS')

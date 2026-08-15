@@ -164,3 +164,5 @@ button:focus-visible, select:focus-visible, [tabindex="0"]:focus-visible { outli
   .fact-pair { grid-template-columns: 1fr; }
   .detail-card dl div { grid-template-columns: 1fr; gap: 6px; }
 }
+.compliance-footer{display:flex;justify-content:center;gap:1.25rem;flex-wrap:wrap;padding:1rem;color:#64748b;font-size:.8rem;border-top:1px solid #e2e8f0;background:#fff}
+.detail-actions{display:flex;gap:.5rem}.admin-order-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem}.admin-order-detail-grid div{padding:.75rem;border:1px solid #e2e8f0;border-radius:.5rem}.admin-order-detail-grid dt{font-size:.75rem;color:#64748b}.admin-order-detail-grid dd{margin:.25rem 0 0;font-weight:600}.table-action{font-size:.8rem;padding:.4rem .6rem}

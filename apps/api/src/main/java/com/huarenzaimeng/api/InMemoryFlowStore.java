@@ -119,6 +119,13 @@ class InMemoryFlowStore implements FlowStore {
         return order;
     }
 
+    @Override public java.util.List<OrderProjection> listOrders(String projectSubjectRef) {
+        String prefix = projectSubjectRef + "\u0000";
+        return orders.entrySet().stream().filter(entry -> entry.getKey().startsWith(prefix))
+                .map(java.util.Map.Entry::getValue)
+                .sorted(java.util.Comparator.comparing(OrderProjection::orderRef)).toList();
+    }
+
     @Override
     public synchronized PaymentIntentCreateResult createPaymentIntent(String subject, PaymentIntentDraft draft,
                                                                        CommandIdentity command,

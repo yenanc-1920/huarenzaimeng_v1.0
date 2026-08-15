@@ -37,7 +37,7 @@ async function createOrder(){
   try{
     if(!await currentSelectionIsValid(selection.value)){invalidateSelection('可选项目已更新，请重新选择/确认。');return}
     let orderRef=quote.value.orderRef,confirmedSnapshot=fromQuote(quote.value)
-    if(apiRuntime.mode==='PROJECT_MOCK_API'){
+    if(apiRuntime.mode!=='BUILTIN_MOCK'){
       const command=getOrCreateCommand(uni,`create-order:${quote.value.priceSnapshotRef}`)
       const attempt=await executeOrderCreationAttempt('P012-RUNTIME',{
         createOrder:()=>api.createOrder(quote.value!.priceSnapshotRef,command.commandId,command.idempotencyKey),

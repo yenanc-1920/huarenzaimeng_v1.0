@@ -16,10 +16,13 @@ import { parseP014Response, P014_BACKEND_IMPLEMENTATION_SHA, storeP014OriginalWr
 import { p014BuiltinSynthetic } from './p014-topup-synthetic'
 import { parseP021Response, type P021Response } from './order-detail-contract'
 import { p021BuiltinSynthetic } from './order-detail-synthetic'
+import { callProjectApi } from './wechat-development-transport'
+import { requireBuyerBearerToken } from './buyer-session-token'
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
 const contentBaseUrl = (import.meta.env.VITE_CONTENT_API_BASE_URL || '/project-api/v1').replace(/\/$/, '')
 const useProjectMockApi = import.meta.env.VITE_USE_PROJECT_MOCK_API === 'true'
+const useWechatDevelopment = import.meta.env.VITE_PROJECT_TRANSPORT_MODE === 'WECHAT_DEVELOPMENT'
 const useP021BuiltinSynthetic = import.meta.env.DEV && import.meta.env.VITE_P021_DATA_MODE === 'BUILTIN_SYNTHETIC'
 const orderRecoveryExternalAuthReady = import.meta.env.VITE_ORDER_RECOVERY_EXTERNAL_AUTH_READY === 'true'
 const projectSubjectRef = import.meta.env.VITE_MOCK_PROJECT_SUBJECT_REF || 'miniapp-local-mock-subject-v1'
@@ -27,6 +30,13 @@ const projectSubjectRef = import.meta.env.VITE_MOCK_PROJECT_SUBJECT_REF || 'mini
 export { ProjectApiError } from './project-envelope'
 
 function requestBody(path: string, method: 'GET' | 'POST', data?: UniNamespace.RequestOptions['data'], root = baseUrl): Promise<unknown> {
+  if (useWechatDevelopment) {
+    const protectedRequest = path === '/quotes' || path === '/orders' || path.startsWith('/orders/') || path === '/recovery-cases' || path.startsWith('/recovery-cases/')
+    return callProjectApi(`${root}${path}`, method, data, protectedRequest ? requireBuyerBearerToken() : undefined).then(result => {
+      if (result.statusCode < 200 || result.statusCode >= 300) throw new ProjectApiError('HTTP_STATUS_REJECTED')
+      return result.data
+    })
+  }
   return new Promise((resolve, reject) => uni.request({
     url: `${root}${path}`,
     method,
@@ -37,6 +47,7 @@ function requestBody(path: string, method: 'GET' | 'POST', data?: UniNamespace.R
   }))
 }
 function requestAnonymousRead(path:string):Promise<unknown> {
+  if(useWechatDevelopment)return callProjectApi(`${baseUrl}${path}`,'GET').then(result=>result.data)
   return new Promise((resolve,reject)=>uni.request({
     url:`${baseUrl}${path}`,
     method:'GET',
@@ -50,6 +61,7 @@ function readCacheControlHeader(headers:unknown):string|null {
   return entries.length===1&&typeof entries[0][1]==='string'?entries[0][1]:null
 }
 function requestTemporalOverviewRead():Promise<TemporalOverviewReadResponse> {
+  if(useWechatDevelopment)return callProjectApi(`${baseUrl}/home/temporal-overview`,'GET').then(result=>({body:result.data,statusCode:result.statusCode,cacheControl:readCacheControlHeader(result.header)}))
   return new Promise((resolve,reject)=>uni.request({
     url:`${baseUrl}/home/temporal-overview`,
     method:'GET',
@@ -58,6 +70,7 @@ function requestTemporalOverviewRead():Promise<TemporalOverviewReadResponse> {
   }))
 }
 function requestTrustedSessionRead(path:string):Promise<unknown>{
+  if(useWechatDevelopment)return callProjectApi(`/buyer-api/v1${path}`,'GET',undefined,requireBuyerBearerToken()).then(result=>result.statusCode>=200&&result.statusCode<300?result.data:Promise.reject(new ProjectApiError('HTTP_STATUS_REJECTED')))
   return new Promise((resolve,reject)=>uni.request({
     url:`${baseUrl}${path}`,method:'GET',
     success:({data:body,statusCode})=>statusCode>=200&&statusCode<300?resolve(body):reject(new ProjectApiError('HTTP_STATUS_REJECTED')),
@@ -73,7 +86,7 @@ function localScopeFingerprint(value:string):string{let hash=2166136261;for(let 
 
 async function loadCatalog(operatorCode:string):Promise<CatalogProjection>{
   if(!operatorCode)throw new ProjectApiError('OPERATOR_CODE_REQUIRED')
-  if(!useProjectMockApi)return mockCatalog(operatorCode)
+  if(!useProjectMockApi&&!useWechatDevelopment)return mockCatalog(operatorCode)
   return parseCatalogProjection(await requestData(`/catalog?operatorCode=${encodeURIComponent(operatorCode)}`,'GET'))
 }
 
@@ -84,7 +97,7 @@ export const api = {
   async createQuote(selection:RechargeSelection): Promise<QuoteSnapshot> {
     const current=await loadCatalog(selection.operatorCode)
     if(!selectionMatchesCatalog(selection,current))throw new ProjectApiError('CATALOG_SELECTION_STALE')
-    if (!useProjectMockApi) return mockQuote(selection)
+    if (!useProjectMockApi&&!useWechatDevelopment) return mockQuote(selection)
     const identity=getOrCreateCommand(uni,`create-quote:${localScopeFingerprint(JSON.stringify(selection))}`)
     const quote = parseProjectQuote(await requestData('/quotes', 'POST', {
       phone:selection.maskedPhone,operatorCode:selection.operatorCode,productRef:selection.productRef,denominationRef:selection.denominationRef,
@@ -96,7 +109,7 @@ export const api = {
     return toQuoteSnapshot(quote)
   },
   async createOrder(quoteRef: string, commandId: string, idempotencyKey: string): Promise<OrderCreationResult> {
-    if(!useProjectMockApi)throw new ProjectApiError('PROJECT_MOCK_API_DISABLED')
+    if(!useProjectMockApi&&!useWechatDevelopment)throw new ProjectApiError('PROJECT_MOCK_API_DISABLED')
     const command=buildOrderCreationCommand({commandId,idempotencyKey},quoteRef,readSessionProjection(uni))
     const body=await requestBody('/orders','POST',command)
     try{return parseOrderCreationResult(body)}catch(error){
@@ -133,12 +146,12 @@ export const api = {
   },
   async getProjection(orderRef: string): Promise<OrderProjection> {
     if (!orderRef) throw new Error('ORDER_REF_REQUIRED')
-    const projection = useProjectMockApi ? toOrderProjection(await projectProjection(`/orders/${encodeURIComponent(orderRef)}/projection`, 'GET')) : await mockProjection(orderRef)
+    const projection = useProjectMockApi||useWechatDevelopment ? toOrderProjection(await projectProjection(`/orders/${encodeURIComponent(orderRef)}/projection`, 'GET')) : await mockProjection(orderRef)
     return acceptNewerProjection(orderRef, projection)
   },
   async getOrders(session:ProjectSessionProjection):Promise<OrderSummary[]>{
     if(session.role!=='BUYER')throw new ProjectApiError('BUYER_SESSION_REQUIRED')
-    if(!useProjectMockApi)return mockOrders(session)
+    if(!useProjectMockApi&&!useWechatDevelopment)return mockOrders(session)
     if(!orderRecoveryExternalAuthReady)throw new ProjectApiError('ORDER_RECOVERY_EXTERNAL_AUTH_NOT_READY')
     const query=`?sessionVersion=${session.sessionVersion}&authorizationSetRef=${encodeURIComponent(session.authorizationSetRef!)}`
     return parseAuthorizedOrders(await requestData(`/orders${query}`,'GET'),session)
@@ -146,7 +159,7 @@ export const api = {
   async recoverOrder(orderRef:string,recoveryMaterialRef:string):Promise<RecoveryResult>{
     if(!orderRef||!recoveryMaterialRef)throw new ProjectApiError('RECOVERY_INPUT_REQUIRED')
     if(readPendingRecoveryCaseRef(uni))throw new ProjectApiError('RECOVERY_CASE_POLL_REQUIRED')
-    if(!useProjectMockApi)return mockRecovery(orderRef,recoveryMaterialRef)
+    if(!useProjectMockApi&&!useWechatDevelopment)return mockRecovery(orderRef,recoveryMaterialRef)
     if(!orderRecoveryExternalAuthReady)throw new ProjectApiError('ORDER_RECOVERY_EXTERNAL_AUTH_NOT_READY')
     const fingerprint=canonicalFingerprint(orderRef,recoveryMaterialRef)
     const identity=getOrCreateCommand(uni,`recover-order:${localScopeFingerprint(fingerprint)}`)
@@ -155,17 +168,17 @@ export const api = {
   },
   async getRecoveryCase(recoveryCaseRef:string):Promise<RecoveryResult>{
     if(!recoveryCaseRef)throw new ProjectApiError('RECOVERY_CASE_REF_REQUIRED')
-    if(!useProjectMockApi)return mockRecoveryCase(recoveryCaseRef)
+    if(!useProjectMockApi&&!useWechatDevelopment)return mockRecoveryCase(recoveryCaseRef)
     if(!orderRecoveryExternalAuthReady)throw new ProjectApiError('ORDER_RECOVERY_EXTERNAL_AUTH_NOT_READY')
     return parseRecoveryResult(await requestData(`/recovery-cases/${encodeURIComponent(recoveryCaseRef)}`,'GET'))
   },
   getSupportCase: (): Promise<SupportCase> => mockSupport(),
   async getDirectory(): Promise<DirectorySummary[]> {
-    if (!useProjectMockApi) return mockDirectory()
+    if (!useProjectMockApi&&!useWechatDevelopment) return mockDirectory()
     return parsePublicContentPage(await requestData('/content/items', 'GET', undefined, contentBaseUrl))
   },
   async getDirectoryDetail(contentRef: string, contentVersion: number): Promise<DirectoryDetailResult> {
-    if (!useProjectMockApi) return mockDirectoryDetail(contentRef, contentVersion)
+    if (!useProjectMockApi&&!useWechatDevelopment) return mockDirectoryDetail(contentRef, contentVersion)
     try {
       const item = parsePublicContentProjection(await requestData(`/content/items/${encodeURIComponent(contentRef)}?contentVersion=${contentVersion}`, 'GET', undefined, contentBaseUrl))
       if (item.contentVersion !== contentVersion) throw new Error('CONTENT_VERSION_RESPONSE_MISMATCH')
@@ -181,7 +194,7 @@ export const api = {
   async reportDirectoryError(contentRef: string, contentVersion: number, reason: string): Promise<ContentErrorReportResult> {
     const identity = getOrCreateCommand(uni, `content-report:${contentRef}:${contentVersion}`)
     const command = buildContentErrorReport(identity, contentVersion, reason)
-    if (!useProjectMockApi) return mockReportDirectoryError(contentRef, command)
+    if (!useProjectMockApi&&!useWechatDevelopment) return mockReportDirectoryError(contentRef, command)
     return parseContentErrorReportReceipt(await requestData(`/content/items/${encodeURIComponent(contentRef)}/reports`, 'POST', command, contentBaseUrl))
   },
   async getLifeContentList():Promise<LifeContentListResult> {

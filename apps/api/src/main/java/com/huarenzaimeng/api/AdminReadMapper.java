@@ -28,4 +28,23 @@ interface AdminReadMapper {
             LIMIT 200
             """)
     List<Map<String, Object>> selectAdminOrders();
+
+    @Select("""
+            SELECT o.order_ref,o.order_state,o.payment_state,o.delivery_state,o.refund_state,
+                   o.updated_at,q.phone_masked,q.total_amount_minor,q.total_currency
+            FROM hz_order o JOIN hz_quote q ON q.quote_ref=o.quote_ref
+            WHERE o.order_ref=#{orderRef}
+            """)
+    Map<String, Object> selectAdminOrderDetail(String orderRef);
+
+    @Select("""
+            SELECT f.provider_fact_ref,f.fact_type,f.observed_at
+            FROM hz_payment_intent p
+            JOIN hz_semantic_action s ON s.semantic_action_key=p.semantic_action_key
+            JOIN hz_external_fact f ON f.case_key=s.case_key
+            WHERE p.order_ref=#{orderRef} AND f.provider='RELOADLY_SANDBOX'
+            ORDER BY f.observed_at DESC,f.external_fact_id DESC
+            LIMIT 1
+            """)
+    Map<String, Object> selectLatestAdminSandboxFact(String orderRef);
 }

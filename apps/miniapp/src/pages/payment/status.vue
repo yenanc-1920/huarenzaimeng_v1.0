@@ -46,7 +46,7 @@ async function refresh(forceLatest=false){
   message.value=''
   try{
     if(created.value&&!forceLatest){projection.value=created.value.currentProjection;return}
-    if(apiRuntime.mode==='PROJECT_MOCK_API'){
+    if(apiRuntime.mode!=='BUILTIN_MOCK'){
       const core=await api.getCoreProjection(orderRef.value)
       projection.value={orderRef:core.orderRef,quoteRef:core.quoteRef,stateCode:core.orderState as OrderCreationProjection['stateCode'],
         priceSnapshot:core.priceSnapshot,projectionVersion:core.projectionVersion,aggregateVersion:core.aggregateVersion,allowedActions:core.allowedActions}

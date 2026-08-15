@@ -25,13 +25,23 @@ export function readSessionProjection(storage: SessionStorage,now=Date.now()): P
         ||value.authorizedOrderRefs.length!==0||value.issuedAt!==null||value.expiresAt!==null))
       || (value.role === 'BUYER' && (typeof value.projectSubjectRef!=='string'||value.projectSubjectRef.length===0
         ||typeof value.authorizationSetRef!=='string'||value.authorizationSetRef.length===0
-        ||typeof value.authorizationEvidenceVersion!=='string'||value.authorizationEvidenceVersion.length===0||value.authorizedOrderRefs.length===0
+        ||typeof value.authorizationEvidenceVersion!=='string'||value.authorizationEvidenceVersion.length===0
         ||typeof value.issuedAt!=='string'||typeof value.expiresAt!=='string'||!Number.isFinite(Date.parse(value.issuedAt))
         ||!Number.isFinite(Date.parse(value.expiresAt))||Date.parse(value.issuedAt)>=Date.parse(value.expiresAt)||Date.parse(value.expiresAt)<=now))) return guest(fallbackVersion)
   return { role:value.role,projectSubjectRef:value.projectSubjectRef as string|null,sessionVersion:value.sessionVersion as number,
     authorizationSetRef:value.authorizationSetRef as string|null,authorizationEvidenceVersion:value.authorizationEvidenceVersion as string|null,
     authorizedOrderRefs:[...value.authorizedOrderRefs],issuedAt:value.issuedAt as string|null,expiresAt:value.expiresAt as string|null,
     semantics:'SERVER_PROJECTION_CACHE_NOT_AUTHORITY' }
+}
+
+export function storeBuyerSessionProjection(storage:SessionStorage,value:unknown,now=Date.now()):ProjectSessionProjection{
+  storage.setStorageSync(SESSION_KEY,value)
+  const projection=readSessionProjection(storage,now)
+  if(projection.role!=='BUYER'){
+    storage.setStorageSync(SESSION_KEY,guest(projection.sessionVersion))
+    throw new Error('BUYER_SESSION_PROJECTION_INVALID')
+  }
+  return projection
 }
 
 export function applyRecoveryResult(storage: SessionStorage, result: RecoveryResult): ProjectSessionProjection {

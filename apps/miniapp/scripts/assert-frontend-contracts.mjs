@@ -128,7 +128,7 @@ assert.match(shared, /\.content\{width:100%;padding:44rpx 40rpx 48rpx\}/, 'home 
 assert.match(shared, /overflow-x:hidden;overflow-y:visible/, 'home must prevent horizontal overflow without clipping short-screen vertical flow')
 assert.match(directory, /<button v-for=/, 'P040 clickable items must be buttons')
 assert.doesNotMatch(directory, /\.filter\(/, 'P040 must not treat client filtering as publication authority')
-assert.match(client, /if \(!useProjectMockApi\) return mockDirectory\(\)/, 'P040 must retain an explicit local mock branch')
+assert.match(client, /if \(!useProjectMockApi&&!useWechatDevelopment\) return mockDirectory\(\)/, 'P040 must retain an explicit local mock branch outside CloudBase development mode')
 assert.match(client, /requestData\('\/content\/items', 'GET', undefined, contentBaseUrl\)/, 'project API mode must call the public Content list endpoint')
 assert.match(client, /content\/items\/\$\{encodeURIComponent\(contentRef\)\}\?contentVersion=\$\{contentVersion\}/, 'project API mode must call versioned Content detail')
 assert.match(client, /content\/items\/\$\{encodeURIComponent\(contentRef\)\}\/reports/, 'project API mode must call the Content report endpoint')
