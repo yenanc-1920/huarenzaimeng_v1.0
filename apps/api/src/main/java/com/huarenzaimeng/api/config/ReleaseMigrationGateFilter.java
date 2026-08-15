@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Profile;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -33,14 +34,17 @@ public final class ReleaseMigrationGateFilter extends OncePerRequestFilter {
             "/assets/index-wztt079N.css",
             "/assets/logo-C5G5A9bI.png");
     private final ReleaseMigrationState state;
+    private final boolean developmentFunctionReleaseEnabled;
 
-    ReleaseMigrationGateFilter(ReleaseMigrationState state) {
+    ReleaseMigrationGateFilter(ReleaseMigrationState state,
+            @Value("${hz.dev-function-release.enabled:false}") boolean developmentFunctionReleaseEnabled) {
         this.state = state;
+        this.developmentFunctionReleaseEnabled = developmentFunctionReleaseEnabled;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return state.isReady();
+        return developmentFunctionReleaseEnabled || state.isReady();
     }
 
     @Override

@@ -22,6 +22,8 @@ spring:
     validate-on-migrate: true
     baseline-on-migrate: false
 hz:
+  dev-function-release:
+    enabled: ${HZ_DEV_FUNCTION_RELEASE_ENABLED:false}
   admin-auth:
     bootstrap-enabled: ${HZ_ADMIN_BOOTSTRAP_ENABLED:false}
     bootstrap-token: ${HZ_ADMIN_BOOTSTRAP_TOKEN:}
