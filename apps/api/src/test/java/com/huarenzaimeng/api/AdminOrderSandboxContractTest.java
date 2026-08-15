@@ -7,6 +7,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +53,20 @@ class AdminOrderSandboxContractTest {
         ResponseEntity<?> response = controller.read("ORDER-1", request);
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
+    }
+
+    @Test void mysqlLocalDateTimeIsAcceptedForOrderAndSandboxObservation() {
+        Map<String, Object> order = new java.util.HashMap<>(order());
+        order.put("updated_at", LocalDateTime.of(2026, 8, 15, 0, 0));
+        when(mapper.selectAdminOrderDetail("ORDER-1")).thenReturn(order);
+        when(mapper.selectLatestAdminSandboxFact("ORDER-1")).thenReturn(Map.of(
+                "provider_fact_ref", "TX-1", "fact_type", "TOPUP_ACCEPTED",
+                "observed_at", LocalDateTime.of(2026, 8, 15, 1, 0)));
+
+        AdminOrderSandboxService.OrderSandboxProjection result = service.read("ORDER-1");
+
+        assertThat(result.updatedAt()).isEqualTo(Instant.parse("2026-08-15T00:00:00Z"));
+        assertThat(result.sandboxTopup().observedAt()).isEqualTo(Instant.parse("2026-08-15T01:00:00Z"));
     }
 
     private static Map<String, Object> order() {

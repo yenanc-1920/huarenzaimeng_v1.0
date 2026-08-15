@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 
 @Service
@@ -39,6 +41,7 @@ class AdminOrderSandboxService {
     private static Instant instant(Object value) {
         if (value instanceof Timestamp timestamp) return timestamp.toInstant();
         if (value instanceof Instant instant) return instant;
+        if (value instanceof LocalDateTime local) return local.toInstant(ZoneOffset.UTC);
         throw new IllegalStateException("ADMIN_ORDER_TIME_UNAVAILABLE");
     }
 
