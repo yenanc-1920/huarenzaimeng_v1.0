@@ -19,7 +19,7 @@ import java.util.UUID;
 @RestController
 @Profile("release-mysql")
 @RequestMapping("/buyer-auth/v1/recovery-cases")
-public final class ReleaseBuyerRecoveryController {
+public class ReleaseBuyerRecoveryController {
     private final JdbcTemplate jdbc;
     ReleaseBuyerRecoveryController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
