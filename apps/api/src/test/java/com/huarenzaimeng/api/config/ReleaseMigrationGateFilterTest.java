@@ -25,8 +25,8 @@ class ReleaseMigrationGateFilterTest {
                 "/admin/login",
                 "/admin/initialize",
                 "/index.html",
-                "/assets/index-DnCFE54m.js",
-                "/assets/index-F1aN-GtB.css",
+                "/assets/index-DOcW18zi.js",
+                "/assets/index-wztt079N.css",
                 "/assets/logo-C5G5A9bI.png")) {
             FilterChain chain = mock(FilterChain.class);
             MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
