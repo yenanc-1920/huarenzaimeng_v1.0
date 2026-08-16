@@ -90,6 +90,18 @@
 - 验证结果：修正参数后定向 19/19 与完整门禁后端 717/717 均通过。
 - 状态：已关闭。
 
+### ENV-DEV-004：DEV 双 Profile 被正式环境校验器拒绝
+
+- 时间：2026-08-17（Asia/Dhaka）
+- 首次失败版本：`huaren-api-dev-004`
+- 现象：镜像构建成功，但容器启动时 `ReleaseSecretBoundaryValidator` 抛出 `RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES`；实际激活的是固定 DEV 组合 `release-mysql,local-mysql`，8080 未持续监听。
+- 根因：正式环境边界校验器只允许单独 `release-mysql`，没有把受控 `local-mysql` 识别为 DEV 数据扩展；原门禁运行了全量测试和镜像构建，却没有把云上真实 Profile 组合作为第一道启动阻断契约。
+- 处理：正式环境继续只允许 `release-mysql`；DEV 仅允许精确的 `release-mysql + local-mysql`，并要求 `hz.dev-function-release.enabled=true` 与 `hz.v1-dev-data.enabled=true`。任何第三个 Profile 或开发开关不完整仍失败关闭。
+- 预防门禁：本地脚本与 GitHub PR 在耗时构建前先运行 `ReleaseSecretBoundaryValidatorTest`、`DevelopmentFlywayMigrationRunnerTest` 与 `BuildSelectionContractTest`；快速阻断通过后才进入后台、小程序、后端全量及 Docker 构建。
+- 定向验证：快速启动阻断组 16/16 通过（Profile 边界 11、Flyway 装配 3、Docker 构建选择 2），失败 0、错误 0。
+- 云上结果：未验证；修复未推送、未部署。
+- 状态：代码已修复，门禁验证中。
+
 ## 部署前全量门禁
 
 必须按相同固定提交依次通过：
