@@ -1,15 +1,16 @@
 export type PageId = 'A100' | 'A110' | 'A120' | 'A121' | 'A122' | 'A130' | 'A140'
-export type AdminRole = 'CS' | 'CONTENT' | 'FIN'
-export type AdminDataMode = 'BUILTIN_SYNTHETIC' | 'PROJECT_API_PROXY'
+export type AdminRole = 'SUPER_ADMIN' | 'CS' | 'CONTENT' | 'FIN'
+export type AdminDataMode = 'PROJECT_API_PROXY'
 
 export interface SupportCaseSummary {
-  supportRef: string
-  subjectLabel: string
-  statusLabel: string
-  maskedPhone: string
-  nextReviewLabel: string
-  noteStatusLabel: string
-  escalationStatusLabel: string
+  caseRef: string
+  sourceType: string
+  issueType: string
+  relatedOrderRef: string | null
+  priorityCode: string
+  state: string
+  ownerRef: string | null
+  updatedAt: string
 }
 
 export interface ContentReviewSummary {
@@ -24,9 +25,55 @@ export interface ContentReviewSummary {
   removalLabel: string
 }
 
+export interface ReconciliationCaseSummary {
+  reconciliationRef: string
+  orderRef: string
+  differenceType: string
+  amount: number
+  currency: string
+  state: string
+  ownerRef: string | null
+  discoveredAt: string
+  updatedAt: string
+}
+
 export interface ManagedContentSummary {
-  contentRef: string; title: string; summary: string; category: string; sourceLabel: string
-  statusLabel: string; versionLabel: string; verifiedAtLabel: string; validUntilLabel: string; updatedAtLabel: string
+  entryRef: string
+  cityRef: string
+  cityName: string
+  category: string
+  name: string
+  summary: string
+  localAddress: string
+  phone: string
+  sourceRef: string
+  verifiedAt: string
+  validUntil: string
+  version: number
+  state: string
+  updatedAt: string
+}
+
+export interface ManagedRuleOrNewsSummary {
+  objectType: 'HOLIDAY' | 'NEWS'
+  objectRef: string
+  countryCode: string | null
+  category: string
+  title: string
+  summary: string | null
+  bodyText: string | null
+  sourceRef: string
+  editor: string | null
+  publishAt: string | null
+  startDate: string | null
+  endDate: string | null
+  weekendDays: string | null
+  effectiveFrom: string | null
+  effectiveUntil: string | null
+  validUntil: string
+  version: number
+  state: string
+  updatedAt: string
 }
 
 export interface CatalogContentSummary {
@@ -39,14 +86,58 @@ export interface CatalogContentSummary {
 }
 
 export interface CatalogFinanceSummary {
-  catalogRef: string
+  productRef: string
+  operatorCode: string
+  productType: string
   displayName: string
-  denominationLabel: string
-  currencyLabel: string
-  priceCostCandidateLabel: string
-  validityLabel: string
-  supportBatchLabel: string
-  financeReviewLabel: string
+  benefitText: string
+  denominationBdt: number | null
+  validityText: string | null
+  providerCode: string
+  providerSku: string
+  countryCode: string
+  dataAllowanceMb: number | null
+  voiceMinutes: number | null
+  smsCount: number | null
+  channelPriority: number
+  phoneRule: string | null
+  saleStartAt: string | null
+  saleEndAt: string | null
+  catalogBatchRef: string | null
+  rawSkuName: string | null
+  rawBenefitText: string | null
+  supplierCost: number | null
+  settlementCurrency: string | null
+  supplierAvailability: string | null
+  catalogSyncedAt: string | null
+  normalizedType: string | null
+  normalizedOperator: string | null
+  mappingState: string | null
+  mappingFailureReason: string | null
+  state: string
+  version: number
+  priceVersionRef: string | null
+  finalAmountCny: number | null
+  fxSource: string | null
+  fxSnapshotRef: string | null
+  priceState: string | null
+  effectiveFrom: string | null
+  effectiveUntil: string | null
+  priceVersion: number | null
+  priceSupplierCost: number | null
+  priceSettlementCurrency: string | null
+  fxDirection: string | null
+  fxRate: number | null
+  fxUpdatedAt: string | null
+  fxValidUntil: string | null
+  bufferRate: number | null
+  markupRate: number | null
+  wechatFeeRate: number | null
+  taxRate: number | null
+  minimumMarginRate: number | null
+  roundingRule: string | null
+  promotionBearer: string | null
+  pricingScope: string | null
 }
 
 export interface SupportOrderSummary {
@@ -140,15 +231,13 @@ interface ProjectionBase {
 }
 
 export type AdminPageProjection =
-  | (ProjectionBase & { pageId: 'A100'; role: 'CS'; items: SupportCaseSummary[] })
-  | (ProjectionBase & { pageId: 'A120'; role: 'CONTENT'; items: ContentReviewSummary[] })
-  | (ProjectionBase & { pageId: 'A121'; role: 'CONTENT'; items: ManagedContentSummary[] })
-  | (ProjectionBase & { pageId: 'A122'; role: 'CONTENT'; items: ManagedContentSummary[] })
-  | (ProjectionBase & { pageId: 'A130'; role: 'CONTENT'; items: CatalogContentSummary[] })
-  | (ProjectionBase & { pageId: 'A130'; role: 'FIN'; items: CatalogFinanceSummary[] })
-  | (ProjectionBase & { pageId: 'A140'; role: 'CS'; items: SupportOrderSummary[] })
-  | (ProjectionBase & { pageId: 'A140'; role: 'FIN'; items: FinanceOrderSummary[] })
-  | A110PageProjection
+  | (ProjectionBase & { pageId: 'A100'; role: 'SUPER_ADMIN' | 'CS'; items: SupportCaseSummary[] })
+  | (ProjectionBase & { pageId: 'A110'; role: 'SUPER_ADMIN' | 'FIN' | 'CS'; items: ReconciliationCaseSummary[] })
+  | (ProjectionBase & { pageId: 'A120'; role: 'SUPER_ADMIN' | 'CONTENT'; items: ContentReviewSummary[] })
+  | (ProjectionBase & { pageId: 'A121'; role: 'SUPER_ADMIN' | 'CONTENT'; items: ManagedContentSummary[] })
+  | (ProjectionBase & { pageId: 'A122'; role: 'SUPER_ADMIN' | 'CONTENT'; items: ManagedRuleOrNewsSummary[] })
+  | (ProjectionBase & { pageId: 'A130'; role: 'SUPER_ADMIN' | 'CONTENT'; items: CatalogFinanceSummary[] })
+  | (ProjectionBase & { pageId: 'A140'; role: 'SUPER_ADMIN' | 'CS' | 'FIN'; items: SupportOrderSummary[] })
 
 export type AdminReadState =
   | { status: 'LOADING'; data: null; message: string }
@@ -158,9 +247,9 @@ export type AdminReadState =
   | { status: 'UNAVAILABLE'; data: null; message: string }
 
 export const pageRoleAllowed = (pageId: PageId, role: AdminRole) =>
-  (pageId === 'A100' && role === 'CS')
+  role === 'SUPER_ADMIN' || (pageId === 'A100' && role === 'CS')
   || (pageId === 'A110' && (role === 'CS' || role === 'FIN'))
   || (pageId === 'A120' && role === 'CONTENT')
   || ((pageId === 'A121' || pageId === 'A122') && role === 'CONTENT')
-  || (pageId === 'A130' && (role === 'CONTENT' || role === 'FIN'))
+  || (pageId === 'A130' && role === 'CONTENT')
   || (pageId === 'A140' && (role === 'CS' || role === 'FIN'))

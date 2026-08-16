@@ -21,74 +21,54 @@ final class ReleasePublicController {
     private final CatalogService catalog;
     private final ContentService content;
     private final Clock clock;
+    private final V1DevelopmentDataService developmentData;
 
-    ReleasePublicController(CatalogService catalog, ContentService content, Clock clock) {
-        this.catalog = catalog; this.content = content; this.clock = clock;
+    ReleasePublicController(CatalogService catalog, ContentService content, Clock clock,
+                            V1DevelopmentDataService developmentData) {
+        this.catalog = catalog; this.content = content; this.clock = clock; this.developmentData = developmentData;
     }
 
-    @GetMapping("/catalog") ResponseEntity<ProjectEnvelope<CatalogView>> catalog(@RequestParam String operatorCode) {
+    @GetMapping("/catalog") ResponseEntity<?> catalog(@RequestParam String operatorCode,
+                                                       @RequestParam(required=false) String productType) {
         if (operatorCode.isBlank()) return ResponseEntity.badRequest()
                 .body(new ProjectEnvelope<>("REJECTED","OPERATOR_CODE_REQUIRED",null));
         return ResponseEntity.ok().header("Cache-Control", "no-store")
-                .body(ProjectEnvelope.accepted(catalog.publicCatalog(operatorCode)));
+                .body(ProjectEnvelope.accepted(developmentData.catalog(operatorCode, productType)));
     }
 
     @GetMapping("/eligibility") ResponseEntity<?> eligibility(@RequestParam String phone) {
         String normalized = phone == null ? "" : phone.replaceAll("[\\s-]", "");
-        boolean eligible = normalized.matches("\\+?[0-9]{6,20}");
-        return ResponseEntity.ok().header("Cache-Control", "no-store").body(Map.of(
-                "outcome", eligible ? "ELIGIBLE" : "REJECTED",
-                "projectCode", eligible ? "RECHARGE_ELIGIBLE" : "RECHARGE_INPUT_INVALID",
-                "eligible", eligible));
+        if(!normalized.matches("(?:\\+880|880|0)?1[3-9][0-9]{8}"))
+            return ResponseEntity.badRequest().body(new ProjectEnvelope<>("REJECTED","RECHARGE_INPUT_INVALID",null));
+        String local=normalized.replaceFirst("^\\+?880","0");
+        String operator=operatorCode(local);
+        Map<String,Object> data=new LinkedHashMap<>();
+        data.put("outcome","UNKNOWN");
+        data.put("maskedPhone",local.substring(0,3)+"****"+local.substring(local.length()-3));
+        data.put("operatorCode",operator);
+        data.put("operatorName",operator==null?null:V1DevelopmentDataService.operatorName(operator));
+        data.put("projectCode","OPERATOR_OR_CATALOG_SELECTION_REQUIRED");
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(ProjectEnvelope.accepted(data));
     }
 
-    @GetMapping("/home/temporal-overview") ResponseEntity<TemporalOverviewResponse> overview() {
-        Instant now = clock.instant();
-        ZoneId dhaka = ZoneId.of("Asia/Dhaka"), beijing = ZoneId.of("Asia/Shanghai");
-        Map<String,TemporalClockView> clocks = new LinkedHashMap<>();
-        clocks.put("dhaka", clockView("DHAKA", "Dhaka", dhaka, now));
-        clocks.put("beijing", clockView("BEIJING", "Beijing", beijing, now));
-        Map<String,TemporalHolidayView> holidays = new LinkedHashMap<>();
-        holidays.put("china", holiday("CN", beijing, now));
-        holidays.put("bangladesh", holiday("BD", dhaka, now));
-        TemporalOverviewResponse body = new TemporalOverviewResponse("HOME-" + now.toEpochMilli(),
-                "TEMPORAL_OVERVIEW_READ_ERROR", "TEMPORAL_OVERVIEW_V1", now, now,
-                "JAVA-TZDB", 60L, "BOTH_AVAILABLE", Map.copyOf(clocks), "NOT_CONFIGURED",
-                Map.copyOf(holidays), "USER_INITIATED_READ_ONLY");
-        return ResponseEntity.ok().header("Cache-Control", "no-store").body(body);
+    @GetMapping("/home/temporal-overview") ResponseEntity<?> overview() {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(ProjectEnvelope.accepted(developmentData.temporalOverview()));
     }
 
-    @GetMapping("/content/life-items") ResponseEntity<LifeContentListResponse> lifeList() {
-        Instant now = clock.instant();
-        List<LifeContentSummary> items = content.publicList().items().stream().map(item -> new LifeContentSummary(
-                item.contentRef(), String.valueOf(item.contentVersion()), category(item.category()), item.title(),
-                item.summary(), "SELF_RESEARCH", "BD", "HUAREN_IN_BANGLADESH", item.updatedAt(), item.updatedAt(),
-                item.updatedAt(), item.validUntil(), "CURRENT", "NOT_CONFIGURED", null)).toList();
-        String state = items.isEmpty() ? "EMPTY" : "READY";
-        return ResponseEntity.ok().header("Cache-Control", "no-store").body(new LifeContentListResponse(
-                "LIFE-" + now.toEpochMilli(), state, "LIFE_CONTENT_LIST_" + state,
-                "LIFE_CONTENT_READ_V1", "RELEASE-CONTENT-V1", items, "NONE", null));
+    @GetMapping("/content/life-items") ResponseEntity<?> lifeList(
+            @RequestParam(required=false) String category) {
+        return ResponseEntity.ok().header("Cache-Control", "no-store")
+                .body(ProjectEnvelope.accepted(developmentData.news(category)));
     }
 
-    @GetMapping("/content/life-items/{contentRef}") ResponseEntity<LifeContentDetailResponse> lifeDetail(
-            @PathVariable String contentRef, @RequestParam String contentVersion) {
-        Instant now = clock.instant();
+    @GetMapping("/content/life-items/{contentRef}") ResponseEntity<?> lifeDetail(
+            @PathVariable String contentRef, @RequestParam(required=false) String contentVersion) {
         try {
-            long version = Long.parseLong(contentVersion);
-            PublicContentProjection item = content.publicDetail(contentRef, version);
-            LifeContentDetail detail = new LifeContentDetail(item.contentRef(), contentVersion,
-                    category(item.category()), item.title(), item.summary(), "SELF_RESEARCH", "BD",
-                    "HUAREN_IN_BANGLADESH", item.updatedAt(), item.updatedAt(), item.updatedAt(), item.validUntil(),
-                    "CURRENT", "NOT_CONFIGURED", null, item.summary());
-            return ResponseEntity.ok().header("Cache-Control", "no-store").body(new LifeContentDetailResponse(
-                    "LIFE-" + now.toEpochMilli(), "READY", "LIFE_CONTENT_DETAIL_READY",
-                    "LIFE_CONTENT_READ_V1", "RELEASE-CONTENT-V1", contentRef, contentVersion,
-                    detail, "NONE", null));
+            return ResponseEntity.ok().header("Cache-Control", "no-store")
+                    .body(ProjectEnvelope.accepted(developmentData.newsDetail(contentRef)));
         } catch (RuntimeException error) {
-            return ResponseEntity.ok().header("Cache-Control", "no-store").body(new LifeContentDetailResponse(
-                    "LIFE-" + now.toEpochMilli(), "REMOVED", "LIFE_CONTENT_DETAIL_REMOVED",
-                    "LIFE_CONTENT_READ_V1", "RELEASE-CONTENT-V1", contentRef, contentVersion,
-                    null, "NONE", null));
+            return ResponseEntity.notFound().build();
         }
     }
 
@@ -99,4 +79,6 @@ final class ReleasePublicController {
         return new TemporalHolidayView(code,now.atZone(zone).toLocalDate(),"READ_ERROR",null,null,null,null,null,null,null,null);
     }
     private static String category(String value) { return "HOLIDAY_EXPLANATION".equals(value) ? value : "LIFE_REMINDER"; }
+    private static String operatorCode(String phone){return switch(phone.substring(0,3)){
+        case"013","017"->"GRAMEENPHONE";case"018"->"ROBI";case"019"->"BANGLALINK";case"016"->"AIRTEL";case"015"->"TELETALK";default->null;};}
 }

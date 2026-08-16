@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 
 const projectRoot = resolve(process.cwd())
@@ -6,6 +6,12 @@ const outputRoot = resolve(projectRoot, 'dist/build/mp-weixin')
 const outputRelative = relative(projectRoot, outputRoot).replaceAll('\\', '/')
 
 if (outputRelative !== 'dist/build/mp-weixin') throw new Error('UNSAFE_MP_WEIXIN_OUTPUT_TARGET')
+
+// Contract fixtures are allowed in source tests but never in the runtime package.
+for (const artifact of ['api/mock.js', 'api/p014-topup-synthetic.js', 'api/order-detail-synthetic.js']) {
+  const target = resolve(outputRoot, artifact)
+  if (existsSync(target)) rmSync(target)
+}
 
 // WeChat DevTools can retain the previous precompile dependency graph after a
 // clean rebuild. Keep an inert file at the retired module path so the stale

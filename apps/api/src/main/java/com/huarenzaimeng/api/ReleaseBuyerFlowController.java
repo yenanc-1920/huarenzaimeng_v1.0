@@ -20,50 +20,39 @@ import java.util.List;
 @Profile("release-mysql")
 @RequestMapping("/buyer-api/v1")
 public final class ReleaseBuyerFlowController {
-    private final MockFlowService flow;
-    ReleaseBuyerFlowController(MockFlowService flow) { this.flow = flow; }
+    private final FlowStore store;
+    ReleaseBuyerFlowController(FlowStore store) { this.store = store; }
 
     @PostMapping("/quotes")
-    ResponseEntity<ProjectEnvelope<Quote>> quote(HttpServletRequest servlet, @Valid @RequestBody QuoteRequest r) {
-        String subject = principal(servlet).subjectRef();
-        return ok(flow.createQuote(subject, r.phone(), r.operatorCode(), r.productRef(), r.denominationRef(),
-                r.supportedOperatorSetVersion(), r.catalogVersion(), r.commandId(), r.idempotencyKey(), r.mnpState()));
+    ResponseEntity<?> quote(HttpServletRequest servlet, @Valid @RequestBody QuoteRequest r) {
+        principal(servlet); return writeUnavailable();
     }
 
     @PostMapping("/orders")
-    ResponseEntity<OrderCreationResponse> order(HttpServletRequest servlet, @Valid @RequestBody OrderRequest r) {
-        String subject = principal(servlet).subjectRef();
-        BuyerAuthorization authorization = new BuyerAuthorization("DEVELOPMENT", subject, r.sessionVersion(),
-                r.authorizationSetRef(), "DEV-BEARER-V1", List.of());
-        return ResponseEntity.ok().header("Cache-Control", "no-store").body(flow.createLocalSyntheticOrder(
-                authorization, r.quoteRef(), r.orderCreationPrecondition(), r.commandId(), r.idempotencyKey()));
+    ResponseEntity<?> order(HttpServletRequest servlet, @Valid @RequestBody OrderRequest r) {
+        principal(servlet); return writeUnavailable();
     }
 
     @GetMapping("/orders")
     ResponseEntity<ProjectEnvelope<List<OrderProjection>>> orders(HttpServletRequest servlet) {
-        return ok(flow.listOrders(principal(servlet).subjectRef()));
+        return ok(store.listOrders(principal(servlet).subjectRef()));
     }
 
     @GetMapping("/orders/{orderRef}")
     ResponseEntity<ProjectEnvelope<OrderProjection>> order(HttpServletRequest servlet, @PathVariable String orderRef) {
-        return ok(flow.requireOrder(principal(servlet).subjectRef(), orderRef));
+        return ok(store.requireOrder(principal(servlet).subjectRef(), orderRef));
     }
 
     @GetMapping("/orders/{orderRef}/projection")
-    ResponseEntity<ProjectEnvelope<ProjectProjection>> projection(HttpServletRequest servlet, @PathVariable String orderRef) {
-        return ok(flow.projectOrder(principal(servlet).subjectRef(), orderRef));
+    ResponseEntity<?> projection(HttpServletRequest servlet, @PathVariable String orderRef) {
+        principal(servlet); return ResponseEntity.status(503).header("Cache-Control","no-store")
+                .body(ProjectEnvelope.rejected("PROJECTION_NOT_AVAILABLE_WITHOUT_PROVIDER_CONFIGURATION"));
     }
 
     @PostMapping("/orders/{orderRef}/payment-intents")
-    ResponseEntity<PaymentIntentResponse> payment(HttpServletRequest servlet, @PathVariable String orderRef,
+    ResponseEntity<?> payment(HttpServletRequest servlet, @PathVariable String orderRef,
                                                    @Valid @RequestBody PaymentRequest r) {
-        String subject = principal(servlet).subjectRef();
-        List<String> refs = flow.listOrders(subject).stream().map(OrderProjection::orderRef).toList();
-        BuyerAuthorization authorization = new BuyerAuthorization("DEVELOPMENT", subject, r.sessionVersion(),
-                r.authorizationSetRef(), "DEV-BEARER-V1", refs);
-        return ResponseEntity.ok().header("Cache-Control", "no-store").body(flow.createDevelopmentPaymentIntent(
-                authorization, orderRef, r.paymentIntentCreationPrecondition(), r.commandId(), r.idempotencyKey(),
-                r.expectedProjectionVersion(), r.expectedAggregateVersion()));
+        principal(servlet); return writeUnavailable();
     }
 
     private static BuyerSessionPrincipal principal(HttpServletRequest request) {
@@ -74,6 +63,8 @@ public final class ReleaseBuyerFlowController {
     private static <T> ResponseEntity<ProjectEnvelope<T>> ok(T body) {
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(ProjectEnvelope.accepted(body));
     }
+    private static ResponseEntity<?> writeUnavailable(){return ResponseEntity.status(503).header("Cache-Control","no-store")
+            .body(ProjectEnvelope.rejected("EXTERNAL_PAYMENT_AND_TOPUP_NOT_CONFIGURED"));}
 
     record QuoteRequest(@NotBlank String phone, @NotBlank String operatorCode, @NotBlank String productRef,
                         @NotBlank String denominationRef, @Min(1) long supportedOperatorSetVersion,

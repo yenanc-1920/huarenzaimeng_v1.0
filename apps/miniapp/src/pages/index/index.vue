@@ -205,7 +205,7 @@ const clockStatusCopy:Record<ClockViewState,string>={
 const holidayTitle=(country:'中国'|'孟加拉',holiday:TemporalHoliday|null)=>{
   if(!holiday)return `${country}：节假日信息暂不可用`
   const copy:Record<HolidayState,string>={
-    NO_HOLIDAY_CONFIRMED:'今日无已登记节假日',CONFIRMED_HOLIDAY:holiday.name||'今日有已登记节假日',
+    NO_HOLIDAY_CONFIRMED:'工作日',CONFIRMED_HOLIDAY:holiday.name==='休息日'?'休息日':holiday.name||'节假日',
     PENDING_CONFIRMATION:`预计为${holiday.name||'节假日'}，待官方确认`,READ_ERROR:'节假日信息读取失败',
     STALE_OR_EXPIRED:'信息已过期，当前结论不可用',UNPUBLISHED:'内容已下架',
   }
@@ -244,8 +244,7 @@ onShow(()=>{
         <text class="temporal-note">本页只读展示；时间与节假日异常不影响充值。</text>
       </view>
 
-      <view class="entries"><button class="card nav" @click="go('/pages/order/list')"><text class="entry-icon blue">单</text><view><text class="card-title">我的订单</text><text class="copy">查看充值和退款进度</text></view><text class="arrow">›</text></button><button class="card nav" @click="go('/pages/directory/list')"><text class="entry-icon orange">讯</text><view><text class="card-title">实用信息</text><text class="copy">电话、办事与生活指南</text></view><text class="arrow">›</text></button><button class="card nav" @click="go('/pages/life-content/list')"><text class="entry-icon warm">阅</text><view><text class="card-title">生活资讯</text><text class="copy">查看生活提醒与节假日说明</text></view><text class="arrow">›</text></button></view>
-      <text class="test-badge">测试版</text>
+      <view class="entries"><button class="card nav" @click="go('/pages/directory/list')"><text class="entry-icon orange">页</text><view><text class="card-title">孟加拉黄页</text><text class="copy">按城市查找电话与生活服务</text></view><text class="arrow">›</text></button><button class="card nav" @click="go('/pages/life-content/list')"><text class="entry-icon warm">阅</text><view><text class="card-title">生活资讯</text><text class="copy">查看生活提醒与节假日说明</text></view><text class="arrow">›</text></button></view>
     </view>
   </view>
 </template>

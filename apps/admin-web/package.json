@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
-    "test:contracts": "node --experimental-strip-types scripts/assert-admin-contracts.mjs && npm run test:state-fixtures",
-    "test:state-fixtures": "node --experimental-strip-types scripts/run-admin-state-fixtures.mjs",
+    "test:contracts": "node --experimental-strip-types scripts/assert-admin-contracts.mjs && npm run test:state-contracts",
+    "test:state-contracts": "node --experimental-strip-types scripts/run-admin-state-contracts.mjs",
     "typecheck": "vue-tsc --noEmit",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173"

@@ -1,6 +1,3 @@
-import { mockCatalog, mockDirectory, mockDirectoryDetail, mockEligibility, mockLifeContentDetailDto, mockLifeContentListDto, mockOrders, mockProjection, mockQuote, mockRecovery, mockRecoveryCase, mockReportDirectoryError, mockSupport, mockTemporalOverviewReadResponse } from './mock'
-import { buildContentErrorReport, mapContentProjectCode, parseContentErrorReportReceipt, parsePublicContentPage, parsePublicContentProjection } from './content-contract'
-import { parseLifeContentDetailResponse, parseLifeContentListResponse } from './life-content-contract'
 import { parseProjectProjection, parseProjectQuote, toOrderProjection, toQuoteSnapshot, type ProjectProjection } from './project-contract'
 import { parseAuthorizedOrders, parseCatalogProjection, parseRecoveryResult, selectionMatchesCatalog } from './topup-recovery-contract'
 import { acceptNewerProjection } from '../domain/projection'
@@ -10,38 +7,38 @@ import { readPendingRecoveryCaseRef } from '../domain/session'
 import { parseAcceptedProjectEnvelope, ProjectApiError } from './project-envelope'
 import { buildOrderCreationCommand, parseOrderCreationResult, type OrderCreationResult } from './order-creation-contract'
 import { readSessionProjection } from '../domain/session'
-import type { CatalogProjection, ContentErrorReportResult, DirectoryDetailResult, DirectorySummary, EligibilityResult, LifeContentDetailResult, LifeContentListResult, OrderProjection, OrderSummary, ProjectSessionProjection, QuoteSnapshot, RechargeSelection, RecoveryResult, SupportCase } from '../domain/types'
+import type { CatalogProjection, ContentErrorReportResult, DirectoryCity, DirectoryItem, DirectorySummary, EligibilityResult, LifeContentDetailResult, LifeContentListResult, OrderProjection, OrderSummary, ProjectSessionProjection, QuoteSnapshot, RechargeSelection, RecoveryResult, SupportCase } from '../domain/types'
 import type { TemporalOverviewReadResponse } from './temporal-overview-contract'
-import { parseP014Response, P014_BACKEND_IMPLEMENTATION_SHA, storeP014OriginalWriteIdentity, type P014CreateCommand, type P014OriginalResultQuery, type P014Response } from './p014-topup-contract'
-import { p014BuiltinSynthetic } from './p014-topup-synthetic'
+import { parseP014Response, P014_BACKEND_IMPLEMENTATION_SHA, type P014Response } from './p014-topup-contract'
 import { parseP021Response, type P021Response } from './order-detail-contract'
-import { p021BuiltinSynthetic } from './order-detail-synthetic'
 import { callProjectApi } from './wechat-development-transport'
 import { requireBuyerBearerToken } from './buyer-session-token'
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
+const buyerBaseUrl = (import.meta.env.VITE_BUYER_API_BASE_URL || '/buyer-api/v1').replace(/\/$/, '')
+const buyerAuthBaseUrl = (import.meta.env.VITE_BUYER_AUTH_BASE_URL || '/buyer-auth/v1').replace(/\/$/, '')
 const contentBaseUrl = (import.meta.env.VITE_CONTENT_API_BASE_URL || '/project-api/v1').replace(/\/$/, '')
-const useProjectMockApi = import.meta.env.VITE_USE_PROJECT_MOCK_API === 'true'
 const useWechatDevelopment = import.meta.env.VITE_PROJECT_TRANSPORT_MODE === 'WECHAT_DEVELOPMENT'
-const useP021BuiltinSynthetic = import.meta.env.DEV && import.meta.env.VITE_P021_DATA_MODE === 'BUILTIN_SYNTHETIC'
 const orderRecoveryExternalAuthReady = import.meta.env.VITE_ORDER_RECOVERY_EXTERNAL_AUTH_READY === 'true'
-const projectSubjectRef = import.meta.env.VITE_MOCK_PROJECT_SUBJECT_REF || 'miniapp-local-mock-subject-v1'
 
 export { ProjectApiError } from './project-envelope'
 
-function requestBody(path: string, method: 'GET' | 'POST', data?: UniNamespace.RequestOptions['data'], root = baseUrl): Promise<unknown> {
+function requestBody(path: string, method: 'GET' | 'POST', data?: UniNamespace.RequestOptions['data'], root = baseUrl, extraHeaders:Record<string,string>={}): Promise<unknown> {
+  const protectedRequest = path === '/quotes' || path === '/orders' || path.startsWith('/orders/') || path === '/recovery-cases' || path.startsWith('/recovery-cases/')
   if (useWechatDevelopment) {
-    const protectedRequest = path === '/quotes' || path === '/orders' || path.startsWith('/orders/') || path === '/recovery-cases' || path.startsWith('/recovery-cases/')
-    return callProjectApi(`${root}${path}`, method, data, protectedRequest ? requireBuyerBearerToken() : undefined).then(result => {
+    const effectiveRoot=protectedRequest&&root===baseUrl?buyerBaseUrl:root
+    return callProjectApi(`${effectiveRoot}${path}`, method, data, protectedRequest ? requireBuyerBearerToken() : undefined,extraHeaders).then(result => {
       if (result.statusCode < 200 || result.statusCode >= 300) throw new ProjectApiError('HTTP_STATUS_REJECTED')
       return result.data
     })
   }
   return new Promise((resolve, reject) => uni.request({
-    url: `${root}${path}`,
+    url: `${protectedRequest&&root===baseUrl?buyerBaseUrl:root}${path}`,
     method,
     data,
-    header: { 'X-Project-Subject-Ref': projectSubjectRef },
+    header: protectedRequest
+      ? { ...extraHeaders,Authorization: `Bearer ${requireBuyerBearerToken()}` }
+      : extraHeaders,
     success: ({ data: body }) => resolve(body),
     fail: () => reject(new ProjectApiError('NETWORK_ERROR')),
   }))
@@ -72,7 +69,7 @@ function requestTemporalOverviewRead():Promise<TemporalOverviewReadResponse> {
 function requestTrustedSessionRead(path:string):Promise<unknown>{
   if(useWechatDevelopment)return callProjectApi(`/buyer-api/v1${path}`,'GET',undefined,requireBuyerBearerToken()).then(result=>result.statusCode>=200&&result.statusCode<300?result.data:Promise.reject(new ProjectApiError('HTTP_STATUS_REJECTED')))
   return new Promise((resolve,reject)=>uni.request({
-    url:`${baseUrl}${path}`,method:'GET',
+    url:`${buyerBaseUrl}${path}`,method:'GET',header:{Authorization:`Bearer ${requireBuyerBearerToken()}`},
     success:({data:body,statusCode})=>statusCode>=200&&statusCode<300?resolve(body):reject(new ProjectApiError('HTTP_STATUS_REJECTED')),
     fail:()=>reject(new ProjectApiError('NETWORK_ERROR')),
   }))
@@ -83,21 +80,41 @@ async function requestData(path: string, method: 'GET' | 'POST', data?: UniNames
 
 const projectProjection = async (path: string, method: 'GET' | 'POST', data?: UniNamespace.RequestOptions['data']): Promise<ProjectProjection> => parseProjectProjection(await requestData(path, method, data))
 function localScopeFingerprint(value:string):string{let hash=2166136261;for(let index=0;index<value.length;index++){hash^=value.charCodeAt(index);hash=Math.imul(hash,16777619)}return(hash>>>0).toString(36)}
+const record=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value)
+const requiredText=(value:unknown):value is string=>typeof value==='string'&&value.trim().length>0
+function parseSupportedOperators(value:unknown):Array<{operatorCode:string;displayName:string}>{
+  if(!record(value)||!Array.isArray(value.supportedOperators))throw new ProjectApiError('INVALID_SUPPORTED_OPERATORS_DTO')
+  return value.supportedOperators.map(entry=>{
+    if(!record(entry)||!requiredText(entry.operatorCode)||!requiredText(entry.displayName))throw new ProjectApiError('INVALID_SUPPORTED_OPERATOR_DTO')
+    return{operatorCode:entry.operatorCode,displayName:entry.displayName}
+  })
+}
+function parseDirectoryCities(value:unknown):DirectoryCity[]{if(!Array.isArray(value))throw new ProjectApiError('INVALID_DIRECTORY_CITIES_DTO');return value.map(row=>{if(!record(row)||!requiredText(row.cityCode)||!requiredText(row.countryCode)||!requiredText(row.displayName)||!requiredText(row.localName)||!requiredText(row.timezoneId))throw new ProjectApiError('INVALID_DIRECTORY_CITY_DTO');return row as unknown as DirectoryCity})}
+function parseDirectoryEntries(value:unknown):DirectorySummary[]{if(!Array.isArray(value))throw new ProjectApiError('INVALID_DIRECTORY_ENTRIES_DTO');return value.map(row=>{if(!record(row)||!requiredText(row.entryRef)||!requiredText(row.cityCode)||!requiredText(row.cityName)||!requiredText(row.category)||!requiredText(row.displayName)||!requiredText(row.summary)||!requiredText(row.localAddress)||!requiredText(row.phone)||!requiredText(row.verifiedAt)||!requiredText(row.validUntil)||!requiredText(row.updatedAt))throw new ProjectApiError('INVALID_DIRECTORY_ENTRY_DTO');return row as unknown as DirectorySummary})}
+function parseDirectoryItem(value:unknown):DirectoryItem{const items=parseDirectoryEntries([value]);return value&&record(value)&&typeof value.sourceLabel==='string'?{...items[0],sourceLabel:value.sourceLabel}:items[0]}
 
 async function loadCatalog(operatorCode:string):Promise<CatalogProjection>{
   if(!operatorCode)throw new ProjectApiError('OPERATOR_CODE_REQUIRED')
-  if(!useProjectMockApi&&!useWechatDevelopment)return mockCatalog(operatorCode)
   return parseCatalogProjection(await requestData(`/catalog?operatorCode=${encodeURIComponent(operatorCode)}`,'GET'))
 }
 
 export const api = {
-  // 号码/MNP识别仍是明确的本地合成输入；项目API只提供批准支持集，不连接第三方识别。
-  checkEligibility: (phone: string): Promise<EligibilityResult> => mockEligibility(phone),
+  checkEligibility: async (phone: string): Promise<EligibilityResult> => {
+    if(!phone.trim())throw new ProjectApiError('PHONE_REQUIRED')
+    const value=await requestData(`/eligibility?phone=${encodeURIComponent(phone.trim())}`,'GET')
+    if(!record(value)||!requiredText(value.maskedPhone)||!requiredText(value.operatorCode)||!requiredText(value.operatorName)||!requiredText(value.projectCode))throw new ProjectApiError('INVALID_ELIGIBILITY_DTO')
+    const caseKey=`ELIGIBILITY-${value.maskedPhone}`
+    return value.operatorCode==='UNKNOWN'
+      ?{outcome:'UNKNOWN',maskedPhone:value.maskedPhone,caseKey,projectCode:'PREPAY_MNP_UNKNOWN'}
+      :{outcome:'ELIGIBLE',maskedPhone:value.maskedPhone,operatorCode:value.operatorCode,operatorName:value.operatorName,caseKey}
+  },
+  async getSupportedOperators():Promise<Array<{operatorCode:string;displayName:string}>>{
+    return parseSupportedOperators(await requestData('/catalog?operatorCode=UNKNOWN','GET'))
+  },
   getCatalog: loadCatalog,
   async createQuote(selection:RechargeSelection): Promise<QuoteSnapshot> {
     const current=await loadCatalog(selection.operatorCode)
     if(!selectionMatchesCatalog(selection,current))throw new ProjectApiError('CATALOG_SELECTION_STALE')
-    if (!useProjectMockApi&&!useWechatDevelopment) return mockQuote(selection)
     const identity=getOrCreateCommand(uni,`create-quote:${localScopeFingerprint(JSON.stringify(selection))}`)
     const quote = parseProjectQuote(await requestData('/quotes', 'POST', {
       phone:selection.maskedPhone,operatorCode:selection.operatorCode,productRef:selection.productRef,denominationRef:selection.denominationRef,
@@ -109,7 +126,6 @@ export const api = {
     return toQuoteSnapshot(quote)
   },
   async createOrder(quoteRef: string, commandId: string, idempotencyKey: string): Promise<OrderCreationResult> {
-    if(!useProjectMockApi&&!useWechatDevelopment)throw new ProjectApiError('PROJECT_MOCK_API_DISABLED')
     const command=buildOrderCreationCommand({commandId,idempotencyKey},quoteRef,readSessionProjection(uni))
     const body=await requestBody('/orders','POST',command)
     try{return parseOrderCreationResult(body)}catch(error){
@@ -119,39 +135,32 @@ export const api = {
       throw new ProjectApiError(error instanceof Error?error.message:'INVALID_ORDER_CREATION_RESULT_DTO')
     }
   },
-  async confirmMockPayment(orderRef: string, commandId: string, idempotencyKey: string, expectedProjectionVersion: number, expectedAggregateVersion: number): Promise<ProjectProjection> {
-    return projectProjection(`/orders/${encodeURIComponent(orderRef)}/mock-payment`, 'POST', { commandId, idempotencyKey, expectedProjectionVersion, expectedAggregateVersion })
-  },
-  async createP014Topup(orderRef:string,command:P014CreateCommand):Promise<P014Response>{
-    if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
-    storeP014OriginalWriteIdentity(uni,orderRef,command)
-    if(!useProjectMockApi)return p014BuiltinSynthetic.create(orderRef,command)
-    return parseP014Response(await requestBody(`/orders/${encodeURIComponent(orderRef)}/topup-intents`,'POST',command))
-  },
-  async getP014TopupResult(orderRef:string,query:P014OriginalResultQuery):Promise<P014Response>{
-    if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
-    if(!useProjectMockApi)return p014BuiltinSynthetic.result(orderRef,query)
-    const params=`commandId=${encodeURIComponent(query.commandId)}&idempotencyKey=${encodeURIComponent(query.idempotencyKey)}&sessionVersion=${query.sessionVersion}&authorizationSetRef=${encodeURIComponent(query.authorizationSetRef)}`
-    return parseP014Response(await requestBody(`/orders/${encodeURIComponent(orderRef)}/topup-intents/result?${params}`,'GET'))
+  async confirmPayment(orderRef: string, commandId: string, idempotencyKey: string, expectedProjectionVersion: number, expectedAggregateVersion: number): Promise<ProjectProjection> {
+    return projectProjection(`/orders/${encodeURIComponent(orderRef)}/payment-intents`, 'POST', { commandId, idempotencyKey, expectedProjectionVersion, expectedAggregateVersion })
   },
   async getP014Progress(orderRef:string):Promise<P014Response>{
     if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
-    if(!useProjectMockApi)return p014BuiltinSynthetic.progress(orderRef)
+    return parseP014Response(await requestBody(`/orders/${encodeURIComponent(orderRef)}/projection`,'GET'))
+  },
+  async getP014TopupResult(orderRef:string,_query:unknown):Promise<P014Response>{
+    if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
     return parseP014Response(await requestBody(`/orders/${encodeURIComponent(orderRef)}/projection`,'GET'))
   },
   async getOrderDetail(orderRef:string):Promise<P021Response>{
     if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
-    if(useP021BuiltinSynthetic)return p021BuiltinSynthetic.read(orderRef)
     return parseP021Response(await requestTrustedSessionRead(`/orders/${encodeURIComponent(orderRef)}`))
+  },
+  async getCoreProjection(orderRef:string):Promise<ProjectProjection>{
+    if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
+    return projectProjection(`/orders/${encodeURIComponent(orderRef)}/projection`,'GET')
   },
   async getProjection(orderRef: string): Promise<OrderProjection> {
     if (!orderRef) throw new Error('ORDER_REF_REQUIRED')
-    const projection = useProjectMockApi||useWechatDevelopment ? toOrderProjection(await projectProjection(`/orders/${encodeURIComponent(orderRef)}/projection`, 'GET')) : await mockProjection(orderRef)
+    const projection = toOrderProjection(await projectProjection(`/orders/${encodeURIComponent(orderRef)}/projection`, 'GET'))
     return acceptNewerProjection(orderRef, projection)
   },
   async getOrders(session:ProjectSessionProjection):Promise<OrderSummary[]>{
     if(session.role!=='BUYER')throw new ProjectApiError('BUYER_SESSION_REQUIRED')
-    if(!useProjectMockApi&&!useWechatDevelopment)return mockOrders(session)
     if(!orderRecoveryExternalAuthReady)throw new ProjectApiError('ORDER_RECOVERY_EXTERNAL_AUTH_NOT_READY')
     const query=`?sessionVersion=${session.sessionVersion}&authorizationSetRef=${encodeURIComponent(session.authorizationSetRef!)}`
     return parseAuthorizedOrders(await requestData(`/orders${query}`,'GET'),session)
@@ -159,63 +168,55 @@ export const api = {
   async recoverOrder(orderRef:string,recoveryMaterialRef:string):Promise<RecoveryResult>{
     if(!orderRef||!recoveryMaterialRef)throw new ProjectApiError('RECOVERY_INPUT_REQUIRED')
     if(readPendingRecoveryCaseRef(uni))throw new ProjectApiError('RECOVERY_CASE_POLL_REQUIRED')
-    if(!useProjectMockApi&&!useWechatDevelopment)return mockRecovery(orderRef,recoveryMaterialRef)
     if(!orderRecoveryExternalAuthReady)throw new ProjectApiError('ORDER_RECOVERY_EXTERNAL_AUTH_NOT_READY')
     const fingerprint=canonicalFingerprint(orderRef,recoveryMaterialRef)
     const identity=getOrCreateCommand(uni,`recover-order:${localScopeFingerprint(fingerprint)}`)
     return parseRecoveryResult(await requestData('/recovery-cases','POST',{commandId:identity.commandId,idempotencyKey:identity.idempotencyKey,
-      recoveryInputFingerprint:fingerprint,creationPrecondition:'RECOVERY_CASE_MUST_NOT_EXIST',orderRef,recoveryMaterialRef}))
+      recoveryInputFingerprint:fingerprint,creationPrecondition:'RECOVERY_CASE_MUST_NOT_EXIST',orderRef,recoveryMaterialRef},buyerAuthBaseUrl))
   },
   async getRecoveryCase(recoveryCaseRef:string):Promise<RecoveryResult>{
     if(!recoveryCaseRef)throw new ProjectApiError('RECOVERY_CASE_REF_REQUIRED')
-    if(!useProjectMockApi&&!useWechatDevelopment)return mockRecoveryCase(recoveryCaseRef)
     if(!orderRecoveryExternalAuthReady)throw new ProjectApiError('ORDER_RECOVERY_EXTERNAL_AUTH_NOT_READY')
-    return parseRecoveryResult(await requestData(`/recovery-cases/${encodeURIComponent(recoveryCaseRef)}`,'GET'))
+    return parseRecoveryResult(await requestData(`/recovery-cases/${encodeURIComponent(recoveryCaseRef)}`,'GET',undefined,buyerAuthBaseUrl))
   },
-  getSupportCase: (): Promise<SupportCase> => mockSupport(),
-  async getDirectory(): Promise<DirectorySummary[]> {
-    if (!useProjectMockApi&&!useWechatDevelopment) return mockDirectory()
-    return parsePublicContentPage(await requestData('/content/items', 'GET', undefined, contentBaseUrl))
-  },
-  async getDirectoryDetail(contentRef: string, contentVersion: number): Promise<DirectoryDetailResult> {
-    if (!useProjectMockApi&&!useWechatDevelopment) return mockDirectoryDetail(contentRef, contentVersion)
-    try {
-      const item = parsePublicContentProjection(await requestData(`/content/items/${encodeURIComponent(contentRef)}?contentVersion=${contentVersion}`, 'GET', undefined, contentBaseUrl))
-      if (item.contentVersion !== contentVersion) throw new Error('CONTENT_VERSION_RESPONSE_MISMATCH')
-      return { outcome:'READY', item }
-    } catch (error) {
-      if (error instanceof ProjectApiError) {
-        const mapped = mapContentProjectCode(error.projectCode)
-        if (mapped) return mapped
-      }
-      throw error
-    }
-  },
-  async reportDirectoryError(contentRef: string, contentVersion: number, reason: string): Promise<ContentErrorReportResult> {
-    const identity = getOrCreateCommand(uni, `content-report:${contentRef}:${contentVersion}`)
-    const command = buildContentErrorReport(identity, contentVersion, reason)
-    if (!useProjectMockApi&&!useWechatDevelopment) return mockReportDirectoryError(contentRef, command)
-    return parseContentErrorReportReceipt(await requestData(`/content/items/${encodeURIComponent(contentRef)}/reports`, 'POST', command, contentBaseUrl))
+  getSupportCase: async (): Promise<SupportCase> => await requestTrustedSessionRead('/support/case') as SupportCase,
+  async getDirectoryCities():Promise<DirectoryCity[]>{return parseDirectoryCities(await requestData('/directory/cities','GET'))},
+  async getDirectory(cityCode?:string,category?:string): Promise<DirectorySummary[]> {const query=new URLSearchParams();if(cityCode)query.set('cityCode',cityCode);if(category)query.set('category',category);return parseDirectoryEntries(await requestData(`/directory/entries${query.size?`?${query}`:''}`,'GET'))},
+  async getDirectoryDetail(entryRef:string):Promise<DirectoryItem>{if(!entryRef)throw new ProjectApiError('DIRECTORY_ENTRY_REF_REQUIRED');return parseDirectoryItem(await requestData(`/directory/entries/${encodeURIComponent(entryRef)}`,'GET'))},
+  async reportDirectoryError(entryRef:string,reasonCode:string,description:string):Promise<ContentErrorReportResult>{
+    const identity=getOrCreateCommand(uni,`directory-report:${entryRef}:${reasonCode}:${localScopeFingerprint(description)}`)
+    const response=parseAcceptedProjectEnvelope(await requestBody(`/directory/entries/${encodeURIComponent(entryRef)}/reports`,'POST',{reasonCode,description},baseUrl,{'Idempotency-Key':identity.idempotencyKey}))
+    if(!record(response)||!requiredText(response.reportRef)||response.state!=='OPEN')throw new ProjectApiError('INVALID_DIRECTORY_REPORT_DTO')
+    return{outcome:'CONTENT_ERROR_REPORTED',supportRef:response.reportRef,reviewTarget:'A120'}
   },
   async getLifeContentList():Promise<LifeContentListResult> {
-    const body=!useProjectMockApi ? await mockLifeContentListDto() : await requestAnonymousRead('/content/life-items')
-    return parseLifeContentListResponse(body)
+    const data=parseAcceptedProjectEnvelope(await requestAnonymousRead('/content/life-items'))
+    if(!Array.isArray(data))throw new ProjectApiError('INVALID_LIFE_CONTENT_LIST_DTO')
+    const items=data.map(row=>{if(!record(row)||!requiredText(row.contentRef)||!requiredText(row.category)||!requiredText(row.title)||!requiredText(row.summary)||!requiredText(row.publishedAt)||!requiredText(row.updatedAt)||!requiredText(row.validUntil))throw new ProjectApiError('INVALID_LIFE_CONTENT_ITEM_DTO');return{contentRef:row.contentRef,contentVersion:row.updatedAt,category:row.category as 'LIFE_REMINDER'|'HOLIDAY_EXPLANATION',title:row.title,summary:row.summary,sourceType:'平台发布',jurisdiction:'孟加拉',applicableAudience:'在孟用户',publishedAt:row.publishedAt,updatedAt:row.updatedAt,effectiveFrom:row.publishedAt,effectiveTo:row.validUntil,freshnessState:'CURRENT' as const,coverState:'NOT_CONFIGURED' as const,coverRef:null}})
+    return{requestRef:`LIFE-LIST-${Date.now()}`,viewState:items.length?'READY':'EMPTY',projectCode:items.length?'LIFE_CONTENT_LIST_READY':'LIFE_CONTENT_LIST_EMPTY',schemaVersion:'LIFE_CONTENT_READ_V1',visibilityRuleVersion:'DATABASE_PUBLISH_STATE',items,retryClass:'NONE',nextReadAt:null}
   },
   async getLifeContentDetail(contentRef:string,contentVersion:string):Promise<LifeContentDetailResult> {
     if(!contentRef||!contentVersion)throw new ProjectApiError('LIFE_CONTENT_READ_KEY_REQUIRED')
-    const body=!useProjectMockApi
-      ?await mockLifeContentDetailDto(contentRef,contentVersion)
-      :await requestAnonymousRead(`/content/life-items/${encodeURIComponent(contentRef)}?contentVersion=${encodeURIComponent(contentVersion)}`)
-    return parseLifeContentDetailResponse(body,contentRef,contentVersion)
+    const row=parseAcceptedProjectEnvelope(await requestAnonymousRead(`/content/life-items/${encodeURIComponent(contentRef)}?contentVersion=${encodeURIComponent(contentVersion)}`))
+    if(!record(row)||row.contentRef!==contentRef||!requiredText(row.category)||!requiredText(row.title)||!requiredText(row.summary)||!requiredText(row.bodyText)||!requiredText(row.publishedAt)||!requiredText(row.updatedAt)||!requiredText(row.validUntil))throw new ProjectApiError('INVALID_LIFE_CONTENT_DETAIL_DTO')
+    const item={contentRef,contentVersion:row.updatedAt,category:row.category as 'LIFE_REMINDER'|'HOLIDAY_EXPLANATION',title:row.title,summary:row.summary,body:row.bodyText,sourceType:requiredText(row.sourceLabel)?row.sourceLabel:'平台发布',jurisdiction:'孟加拉',applicableAudience:'在孟用户',publishedAt:row.publishedAt,updatedAt:row.updatedAt,effectiveFrom:row.publishedAt,effectiveTo:row.validUntil,freshnessState:'CURRENT' as const,coverState:'NOT_CONFIGURED' as const,coverRef:null}
+    return{requestRef:`LIFE-DETAIL-${contentRef}`,viewState:'READY',projectCode:'LIFE_CONTENT_DETAIL_READY',schemaVersion:'LIFE_CONTENT_READ_V1',visibilityRuleVersion:'DATABASE_PUBLISH_STATE',contentRef,contentVersion:item.contentVersion,item,retryClass:'NONE',nextReadAt:null}
   },
   async getTemporalOverview() {
-    return !useProjectMockApi ? mockTemporalOverviewReadResponse() : requestTemporalOverviewRead()
+    const response=await requestTemporalOverviewRead()
+    const data=parseAcceptedProjectEnvelope(response.body)
+    if(!record(data)||!requiredText(data.serverTime)||!record(data.dhaka)||!record(data.beijing))throw new ProjectApiError('INVALID_TEMPORAL_OVERVIEW_DTO')
+    const referenceInstant=data.serverTime
+    const clock=(source:Record<string,unknown>,cityCode:'DHAKA'|'BEIJING',displayName:string,zoneId:'Asia/Dhaka'|'Asia/Shanghai')=>({cityCode,displayName,zoneId,localDate:String(source.date),localTime:String(source.localTime).slice(0,5),availabilityState:'AVAILABLE' as const})
+    const holiday=(source:Record<string,unknown>,countryCode:'CN'|'BD')=>{const dayType=String(source.dayType);const isHoliday=dayType==='HOLIDAY'||dayType==='REST_DAY';return{countryCode,localDate:String(source.date),state:isHoliday?'CONFIRMED_HOLIDAY' as const:'NO_HOLIDAY_CONFIRMED' as const,holidayId:isHoliday?`${countryCode}-${source.date}-${dayType}`:null,name:dayType==='REST_DAY'?'休息日':dayType==='HOLIDAY'?String(source.holidayName||'节假日'):null,note:null,sourceType:'LOCAL_DATABASE_RULE',sourceCoverageDate:String(source.date),effectiveFrom:new Date(Date.parse(referenceInstant)-86400000).toISOString(),effectiveTo:new Date(Date.parse(referenceInstant)+86400000).toISOString(),version:'DB-RULE-V1'}}
+    response.body={requestRef:`TEMPORAL-${referenceInstant}`,projectCode:'TEMPORAL_OVERVIEW_READY',schemaVersion:'TEMPORAL_OVERVIEW_V1',referenceInstant,generatedAt:referenceInstant,timeZoneRuleVersion:'IANA_DB',clockStaleAfterSeconds:300,clockState:'BOTH_AVAILABLE',clocks:{dhaka:clock(data.dhaka,'DHAKA','达卡','Asia/Dhaka'),beijing:clock(data.beijing,'BEIJING','北京','Asia/Shanghai')},holidayRuleVersion:'LOCAL_DATABASE_RULE',holidays:{china:holiday(data.beijing,'CN'),bangladesh:holiday(data.dhaka,'BD')},retryClass:'NONE'}
+    return response
   },
 }
 
-export const apiRuntime = Object.freeze({ mode:useProjectMockApi ? 'PROJECT_MOCK_API' : 'BUILTIN_MOCK', baseUrl, contentBaseUrl,
+export const apiRuntime = Object.freeze({ mode:'PROJECT_API', baseUrl, contentBaseUrl,
   p014BackendImplementationSha:P014_BACKEND_IMPLEMENTATION_SHA,
   p014AllowedActionsSemantics:'CONTROLLED_METADATA_NOT_CLIENT_AUTHORIZATION',p014RealWriteEligibility:0,
-  orderRecoveryProjectApiEligibility:useProjectMockApi&&orderRecoveryExternalAuthReady?1:0,
+  orderRecoveryProjectApiEligibility:orderRecoveryExternalAuthReady?1:0,
   orderRecoveryAuthBoundary:'RUNTIME_EXTERNAL_SECURE_PROXY_OR_DEVELOPER_TOOL_MANUAL_HEADER_INJECTION_REQUIRED_NO_CLIENT_SECRET',
-  subjectRefSemantics:'LOCAL_MOCK_ROUTING_ONLY_NOT_TRUSTED_IDENTITY' })
+  subjectRefSemantics:'BUYER_BEARER_SERVER_AUTHORITY' })

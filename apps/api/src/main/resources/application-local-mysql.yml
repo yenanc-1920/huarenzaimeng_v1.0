@@ -1,0 +1,13 @@
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/devdata
+hz:
+  v1-dev-data:
+    enabled: true
+  dev-function-release:
+    enabled: true
+  persistence:
+    mode: mysql
+  external-integrations:
+    wechat-payment-enabled: false
+    topup-provider-enabled: false

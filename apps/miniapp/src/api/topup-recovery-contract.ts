@@ -6,6 +6,7 @@ const integer = (value: unknown): value is number => typeof value === 'number' &
 const currency = (value: unknown): value is Money['currency'] => value === 'CNY' || value === 'BDT'
 const itemKind = (value: unknown): value is CatalogItem['itemKind'] => value === 'PRESET_DENOMINATION' || value === 'PRESET_PACKAGE'
 const evidenceSemantics = (value: unknown): value is CatalogProjection['evidenceSemantics'] => value === 'LOCAL_MOCK_NO_REAL_OPERATOR_FACTS' || value === 'LOCAL_DATABASE_STATE_NOT_EXTERNAL_OPERATOR_FACT'
+const productType = (value:unknown):value is CatalogItem['productType'] => value==='BALANCE'||value==='DATA'||value==='BUNDLE'
 const orderStates:readonly OrderSummaryState[] = ['AWAITING_PAYMENT','PAYMENT_PROCESSING','PAID_AWAITING_TOPUP','TOPUP_PROCESSING','TOPUP_RESULT_UNKNOWN','DELIVERED','CONFIRMED_NOT_DELIVERED','REFUND_PROCESSING','REFUNDED','DELIVERY_REFUND_CONFLICT_REVIEW','SUPPORT_REVIEW']
 const orderState = (value:unknown):value is OrderSummaryState => typeof value==='string'&&orderStates.includes(value as OrderSummaryState)
 const exactKeys = (value:Record<string,unknown>,allowed:string[]):boolean => Object.keys(value).length===allowed.length&&Object.keys(value).every((key)=>allowed.includes(key))
@@ -13,14 +14,32 @@ const instant = (value:unknown):value is string => text(value)&&Number.isFinite(
 const sameStringSet=(left:string[],right:string[]):boolean=>left.length===right.length&&new Set(left).size===left.length&&left.every((item)=>right.includes(item))
 
 function parseCatalogItem(value: unknown, operatorCode: string): CatalogItem {
-  if (!object(value) || !exactKeys(value,['operatorCode','productRef','denominationRef','itemKind','amountMinor','currency'])
+  if (!object(value))throw new Error('INVALID_CATALOG_ITEM_DTO')
+  const extended=exactKeys(value,['operatorCode','productRef','denominationRef','itemKind','amountMinor','currency','displayName','productType','benefitText','validityText','finalAmountCny','priceVersionRef'])
+  const legacy=exactKeys(value,['operatorCode','productRef','denominationRef','itemKind','amountMinor','currency'])
+  if ((!extended&&!legacy)
       || value.operatorCode !== operatorCode || !text(value.productRef) || !text(value.denominationRef)
       || !itemKind(value.itemKind) || !integer(value.amountMinor) || !currency(value.currency)) throw new Error('INVALID_CATALOG_ITEM_DTO')
+  if(extended&&(!text(value.displayName)||!productType(value.productType)||!text(value.benefitText)
+      ||(value.validityText!==null&&!text(value.validityText))||!integer(value.finalAmountCny)||!text(value.priceVersionRef)))throw new Error('INVALID_CATALOG_ITEM_DTO')
+  const displayName=extended?value.displayName as string:`${value.amountMinor as number/100} ${value.currency}`
+  const resolvedType=extended?value.productType as CatalogItem['productType']:value.itemKind==='PRESET_PACKAGE'?'BUNDLE':'BALANCE'
   return { operatorCode, productRef:value.productRef, denominationRef:value.denominationRef, itemKind:value.itemKind,
-    faceValue:{minor:value.amountMinor,currency:value.currency}, available:true }
+    faceValue:{minor:value.amountMinor,currency:value.currency},displayName,productType:resolvedType,
+    benefitText:extended?value.benefitText as string:displayName,validityText:extended?value.validityText as string|null:null,
+    finalAmountCny:extended?value.finalAmountCny as number:value.amountMinor as number,priceVersionRef:extended?value.priceVersionRef as string:'legacy-price-v1',available:true }
 }
 
 export function parseCatalogProjection(value: unknown): CatalogProjection {
+  if(object(value)&&exactKeys(value,['supportedOperatorSetVersion','catalogVersion','operatorCode','operatorName','supportedOperators','items'])){
+    if(!integer(value.supportedOperatorSetVersion)||!integer(value.catalogVersion)||!text(value.operatorCode)||!text(value.operatorName)||!Array.isArray(value.supportedOperators)||!Array.isArray(value.items))throw new Error('INVALID_CATALOG_DTO')
+    const supported=value.supportedOperators.map(entry=>{if(!object(entry)||!exactKeys(entry,['operatorCode','displayName'])||!text(entry.operatorCode)||!text(entry.displayName))throw new Error('INVALID_SUPPORTED_OPERATOR_DTO');return{operatorCode:entry.operatorCode,displayName:entry.displayName}})
+    const isSupported=supported.some(entry=>entry.operatorCode===value.operatorCode)
+    if(!isSupported)return{operatorQualification:'UNSUPPORTED',supportedOperatorSetVersion:value.supportedOperatorSetVersion,catalogVersion:value.catalogVersion,operatorCode:value.operatorCode,items:[],evidenceSemantics:'LOCAL_DATABASE_STATE_NOT_EXTERNAL_OPERATOR_FACT'}
+    const items:CatalogItem[]=value.items.map(entry=>{if(!object(entry)||!exactKeys(entry,['productRef','operatorCode','productType','displayName','benefitText','denominationBdt','validityText','finalAmountCny','priceVersionRef','priceValidUntil'])||entry.operatorCode!==value.operatorCode||!text(entry.productRef)||!productType(entry.productType)||!text(entry.displayName)||!text(entry.benefitText)||typeof entry.denominationBdt!=='number'||entry.denominationBdt<=0||(entry.validityText!==null&&!text(entry.validityText))||typeof entry.finalAmountCny!=='number'||entry.finalAmountCny<=0||!text(entry.priceVersionRef)||!instant(entry.priceValidUntil))throw new Error('INVALID_CATALOG_ITEM_DTO');return{operatorCode:value.operatorCode,productRef:entry.productRef,denominationRef:`BDT-${entry.denominationBdt}`,itemKind:entry.productType==='BALANCE'?'PRESET_DENOMINATION':'PRESET_PACKAGE',faceValue:{minor:Math.round(entry.denominationBdt*100),currency:'BDT'},displayName:entry.displayName,productType:entry.productType,benefitText:entry.benefitText,validityText:entry.validityText as string|null,finalAmountCny:entry.finalAmountCny,priceVersionRef:entry.priceVersionRef,available:true}})
+    if(!items.length)throw new Error('EMPTY_SUPPORTED_CATALOG_DTO')
+    return{operatorQualification:'SUPPORTED',supportedOperatorSetVersion:value.supportedOperatorSetVersion,catalogVersion:value.catalogVersion,operatorCode:value.operatorCode,items,evidenceSemantics:'LOCAL_DATABASE_STATE_NOT_EXTERNAL_OPERATOR_FACT'}
+  }
   if (!object(value) || !exactKeys(value,['supportedOperatorSetVersion','catalogVersion','operatorCode','operatorQualification','items','evidenceSemantics'])
       || !text(value.operatorCode) || !evidenceSemantics(value.evidenceSemantics)
       || !Array.isArray(value.items) || !text(value.operatorQualification)) throw new Error('INVALID_CATALOG_DTO')

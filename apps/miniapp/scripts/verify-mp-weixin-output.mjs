@@ -8,10 +8,7 @@ const requiredArtifacts = [
   'app.js',
   'app.json',
   'api/client.js',
-  'api/mock.js',
-  'api/payment-intent-contract.js',
   'api/p014-topup-contract.js',
-  'api/p014-topup-synthetic.js',
   'pages/index/index.js',
   'pages/index/index.wxml',
   'pages/recharge/select.js',
@@ -30,6 +27,10 @@ const requiredArtifacts = [
 
 for (const artifact of requiredArtifacts) {
   if (!existsSync(resolve(outputRoot, artifact))) throw new Error(`MP_WEIXIN_ARTIFACT_MISSING:${artifact}`)
+}
+
+for (const artifact of ['api/mock.js', 'api/payment-intent-client.js', 'api/payment-intent-contract.js', 'api/p014-topup-synthetic.js', 'api/order-detail-synthetic.js']) {
+  if (existsSync(resolve(outputRoot, artifact))) throw new Error(`MP_WEIXIN_DEV_SYNTHETIC_ARTIFACT_PRESENT:${artifact}`)
 }
 
 function collectJavaScript(directory) {
@@ -81,15 +82,12 @@ for (const [page, root] of [
 }
 
 const commonClient = readFileSync(resolve(outputRoot, 'api/client.js'), 'utf8')
-const commonMock = readFileSync(resolve(outputRoot, 'api/mock.js'), 'utf8')
 const generatedHome = readFileSync(resolve(outputRoot, 'pages/index/index.js'), 'utf8')
 const retiredTemporalFlow = readFileSync(resolve(outputRoot, 'domain/temporal-overview-flow.js'), 'utf8')
-if (/require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonClient)
-  || /require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonMock)) {
+if (/require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonClient)) {
   throw new Error('MP_WEIXIN_COMMON_ENTRY_PAYMENT_INTENT_DEPENDENCY_NOT_ISOLATED')
 }
-if (/require\(["']\.\/temporal-overview-contract\.js["']\)/.test(commonClient)
-  || /require\(["']\.\/temporal-overview-contract\.js["']\)/.test(commonMock)) {
+if (/require\(["']\.\/temporal-overview-contract\.js["']\)/.test(commonClient)) {
   throw new Error('MP_WEIXIN_COMMON_ENTRY_TEMPORAL_CONTRACT_DEPENDENCY_NOT_ISOLATED')
 }
 if (/temporal-overview-flow\.js/.test(generatedHome)) {

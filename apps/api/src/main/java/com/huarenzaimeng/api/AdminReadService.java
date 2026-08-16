@@ -27,13 +27,57 @@ class AdminReadService {
 
     AdminProjection read(String pageId) {
         return switch (pageId) {
+            case "A100" -> customerCaseProjection();
+            case "A110" -> reconciliationProjection();
             case "A120" -> contentProjection();
-            case "A121" -> managedContentProjection("A121", false);
-            case "A122" -> managedContentProjection("A122", true);
-            case "A130" -> catalogProjection();
+            case "A121" -> directoryProjection();
+            case "A122" -> holidayNewsProjection();
+            case "A130" -> productProjection();
             case "A140" -> orderProjection();
             default -> null;
         };
+    }
+
+    AdminProjection cities() {
+        List<Map<String,Object>> rows=mapper.selectCities();
+        return new AdminProjection("ADMIN_READ_V1",version("CITIES",rows),"A121-CITIES","SUPER_ADMIN",rows);
+    }
+
+    AdminProjection channels() {
+        List<Map<String,Object>> rows=mapper.selectProviderChannels();
+        return new AdminProjection("ADMIN_READ_V1",version("CHANNELS",rows),"A130-CHANNELS","SUPER_ADMIN",rows);
+    }
+
+    private AdminProjection customerCaseProjection() {
+        List<Map<String,Object>> rows=mapper.selectCustomerCases();
+        return new AdminProjection("ADMIN_READ_V1", version("CASES",rows), "A100", "SUPER_ADMIN", rows);
+    }
+
+    private AdminProjection reconciliationProjection() {
+        List<Map<String,Object>> rows=mapper.selectReconciliationCases();
+        return new AdminProjection("ADMIN_READ_V1", version("RECONCILIATION",rows), "A110", "SUPER_ADMIN", rows);
+    }
+
+    private AdminProjection directoryProjection() {
+        List<Map<String,Object>> rows=mapper.selectDirectoryEntries();
+        if (rows == null || rows.isEmpty()) return managedContentProjection("A121", false);
+        return new AdminProjection("ADMIN_READ_V1", version("DIRECTORY",rows), "A121", "SUPER_ADMIN", rows);
+    }
+
+    private AdminProjection holidayNewsProjection() {
+        List<Map<String,Object>> rows=mapper.selectHolidayAndNews();
+        if (rows == null || rows.isEmpty()) return managedContentProjection("A122", true);
+        return new AdminProjection("ADMIN_READ_V1", version("CONTENT",rows), "A122", "SUPER_ADMIN", rows);
+    }
+
+    private AdminProjection productProjection() {
+        List<Map<String,Object>> rows=mapper.selectPlatformProducts();
+        if (rows == null) rows=List.of();
+        return new AdminProjection("ADMIN_READ_V1", version("PRODUCTS",rows), "A130", "SUPER_ADMIN", rows);
+    }
+
+    private static String version(String prefix,List<Map<String,Object>> rows) {
+        return prefix + "-" + rows.size() + "-" + rows.stream().map(Object::toString).mapToInt(String::hashCode).reduce(0,(a,b)->31*a+b);
     }
 
     private AdminProjection managedContentProjection(String pageId, boolean news) {
@@ -51,13 +95,21 @@ class AdminReadService {
     private AdminProjection contentProjection() {
         List<DirectoryContent> source = content.internalList().items();
         Instant now = clock.instant();
-        List<A120Item> items = source.stream().map(value -> new A120Item(
+        List<Object> items = new java.util.ArrayList<>(source.stream().map(value -> (Object)new A120Item(
                 value.contentRef(), value.title(), sourceLabel(value), reviewLabel(value),
                 value.complaintPending() ? "存在待查投诉" : "无待查投诉", visibilityLabel(value),
                 present(value.verifiedBy()) ? "核验人：" + value.verifiedBy() : "内容职责待复核",
-                "历史记录 " + value.auditTrail().size() + " 条", removalLabel(value, now))).toList();
+                "历史记录 " + value.auditTrail().size() + " 条", removalLabel(value, now))).toList());
+        List<Map<String,Object>> reports=mapper.selectDirectoryReports();
+        if (reports != null) reports.stream().map(report -> new A120Item(
+                text(report, "reportRef"),
+                "黄页反馈：" + text(report, "entryRef") + " / " + reportReasonLabel(text(report, "reasonCode")),
+                "黄页用户反馈", text(report, "state"),
+                optionalText(report, "description", "未补充说明"),
+                "不直接修改公开内容", "待内容运营核验",
+                timestamp(report, "createdAt").toString(), "核验后处理")).forEach(items::add);
         long version = source.stream().mapToLong(DirectoryContent::version).max().orElse(0);
-        return new AdminProjection("ADMIN_READ_V1", "CONTENT-V" + version, "A120", "CONTENT", items);
+        return new AdminProjection("ADMIN_READ_V1", "CONTENT-V" + version + "-R" + (reports==null?0:reports.size()), "A120", "SUPER_ADMIN", items);
     }
 
     private AdminProjection catalogProjection() {
@@ -72,7 +124,7 @@ class AdminReadService {
                     "ACTIVE".equals(state) && bool(row, "qualification_known") ? "当前有效" : "暂不可用");
         }).toList();
         long version = source.stream().mapToLong(row -> number(row, "catalog_version")).max().orElse(0);
-        return new AdminProjection("ADMIN_READ_V1", "CATALOG-V" + version, "A130", "FIN", items);
+        return new AdminProjection("ADMIN_READ_V1", "CATALOG-V" + version, "A130", "SUPER_ADMIN", items);
     }
 
     private AdminProjection orderProjection() {
@@ -85,7 +137,7 @@ class AdminReadService {
                     ageLabel(updated, now));
         }).toList();
         String version = source.isEmpty() ? "ORDERS-EMPTY" : "ORDERS-" + timestamp(source.get(0), "updated_at").toEpochMilli();
-        return new AdminProjection("ADMIN_READ_V1", version, "A140", "CS", items);
+        return new AdminProjection("ADMIN_READ_V1", version, "A140", "SUPER_ADMIN", items);
     }
 
     private static String sourceLabel(DirectoryContent value) {
@@ -113,6 +165,20 @@ class AdminReadService {
             case "TOPUP_PROCESSING" -> "充值处理中"; case "COMPLETED" -> "已完成";
             case "FAILED" -> "处理失败"; case "REFUNDED" -> "已退款"; default -> "状态待核对";
         };
+    }
+    private static String reportReasonLabel(String reasonCode) {
+        return switch (reasonCode) {
+            case "INCORRECT_INFO" -> "信息不准确";
+            case "PHONE_INVALID" -> "联系电话无效";
+            case "ADDRESS_INVALID" -> "地址无效";
+            case "CLOSED" -> "机构已关闭";
+            case "OTHER" -> "其他问题";
+            default -> throw new IllegalStateException("ADMIN_READ_REPORT_REASON_INVALID:" + reasonCode);
+        };
+    }
+    private static String optionalText(Map<String, Object> row, String key, String fallback) {
+        Object value = row.get(key);
+        return value == null || value.toString().isBlank() ? fallback : value.toString();
     }
     private static String money(long minor, String currency) {
         return currency + " " + BigDecimal.valueOf(minor, 2).setScale(2, RoundingMode.UNNECESSARY).toPlainString();

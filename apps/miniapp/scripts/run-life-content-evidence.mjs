@@ -19,11 +19,14 @@ import {
 const scriptPath=fileURLToPath(import.meta.url)
 const miniappRoot=path.resolve(path.dirname(scriptPath),'..')
 const workspaceRoot=path.resolve(miniappRoot,'..','..')
+const mainWorkspaceRoot=path.basename(path.dirname(workspaceRoot))==='.worktrees'
+  ?path.resolve(workspaceRoot,'..','..')
+  :workspaceRoot
 export const LIFE_CONTENT_EVIDENCE_OUTPUT_DIRECTORY=path.join(
-  workspaceRoot,'项目管理','正式交付','D4-开发计划与工程准备','运行证据','D5-INF-01前端',
+  mainWorkspaceRoot,'项目管理','正式交付','D4-开发计划与工程准备','运行证据','D5-INF-01前端',
 )
 export const LIFE_CONTENT_QUALITY_MATRIX_FILE=path.join(
-  workspaceRoot,'项目管理','正式交付','D4-开发计划与工程准备','D5-INF-01生活资讯只读固定13项质量矩阵.md',
+  mainWorkspaceRoot,'项目管理','正式交付','D4-开发计划与工程准备','D5-INF-01生活资讯只读固定13项质量矩阵.md',
 )
 
 export const LIFE_CONTENT_IMPLEMENTATION_FILES=Object.freeze([

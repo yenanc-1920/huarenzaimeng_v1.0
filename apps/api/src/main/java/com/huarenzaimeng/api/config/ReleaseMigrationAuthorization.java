@@ -22,7 +22,9 @@ record ReleaseMigrationAuthorization(String authorizationRef, String runId, Stri
         if (expectedServerUuid == null || expectedServerUuid.isBlank()) fail();
         if (startState == null || allowedTarget == null
                 || (startState == StartState.PRE_V10 && allowedTarget != AllowedTarget.V12_VIA_V11)
-                || (startState == StartState.MID_V11 && allowedTarget != AllowedTarget.V12_ONLY)) fail();
+                || (startState == StartState.MID_V11 && allowedTarget != AllowedTarget.V12_ONLY)
+                || (startState == StartState.POST_V12 && allowedTarget != AllowedTarget.V14_VIA_V13)
+                || (startState == StartState.POST_V13 && allowedTarget != AllowedTarget.V14_ONLY)) fail();
         if (validFrom == null || validUntil == null || !validFrom.isBefore(validUntil)) fail();
     }
 
@@ -50,6 +52,6 @@ record ReleaseMigrationAuthorization(String authorizationRef, String runId, Stri
                              String restoreEvidenceSha256, String oracleManifestSha256,
                              String migrationInventorySha256) {}
 
-    enum StartState { PRE_V10, MID_V11 }
-    enum AllowedTarget { V12_VIA_V11, V12_ONLY }
+    enum StartState { PRE_V10, MID_V11, POST_V12, POST_V13 }
+    enum AllowedTarget { V12_VIA_V11, V12_ONLY, V14_VIA_V13, V14_ONLY }
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const navigateBack=()=>uni.navigateBack()
 import { ref } from 'vue'
 import { onHide, onLoad, onShow } from '@dcloudio/uni-app'
 import AppHeader from '../../components/AppHeader.vue'
@@ -48,7 +49,7 @@ onHide(()=>revokeReady('STALE'))
 
 <template>
   <view class="page life-page" data-page-id="UX-P043" data-authority-read-key="contentRef+contentVersion" data-reread-on="enter,return,foreground">
-    <AppHeader touch-safe left="返回列表" @left="uni.navigateBack()" />
+<AppHeader touch-safe left="返回列表" @left="navigateBack" />
     <view class="content detail-content">
       <view v-if="state==='LOADING'" class="detail-state loading" role="status" data-state="LOADING" data-body-visible="false" data-clear-old-body="true" data-retry-visible="false">
         <view class="large-state-symbol" aria-hidden="true"/><view class="state-heading" role="heading" aria-level="1">正在确认最新内容</view><text class="state-copy">旧内容已收起，请稍候。</text>
@@ -72,18 +73,16 @@ onHide(()=>revokeReady('STALE'))
         <text class="large-state-symbol">!</text><view class="state-heading" role="heading" aria-level="1">暂时无法读取</view><text class="state-copy">请重新读取，或先返回列表。</text><button class="readonly-retry" @click="loadDetail('USER_RETRY')">重新读取</button>
       </view>
 
-      <view v-else-if="item" class="published" data-state="PUBLISHED" data-body-visible="true" :data-cover-state="item.coverState" :data-cover-ref="item.coverState==='IMAGE_UNAVAILABLE'?'':undefined">
-        <view v-if="item.coverState==='IMAGE_UNAVAILABLE'" class="cover-fallback" role="img" aria-label="图片暂时无法显示"><text>图</text><text>图片暂时无法显示</text></view>
+      <view v-else-if="item" class="published" data-state="PUBLISHED" data-body-visible="true">
         <view class="article-body">
           <text class="eyebrow">{{categoryLabel(item.category)}}</text>
           <view class="article-title" role="heading" aria-level="1">{{item.title}}</view>
           <view class="article-meta"><text>来源类别：{{sourceTypeLabel(item.sourceType)}}</text><text>适用：{{item.applicableAudience}}</text><text>{{updatedLabel(item.updatedAt)}}</text></view>
           <text class="article-copy">{{item.body}}</text>
-          <view v-if="item.coverState==='IMAGE_UNAVAILABLE'" class="article-note">图片未加载，不影响阅读文字内容。</view>
         </view>
       </view>
     </view>
-    <view class="action"><button class="primary" @click="uni.navigateBack()">返回生活资讯</button></view>
+<view class="action"><button class="primary" @click="navigateBack">返回生活资讯</button></view>
   </view>
 </template>
 

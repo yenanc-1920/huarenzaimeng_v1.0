@@ -22,6 +22,8 @@ spring:
     validate-on-migrate: true
     baseline-on-migrate: false
 hz:
+  v1-dev-data:
+    enabled: false
   dev-function-release:
     enabled: ${HZ_DEV_FUNCTION_RELEASE_ENABLED:false}
   admin-auth:

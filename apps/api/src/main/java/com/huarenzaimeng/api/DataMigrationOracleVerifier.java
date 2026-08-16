@@ -14,7 +14,9 @@ public final class DataMigrationOracleVerifier {
     private static final String PRE_SHA = "B7AB11C95F9702221F00ED4E960D7E45598D73E480AEE503ADC5E1ECC8BE41C5";
     private static final String MID_SHA = "E648F2AC6214E418B2EA5973D5C5D1B3C850CBCCB132FDBE52AA50176355D01E";
     private static final String POST_SHA = "A0305BB9E506EA8CE1C6269D62C33D7EF92E203B993F30700D11017940770801";
-    public enum State { PRE_V10, MID_V11, POST_V12, NO_GO_PARTIAL_OR_DRIFT, NO_GO_ORACLE_UNAVAILABLE }
+    private static final String POST_V13_SHA = "A290F571C9C5AEF754D876163F7CF13563EA32AC06F43A2727FD0702788A8374";
+    private static final String POST_V14_SHA = "46F029604E188F67F9F5DBFB52A0A95AF68736D91533CF7D0CFC32472F0056A0";
+    public enum State { PRE_V10, MID_V11, POST_V12, POST_V13, POST_V14, NO_GO_PARTIAL_OR_DRIFT, NO_GO_ORACLE_UNAVAILABLE }
 
     private DataMigrationOracleVerifier() {}
 
@@ -43,6 +45,8 @@ public final class DataMigrationOracleVerifier {
         if (phaseSha("PRE_V10", 10, actual).equals(PRE_SHA)) return State.PRE_V10;
         if (phaseSha("MID_V11", 11, actual).equals(MID_SHA)) return State.MID_V11;
         if (phaseSha("POST_V12", 12, actual).equals(POST_SHA)) return State.POST_V12;
+        if (phaseSha("POST_V13", 13, actual).equals(POST_V13_SHA)) return State.POST_V13;
+        if (phaseSha("POST_V14", 14, actual).equals(POST_V14_SHA)) return State.POST_V14;
         return State.NO_GO_PARTIAL_OR_DRIFT;
     }
 

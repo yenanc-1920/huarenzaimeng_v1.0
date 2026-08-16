@@ -1,5 +1,4 @@
 import type { A110AllowedAction, A110PageProjection, A110ServerViewState, AdminDataMode, AdminPageProjection, AdminReadState, AdminRole, PageId, ReconciliationFactCode, ReconciliationFactState, ReconciliationFinanceSummary, ReconciliationSupportSummary } from '../domain/admin.ts'
-import { getSyntheticA110Response, getSyntheticProjection } from '../data/synthetic.ts'
 
 export const ADMIN_READ_PROXY_PATH = '/admin-read/v1/pages'
 export const A110_READ_PROXY_PATH = '/admin-read/v1/reconciliations'
@@ -18,14 +17,11 @@ const isRfc3339 = (value: unknown): value is string => isNonEmptyString(value) &
 const isNullableRfc3339 = (value: unknown) => value === null || isRfc3339(value)
 
 const itemKeyMap = {
-  'A100:CS': ['supportRef', 'subjectLabel', 'statusLabel', 'maskedPhone', 'nextReviewLabel', 'noteStatusLabel', 'escalationStatusLabel'],
+  'A120:SUPER_ADMIN': ['contentRef', 'title', 'sourceLabel', 'reviewLabel', 'complaintLabel', 'visibilityLabel', 'ownerLabel', 'historyLabel', 'removalLabel'],
   'A120:CONTENT': ['contentRef', 'title', 'sourceLabel', 'reviewLabel', 'complaintLabel', 'visibilityLabel', 'ownerLabel', 'historyLabel', 'removalLabel'],
-  'A121:CONTENT': ['contentRef', 'title', 'summary', 'category', 'sourceLabel', 'statusLabel', 'versionLabel', 'verifiedAtLabel', 'validUntilLabel', 'updatedAtLabel'],
-  'A122:CONTENT': ['contentRef', 'title', 'summary', 'category', 'sourceLabel', 'statusLabel', 'versionLabel', 'verifiedAtLabel', 'validUntilLabel', 'updatedAtLabel'],
-  'A130:CONTENT': ['catalogRef', 'displayName', 'operatorLabel', 'categoryLabel', 'contentStatusLabel', 'saleReviewLabel'],
-  'A130:FIN': ['catalogRef', 'displayName', 'denominationLabel', 'currencyLabel', 'priceCostCandidateLabel', 'validityLabel', 'supportBatchLabel', 'financeReviewLabel'],
+  'A140:SUPER_ADMIN': ['orderRef', 'maskedPhone', 'userStatusLabel', 'totalLabel', 'updatedLabel'],
   'A140:CS': ['orderRef', 'maskedPhone', 'userStatusLabel', 'totalLabel', 'updatedLabel'],
-  'A140:FIN': ['orderRef', 'refundLayerLabel', 'factStatusLabel', 'totalLabel', 'agingLabel'],
+  'A140:FIN': ['orderRef', 'maskedPhone', 'userStatusLabel', 'totalLabel', 'updatedLabel'],
 } as const
 
 type ProjectionVariant = keyof typeof itemKeyMap
@@ -103,22 +99,23 @@ function finViewStateMatches(viewState: A110ServerViewState, items: Reconciliati
   return viewState === derived
 }
 
-const a110Unavailable = (message: string): AdminReadState => ({ status: 'UNAVAILABLE', data: null, message })
-const a110Denied = (message: string, denialKind: 'ROLE_DENIED' | 'AUTHORITY_UNAVAILABLE'): AdminReadState => ({ status: 'ACCESS_DENIED', data: null, message, denialKind })
+const a110Unavailable = (message: string) => ({ status: 'UNAVAILABLE' as const, data: null, message })
+const a110Denied = (message: string, denialKind: 'ROLE_DENIED' | 'AUTHORITY_UNAVAILABLE') => ({ status: 'ACCESS_DENIED' as const, data: null, message, denialKind })
 
-export function parseA110ReadResponse(value: unknown, expectedSyntheticRole?: AdminRole): AdminReadState {
+type LegacyA110ReadState = Exclude<AdminReadState, { status: 'READY' }> | { status: 'READY'; data: A110PageProjection; message: string }
+export function parseA110ReadResponse(value: unknown): LegacyA110ReadState {
   if (!isRecord(value) || !exactKeys(value, A110_ROOT_KEYS) || !isNonEmptyString(value.requestRef)
     || value.schemaVersion !== 'A110_RECONCILIATION_READ_V1' || !A110_VIEW_STATES.includes(value.viewState as A110ServerViewState)
     || value.projectCode !== `A110_${String(value.viewState)}` || !['FIN', 'CS', null].includes(value.roleProjection as 'FIN' | 'CS' | null)
     || !['NONE', 'USER_INITIATED_READ_ONLY'].includes(String(value.retryClass)) || !Array.isArray(value.items)
-    || !uniqueAllowedStrings(value.allowedActions, A110_ACTIONS)) return a110Unavailable('悬账与冲突只读响应不符合约定')
+    || !uniqueAllowedStrings(value.allowedActions, A110_ACTIONS)) return a110Unavailable('交易差异只读响应不符合约定')
 
   const viewState = value.viewState as A110ServerViewState
   const allowedActions = value.allowedActions as A110AllowedAction[]
   const denied = A110_DENIED_STATES.includes(viewState)
   if (denied) {
     if (value.roleProjection !== null || value.roleBindingVersion !== null || value.authorizationDecisionVersion !== null || value.projectionVersion !== null
-      || value.items.length !== 0 || allowedActions.length !== 0) return a110Unavailable('悬账与冲突拒绝响应不符合约定')
+      || value.items.length !== 0 || allowedActions.length !== 0) return a110Unavailable('交易差异拒绝响应不符合约定')
     return viewState === 'ACCESS_DENIED'
       ? a110Denied('当前无法访问此页面', 'ROLE_DENIED')
       : a110Denied('当前无法安全显示，请重新进入', 'AUTHORITY_UNAVAILABLE')
@@ -126,21 +123,21 @@ export function parseA110ReadResponse(value: unknown, expectedSyntheticRole?: Ad
 
   if (['READ_ERROR', 'UNAVAILABLE', 'VERSION_CONFLICT'].includes(viewState)) {
     if (value.roleProjection !== null || value.roleBindingVersion !== null || value.authorizationDecisionVersion !== null || value.projectionVersion !== null
-      || value.items.length !== 0 || allowedActions.length !== 1 || allowedActions[0] !== 'READ_REFRESH') return a110Unavailable('悬账与冲突失败响应不符合约定')
-    const message = viewState === 'VERSION_CONFLICT' ? '当前信息已变化，请重新读取' : '暂时无法读取悬账与冲突数据'
+      || value.items.length !== 0 || allowedActions.length !== 1 || allowedActions[0] !== 'READ_REFRESH') return a110Unavailable('交易差异失败响应不符合约定')
+    const message = viewState === 'VERSION_CONFLICT' ? '当前信息已变化，请重新读取' : '暂时无法读取交易差异数据'
     return a110Unavailable(message)
   }
 
   if (!['FIN', 'CS'].includes(String(value.roleProjection)) || !isNonEmptyString(value.roleBindingVersion)
     || !isNonEmptyString(value.authorizationDecisionVersion) || !Number.isSafeInteger(value.projectionVersion) || Number(value.projectionVersion) <= 0
-    || (expectedSyntheticRole && value.roleProjection !== expectedSyntheticRole)) return a110Unavailable('悬账与冲突授权投影不符合约定')
+    ) return a110Unavailable('交易差异授权投影不符合约定')
 
-  if ((viewState === 'EMPTY' && value.items.length !== 0) || (A110_DATA_STATES.includes(viewState) && value.items.length === 0)) return a110Unavailable('悬账与冲突状态和记录数量不一致')
+  if ((viewState === 'EMPTY' && value.items.length !== 0) || (A110_DATA_STATES.includes(viewState) && value.items.length === 0)) return a110Unavailable('交易差异状态和记录数量不一致')
   const parsedItems = value.roleProjection === 'FIN' ? value.items.map(parseA110FinanceItem) : value.items.map(parseA110SupportItem)
-  if (parsedItems.some((item) => !item)) return a110Unavailable('悬账与冲突职责字段不符合约定')
-  if (parsedItems.some((item) => item!.projectionVersion !== value.projectionVersion)) return a110Unavailable('悬账与冲突版本不一致')
+  if (parsedItems.some((item) => !item)) return a110Unavailable('交易差异职责字段不符合约定')
+  if (parsedItems.some((item) => item!.projectionVersion !== value.projectionVersion)) return a110Unavailable('交易差异版本不一致')
   if (value.roleProjection === 'FIN' && A110_DATA_STATES.includes(viewState)
-    && !finViewStateMatches(viewState, parsedItems as ReconciliationFinanceSummary[])) return a110Unavailable('悬账与冲突状态和事实不一致')
+    && !finViewStateMatches(viewState, parsedItems as ReconciliationFinanceSummary[])) return a110Unavailable('交易差异状态和事实不一致')
 
   const projection = { ...value, pageId: 'A110', items: parsedItems } as unknown as A110PageProjection
   return { status: 'READY', data: projection, message: viewState === 'EMPTY' ? '当前可查看范围没有待显示差异' : '已读取当前只读差异' }
@@ -151,7 +148,47 @@ export const parseAdminPageProjection = (value: unknown, requestedPage: PageId):
   if (value.schemaVersion !== 'ADMIN_READ_V1' || value.pageId !== requestedPage || !isNonEmptyString(value.projectionVersion)) return null
   if (!Array.isArray(value.items)) return null
 
+  if (['SUPER_ADMIN', 'FIN', 'CS'].includes(String(value.role)) && value.pageId === 'A110') {
+    const keys = ['reconciliationRef', 'orderRef', 'differenceType', 'amount', 'currency', 'state', 'ownerRef', 'discoveredAt', 'updatedAt'] as const
+    const valid = value.items.every((item) => isRecord(item) && exactKeys(item, keys)
+      && ['reconciliationRef', 'orderRef', 'differenceType', 'currency', 'state', 'discoveredAt', 'updatedAt'].every(key => isNonEmptyString(item[key]))
+      && typeof item.amount === 'number' && (item.ownerRef === null || isNonEmptyString(item.ownerRef)))
+    return valid ? value as unknown as AdminPageProjection : null
+  }
+
   const variant = `${String(value.pageId)}:${String(value.role)}` as ProjectionVariant
+  if (['SUPER_ADMIN', 'CS'].includes(String(value.role)) && value.pageId === 'A100') {
+    const keys = ['caseRef', 'sourceType', 'issueType', 'relatedOrderRef', 'priorityCode', 'ownerRef', 'state', 'updatedAt'] as const
+    const valid = value.items.every((item) => isRecord(item) && exactKeys(item, keys)
+      && ['caseRef', 'sourceType', 'issueType', 'priorityCode', 'state', 'updatedAt'].every(key => isNonEmptyString(item[key]))
+      && (item.relatedOrderRef === null || isNonEmptyString(item.relatedOrderRef)) && (item.ownerRef === null || isNonEmptyString(item.ownerRef)))
+    return valid ? value as unknown as AdminPageProjection : null
+  }
+  if (['SUPER_ADMIN', 'CONTENT'].includes(String(value.role)) && value.pageId === 'A121') {
+    const keys = ['entryRef', 'cityRef', 'cityName', 'category', 'name', 'summary', 'localAddress', 'phone', 'sourceRef', 'verifiedAt', 'validUntil', 'version', 'state', 'updatedAt'] as const
+    const valid = value.items.every((item) => isRecord(item) && exactKeys(item, keys)
+      && keys.filter(key => key !== 'version').every(key => isNonEmptyString(item[key])) && Number.isSafeInteger(item.version) && Number(item.version) > 0)
+    return valid ? value as unknown as AdminPageProjection : null
+  }
+  if (['SUPER_ADMIN', 'CONTENT'].includes(String(value.role)) && value.pageId === 'A122') {
+    const keys = ['objectType', 'objectRef', 'countryCode', 'category', 'title', 'summary', 'bodyText', 'sourceRef', 'editor', 'publishAt', 'startDate', 'endDate', 'weekendDays', 'effectiveFrom', 'effectiveUntil', 'validUntil', 'version', 'state', 'updatedAt'] as const
+    const nullable = ['countryCode', 'summary', 'bodyText', 'editor', 'publishAt', 'startDate', 'endDate', 'weekendDays', 'effectiveFrom', 'effectiveUntil'] as const
+    const valid = value.items.every((item) => isRecord(item) && exactKeys(item, keys) && ['HOLIDAY', 'NEWS'].includes(String(item.objectType))
+      && ['objectRef', 'category', 'title', 'sourceRef', 'validUntil', 'state', 'updatedAt'].every(key => isNonEmptyString(item[key]))
+      && nullable.every(key => item[key] === null || isNonEmptyString(item[key])) && Number.isSafeInteger(item.version) && Number(item.version) > 0)
+    return valid ? value as unknown as AdminPageProjection : null
+  }
+  if (['SUPER_ADMIN', 'CONTENT'].includes(String(value.role)) && value.pageId === 'A130') {
+    const keys = ['productRef', 'operatorCode', 'productType', 'displayName', 'benefitText', 'denominationBdt', 'validityText', 'providerCode', 'providerSku', 'countryCode', 'dataAllowanceMb', 'voiceMinutes', 'smsCount', 'channelPriority', 'phoneRule', 'saleStartAt', 'saleEndAt', 'catalogBatchRef', 'rawSkuName', 'rawBenefitText', 'supplierCost', 'settlementCurrency', 'supplierAvailability', 'catalogSyncedAt', 'normalizedType', 'normalizedOperator', 'mappingState', 'mappingFailureReason', 'state', 'version', 'priceVersionRef', 'finalAmountCny', 'fxSource', 'fxSnapshotRef', 'priceState', 'effectiveFrom', 'effectiveUntil', 'priceVersion', 'priceSupplierCost', 'priceSettlementCurrency', 'fxDirection', 'fxRate', 'fxUpdatedAt', 'fxValidUntil', 'bufferRate', 'markupRate', 'wechatFeeRate', 'taxRate', 'minimumMarginRate', 'roundingRule', 'promotionBearer', 'pricingScope'] as const
+    const nullableStrings = ['validityText', 'phoneRule', 'saleStartAt', 'saleEndAt', 'catalogBatchRef', 'rawSkuName', 'rawBenefitText', 'settlementCurrency', 'supplierAvailability', 'catalogSyncedAt', 'normalizedType', 'normalizedOperator', 'mappingState', 'mappingFailureReason', 'priceVersionRef', 'fxSource', 'fxSnapshotRef', 'priceState', 'effectiveFrom', 'effectiveUntil', 'priceSettlementCurrency', 'fxDirection', 'fxUpdatedAt', 'fxValidUntil', 'roundingRule', 'promotionBearer', 'pricingScope'] as const
+    const nullableNumbers = ['denominationBdt', 'dataAllowanceMb', 'voiceMinutes', 'smsCount', 'supplierCost', 'finalAmountCny', 'priceSupplierCost', 'fxRate', 'bufferRate', 'markupRate', 'wechatFeeRate', 'taxRate', 'minimumMarginRate'] as const
+    const valid = value.items.every((item) => isRecord(item) && exactKeys(item, keys)
+      && ['productRef', 'operatorCode', 'productType', 'displayName', 'benefitText', 'providerCode', 'providerSku', 'countryCode', 'state'].every(key => isNonEmptyString(item[key]))
+      && nullableStrings.every(key => item[key] === null || isNonEmptyString(item[key]))
+      && nullableNumbers.every(key => item[key] === null || typeof item[key] === 'number')
+      && Number.isSafeInteger(item.channelPriority) && Number(item.channelPriority) >= 0 && Number.isSafeInteger(item.version) && Number(item.version) > 0 && (item.priceVersion === null || (Number.isSafeInteger(item.priceVersion) && Number(item.priceVersion) > 0)))
+    return valid ? value as unknown as AdminPageProjection : null
+  }
   const itemKeys = itemKeyMap[variant]
   if (!itemKeys) return null
   if (!value.items.every((item) => isRecord(item) && exactKeys(item, itemKeys) && itemKeys.every((key) => isNonEmptyString(item[key])))) return null
@@ -159,28 +196,18 @@ export const parseAdminPageProjection = (value: unknown, requestedPage: PageId):
   return value as unknown as AdminPageProjection
 }
 
-export const resolveAdminDataMode = (value: unknown, allowBuiltinSynthetic = false): AdminDataMode | null => {
-  if (value === undefined || value === '') return allowBuiltinSynthetic ? 'BUILTIN_SYNTHETIC' : null
-  if (value === 'BUILTIN_SYNTHETIC') return allowBuiltinSynthetic ? value : null
-  return value === 'PROJECT_API_PROXY' ? value : null
+export const resolveAdminDataMode = (value: unknown): AdminDataMode | null => {
+  if (value === undefined || value === '' || value === 'PROJECT_API_PROXY') return 'PROJECT_API_PROXY'
+  return null
 }
 
 export async function loadAdminPage(
   mode: AdminDataMode,
   pageId: PageId,
-  syntheticRole: AdminRole,
   transport: AdminTransport = fetch,
 ): Promise<AdminReadState> {
-  if (mode === 'BUILTIN_SYNTHETIC') {
-    if (pageId === 'A110') return parseA110ReadResponse(getSyntheticA110Response(syntheticRole, syntheticRole === 'CONTENT' ? 'ACCESS_DENIED' : 'READY'), syntheticRole)
-    const projection = getSyntheticProjection(pageId, syntheticRole)
-    return projection
-      ? { status: 'READY', data: projection, message: '当前展示示例数据' }
-      : { status: 'ACCESS_DENIED', data: null, message: '当前无法访问此页面', denialKind: 'ROLE_DENIED' }
-  }
-
   try {
-    const response = await transport(pageId === 'A110' ? A110_READ_PROXY_PATH : `${ADMIN_READ_PROXY_PATH}/${pageId}`, {
+    const response = await transport(`${ADMIN_READ_PROXY_PATH}/${pageId}`, {
       method: 'GET',
       credentials: 'include',
       headers: { Accept: 'application/json' },
@@ -195,7 +222,6 @@ export async function loadAdminPage(
     if (!response.ok) return { status: 'UNAVAILABLE', data: null, message: '后台只读服务暂不可用' }
 
     const body = await response.json()
-    if (pageId === 'A110') return parseA110ReadResponse(body)
     const parsed = parseAdminPageProjection(body, pageId)
     if (!parsed) return { status: 'UNAVAILABLE', data: null, message: '后台只读响应不符合约定' }
     return { status: 'READY', data: parsed, message: '已读取受信后台代理数据' }

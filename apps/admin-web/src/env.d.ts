@@ -6,7 +6,7 @@ declare module '*.vue' {
 }
 
 interface ImportMetaEnv {
-  readonly VITE_ADMIN_DATA_MODE?: 'BUILTIN_SYNTHETIC' | 'PROJECT_API_PROXY'
+  readonly VITE_ADMIN_DATA_MODE?: 'PROJECT_API_PROXY'
   readonly VITE_ADMIN_REENTRY_PATH?: string
   readonly VITE_ICP_FILING?: string
   readonly VITE_PUBLIC_SECURITY_FILING?: string

@@ -38,7 +38,7 @@ class ReleaseFlywayMigrationRunnerTest {
             fixture.runner().execute();
         }
         assertThat(fixture.stages().targets).containsExactly("11", "12");
-        assertThat(fixture.state().phase()).isEqualTo(ReleaseMigrationState.Phase.READY);
+        assertThat(fixture.state().phase()).isEqualTo(ReleaseMigrationState.Phase.MIGRATING);
         assertThat(Files.readString(fixture.marker())).isEqualTo("SUCCEEDED\n");
     }
 
@@ -51,6 +51,18 @@ class ReleaseFlywayMigrationRunnerTest {
             fixture.runner().execute();
         }
         assertThat(fixture.stages().targets).containsExactly("12");
+        assertThat(fixture.state().phase()).isEqualTo(ReleaseMigrationState.Phase.MIGRATING);
+    }
+
+    @Test void postV12NewAuthorizationRunsV13ThenV14AndOnlyV14OpensGate() throws Exception {
+        Fixture fixture=fixture("RUN-000014",NOW.minusSeconds(1),NOW.plusSeconds(60),identity(),
+                ReleaseMigrationAuthorization.StartState.POST_V12,
+                ReleaseMigrationAuthorization.AllowedTarget.V14_VIA_V13);
+        try(var oracle=oracle(DataMigrationOracleVerifier.State.POST_V12,
+                DataMigrationOracleVerifier.State.POST_V13,DataMigrationOracleVerifier.State.POST_V14)){
+            fixture.runner().execute();
+        }
+        assertThat(fixture.stages().targets).containsExactly("13","14");
         assertThat(fixture.state().phase()).isEqualTo(ReleaseMigrationState.Phase.READY);
     }
 
@@ -129,7 +141,7 @@ class ReleaseFlywayMigrationRunnerTest {
         try (var oracle = oracle(DataMigrationOracleVerifier.State.POST_V12)) {
             new ReleaseMigrationReadyVerifier(store, identityProvider(identity()), new FakeStages(), restartedState).run(null);
         }
-        assertThat(restartedState.phase()).isEqualTo(ReleaseMigrationState.Phase.READY);
+        assertThat(restartedState.phase()).isEqualTo(ReleaseMigrationState.Phase.MIGRATING);
     }
 
     @Test void forgedCrossProcessReadyNeverOpensGate() throws Exception {

@@ -11,6 +11,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AdminReadServiceTest {
@@ -26,21 +28,51 @@ class AdminReadServiceTest {
         when(content.internalList()).thenReturn(new ContentPage<>(List.of(item), 1));
         AdminReadService.AdminProjection result = service.read("A120");
         assertThat(result.schemaVersion()).isEqualTo("ADMIN_READ_V1");
-        assertThat(result.role()).isEqualTo("CONTENT");
+        assertThat(result.role()).isEqualTo("SUPER_ADMIN");
         assertThat((List<?>) result.items()).hasSize(1);
         assertThat(((AdminReadService.A120Item) ((List<?>) result.items()).get(0)).visibilityLabel()).isEqualTo("可展示");
     }
 
-    @Test void catalogProjectionIsFinanceReadOnlyAndBounded() {
-        when(mapper.selectAdminCatalog()).thenReturn(List.of(Map.ofEntries(
-                Map.entry("catalog_version", 7L), Map.entry("operator_code", "BD-OP"), Map.entry("product_ref", "P-1"),
-                Map.entry("denomination_ref", "D-100"), Map.entry("item_kind", "PRESET"), Map.entry("amount_minor", 10000L),
-                Map.entry("currency", "BDT"), Map.entry("item_state", "ACTIVE"), Map.entry("catalog_ref", "CAT-7"),
-                Map.entry("catalog_state", "ACTIVE"), Map.entry("expires_at", Timestamp.from(now.plusSeconds(86400))),
-                Map.entry("batch_ref", "BATCH-7"), Map.entry("batch_state", "ACTIVE"), Map.entry("qualification_known", 1))));
+    @Test void productProjectionReturnsCurrentAdminReadSchemaWithoutLegacyTransformation() {
+        Map<String,Object> product=Map.ofEntries(
+                Map.entry("productRef","P-1"),Map.entry("countryCode","BD"),Map.entry("operatorCode","ROBI"),
+                Map.entry("productType","DATA"),Map.entry("displayName","Robi 5GB"),Map.entry("benefitText","5GB"),
+                Map.entry("channelPriority",10),Map.entry("state","ENABLED"),Map.entry("version",1L));
+        when(mapper.selectPlatformProducts()).thenReturn(List.of(product));
         AdminReadService.AdminProjection result = service.read("A130");
-        assertThat(result.role()).isEqualTo("FIN");
-        assertThat(((AdminReadService.A130FinanceItem) ((List<?>) result.items()).get(0)).denominationLabel()).isEqualTo("BDT 100.00");
+        assertThat(result.role()).isEqualTo("SUPER_ADMIN");
+        assertThat(((List<?>)result.items()).get(0)).isEqualTo(product);
+        verify(mapper,never()).selectAdminCatalog();
+    }
+
+    @Test void a130EmptyProductsKeepsCurrentSchemaAndNeverFallsBackToLegacyCatalog() {
+        when(mapper.selectPlatformProducts()).thenReturn(List.of());
+        AdminReadService.AdminProjection result=service.read("A130");
+        assertThat(result.schemaVersion()).isEqualTo("ADMIN_READ_V1");
+        assertThat(result.pageId()).isEqualTo("A130");
+        assertThat((List<?>)result.items()).isEmpty();
+        verify(mapper,never()).selectAdminCatalog();
+    }
+
+    @Test void a120IncludesPersistedDirectoryReports() {
+        when(content.internalList()).thenReturn(new ContentPage<>(List.of(),0));
+        when(mapper.selectDirectoryReports()).thenReturn(List.of(Map.ofEntries(
+                Map.entry("reportRef","DR-1"),Map.entry("entryRef","DIR-1"),Map.entry("reasonCode","INCORRECT_INFO"),
+                Map.entry("description",""),Map.entry("state","OPEN"),Map.entry("createdAt",Timestamp.from(now)))));
+        AdminReadService.AdminProjection result=service.read("A120");
+        assertThat((List<?>)result.items()).singleElement().satisfies(item -> {
+            assertThat(item).isInstanceOf(AdminReadService.A120Item.class);
+            AdminReadService.A120Item report=(AdminReadService.A120Item)item;
+            assertThat(report.contentRef()).isEqualTo("DR-1");
+            assertThat(report.title()).isEqualTo("黄页反馈：DIR-1 / 信息不准确");
+            assertThat(report.sourceLabel()).isEqualTo("黄页用户反馈");
+            assertThat(report.reviewLabel()).isEqualTo("OPEN");
+            assertThat(report.complaintLabel()).isEqualTo("未补充说明");
+            assertThat(report.visibilityLabel()).isEqualTo("不直接修改公开内容");
+            assertThat(report.ownerLabel()).isEqualTo("待内容运营核验");
+            assertThat(report.historyLabel()).isEqualTo(now.toString());
+            assertThat(report.removalLabel()).isEqualTo("核验后处理");
+        });
     }
 
     @Test void directoryAndNewsPagesExposeFullStoredContentByCategory() {
@@ -72,7 +104,7 @@ class AdminReadServiceTest {
     }
 
     @Test void unsupportedPagesStayUnavailableInsteadOfReturningSyntheticEmptyData() {
-        assertThat(service.read("A100")).isNull();
-        assertThat(service.read("A110")).isNull();
+        assertThat(service.read("A100")).isNotNull();
+        assertThat(service.read("A110")).isNotNull();
     }
 }

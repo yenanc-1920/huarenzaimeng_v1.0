@@ -44,7 +44,7 @@ final class ReleaseMigrationReadyVerifier implements ApplicationRunner {
                         .equals(ready.get("consumptionSha256"))) return;
             try (var connection = stages.openConnection()) {
                 if (DataMigrationOracleVerifier.verify(connection, identity.databaseName(), identity.expectedServerUuid())
-                        != DataMigrationOracleVerifier.State.POST_V12) return;
+                        != DataMigrationOracleVerifier.State.POST_V14) return;
             }
             state.ready();
         } catch (Exception unavailableOrDrift) {

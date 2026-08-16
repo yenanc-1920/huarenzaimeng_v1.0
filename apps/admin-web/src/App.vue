@@ -9,15 +9,12 @@ import AdminWorkspace from './components/AdminWorkspace.vue'
 import AdminInitialization from './components/AdminInitialization.vue'
 import LoginRequired from './components/LoginRequired.vue'
 import ReadUnavailable from './components/ReadUnavailable.vue'
-import P021AdminOrderDetail from './components/P021AdminOrderDetail.vue'
 import AdminOrderSandboxDetail from './components/AdminOrderSandboxDetail.vue'
-import type { AdminReadState, AdminRole, PageId } from './domain/admin'
+import type { AdminReadState, PageId } from './domain/admin'
 
-const activePage = ref<PageId>('A120')
+const activePage = ref<PageId>('A130')
 const isInitializationRoute = window.location.pathname.replace(/\/+$/, '') === '/admin/initialize'
-const previewRole = ref<AdminRole>('CS')
-const localA110VisualState = ref<{ role: AdminRole; state: AdminReadState | null } | null>(null)
-const resolvedMode = resolveAdminDataMode(import.meta.env.VITE_ADMIN_DATA_MODE, import.meta.env.DEV)
+const resolvedMode = resolveAdminDataMode(import.meta.env.VITE_ADMIN_DATA_MODE)
 const readState = ref<AdminReadState>({ status: 'LOADING', data: null, message: '正在读取只读数据' })
 const authResolved = ref(false)
 const loggingOut = ref(false)
@@ -25,47 +22,23 @@ const selectedOrderRef = ref<string | null>(null)
 const icpFiling = import.meta.env.VITE_ICP_FILING?.trim() || 'ICP备案号待补充（开发样例）'
 const publicSecurityFiling = import.meta.env.VITE_PUBLIC_SECURITY_FILING?.trim() || '公安备案号待补充（开发样例）'
 const readController = createAdminReadController((state) => { readState.value = state })
-const p021ItEntry = (() => {
-  if (!import.meta.env.DEV) return null
-  const query = new URLSearchParams(window.location.search)
-  const role = query.get('p021ItRole')
-  const orderRef = query.get('p021ItOrderRef')
-  return orderRef && (role === 'CS' || role === 'FIN' || role === 'CONTENT') ? { orderRef, role: role as 'CS' | 'FIN' | 'CONTENT' } : null
-})()
-
-if (import.meta.env.DEV) {
-  void import('../scripts/a110-visual-fixture-entry').then(({ resolveA110VisualScenario }) => {
-    const scenario = resolveA110VisualScenario(window.location.search)
-    if (!scenario) return
-    localA110VisualState.value = scenario
-    previewRole.value = scenario.role
-    activePage.value = 'A110'
-  })
-}
-
 const pages: Array<{ id: PageId; label: string; description: string }> = [
-  { id: 'A120', label: '审核中心', description: '查看来源、责任、历史版本、投诉和上下架状态' },
-  { id: 'A121', label: '黄页管理', description: '查看黄页条目的完整摘要、类别、来源、版本和有效期' },
-  { id: 'A122', label: '资讯管理', description: '查看生活提醒与节日资讯的完整摘要和发布信息' },
-  { id: 'A130', label: '商品与运营商', description: '按职责查看互斥的目录或财务候选字段' },
-  { id: 'A140', label: '订单与退款', description: '按职责查看互斥的客服或财务只读摘要' },
+  { id: 'A100', label: '客服案件', description: '跟进本地开发库中的客服案件，不改写交易事实' },
+  { id: 'A110', label: '交易差异', description: '核对支付、充值和退款差异，禁止重充和手工改终态' },
+  { id: 'A120', label: '内容审核', description: '审核黄页、节假日和资讯版本，不编辑业务正文' },
+  { id: 'A121', label: '黄页管理', description: '维护城市和机构的结构化文字资料，V1不含图片' },
+  { id: 'A122', label: '节假日与资讯', description: '维护周休、节假日和纯文字生活资讯，V1不含图片' },
+  { id: 'A130', label: '商品、渠道与定价', description: '管理本地预置商品和价格；供应商同步保持不可达' },
+  { id: 'A140', label: '订单与退款', description: '只读查看订单、支付、充值和退款事实' },
 ]
-const roleLabels: Record<AdminRole, string> = { CS: '客服职责', CONTENT: '内容职责', FIN: '财务职责' }
 const activeMeta = computed(() => pages.find(({ id }) => id === activePage.value)!)
-const isSynthetic = computed(() => resolvedMode === 'BUILTIN_SYNTHETIC')
 const visibleRoleLabel = computed(() => {
-  if (readState.value.status === 'READY') {
-    const role = readState.value.data.pageId === 'A110' ? readState.value.data.roleProjection : readState.value.data.role
-    return roleLabels[role]
-  }
-  return isSynthetic.value ? roleLabels[previewRole.value] : '受信职责待确认'
+  const state = readState.value
+  if (state.status !== 'READY') return '登录角色'
+  return state.data.pageId === 'A110' ? `${state.data.role} 只读投影` : state.data.role
 })
 const showHeaderRefresh = computed(() => {
-  if (activePage.value !== 'A110') return true
-  if (readState.value.status === 'LOADING' || readState.value.status === 'UNAUTHENTICATED' || readState.value.status === 'ACCESS_DENIED') return false
-  if (readState.value.status === 'UNAVAILABLE') return true
-  const data = readState.value.data
-  return data.pageId === 'A110' && data.allowedActions.includes('READ_REFRESH')
+  return readState.value.status !== 'LOADING' && readState.value.status !== 'UNAUTHENTICATED' && readState.value.status !== 'ACCESS_DENIED'
 })
 
 watch(readState, (state) => {
@@ -93,13 +66,7 @@ async function logout() {
 }
 
 async function refresh() {
-  if (localA110VisualState.value && activePage.value === 'A110' && resolvedMode === 'BUILTIN_SYNTHETIC') {
-    readState.value = { status: 'LOADING', data: null, message: '正在读取只读数据' }
-    if (localA110VisualState.value.state === null) return
-    readState.value = localA110VisualState.value.state
-    return
-  }
-  await readController.refresh({ mode: resolvedMode, pageId: activePage.value, syntheticRole: previewRole.value })
+  await readController.refresh({ mode: resolvedMode, pageId: activePage.value })
 }
 
 function safeNavigate(pageId: 'A100' | 'A140') {
@@ -110,14 +77,11 @@ function selectOrder(orderRef: string) {
   selectedOrderRef.value = orderRef
 }
 
-watch([activePage, () => (isSynthetic.value ? previewRole.value : 'TRUSTED_ROLE')], refresh, { immediate: true })
+watch(activePage, refresh, { immediate: true })
 </script>
 
 <template>
   <AdminInitialization v-if="isInitializationRoute" />
-  <main v-else-if="p021ItEntry" class="workspace p021-it-entry" data-it-entry="P021-ADMIN" :data-it-role="p021ItEntry.role">
-    <P021AdminOrderDetail :order-ref="p021ItEntry.orderRef" :role="p021ItEntry.role" />
-  </main>
   <LoginRequired v-else-if="!authResolved && readState.status === 'UNAUTHENTICATED'" class="standalone-login" @authenticated="authenticated" />
   <main v-else-if="!authResolved" class="auth-check" data-read-state="AUTH_CHECK" role="status" aria-live="polite">
     <img :src="logoUrl" alt="华人在孟">
@@ -129,13 +93,10 @@ watch([activePage, () => (isSynthetic.value ? previewRole.value : 'TRUSTED_ROLE'
     <header class="topbar">
       <div class="brand"><img :src="logoUrl" alt="华人在孟"><div><strong>华人在孟</strong><span>运营后台只读页面</span></div></div>
       <div class="topbar-actions">
-        <span class="environment">{{ isSynthetic ? '界面预览' : '内部试用' }}</span>
-        <span v-if="!isSynthetic" class="data-origin">试用数据库数据</span>
-        <label v-if="isSynthetic">查看职责
-          <select v-model="previewRole" aria-label="选择界面查看职责"><option value="CS">客服职责</option><option value="CONTENT">内容职责</option><option value="FIN">财务职责</option></select>
-        </label>
-        <span v-else class="trusted-role">{{ visibleRoleLabel }}</span>
-        <button v-if="!isSynthetic" class="logout-button" type="button" :disabled="loggingOut" @click="logout">{{ loggingOut ? '退出中' : '退出登录' }}</button>
+        <span class="environment">开发环境</span>
+        <span class="data-origin">本地数据库预置数据</span>
+        <span class="trusted-role">{{ visibleRoleLabel }}</span>
+        <button class="logout-button" type="button" :disabled="loggingOut" @click="logout">{{ loggingOut ? '退出中' : '退出登录' }}</button>
       </div>
     </header>
 
@@ -145,8 +106,8 @@ watch([activePage, () => (isSynthetic.value ? previewRole.value : 'TRUSTED_ROLE'
         <button v-for="page in pages" :key="page.id" :class="['nav-item', { active: activePage === page.id }]" :aria-current="activePage === page.id ? 'page' : undefined" @click="activePage = page.id">
           <span>{{ page.label }}</span>
         </button>
-        <div class="sidebar-pending"><strong>后续开放</strong><span>客服案件、悬账与冲突仍在建设中，本版本不展示占位数据。</span></div>
-        <div class="sidebar-foot"><strong>当前为只读界面</strong><span>实际可查看范围需重新确认，页面暂不支持修改。</span></div>
+        <div class="sidebar-pending"><strong>真实接口边界</strong><span>页面不读取 Mock 或合成数据；外部供应商目录同步、充值和余额操作当前不可达。</span></div>
+        <div class="sidebar-foot"><strong>开发库操作</strong><span>新增、编辑和启停仅作用于本地开发库预置记录，并保留版本与审计。</span></div>
       </nav>
 
       <main class="workspace">
@@ -155,7 +116,7 @@ watch([activePage, () => (isSynthetic.value ? previewRole.value : 'TRUSTED_ROLE'
           <div class="heading-actions"><button v-if="showHeaderRefresh" class="secondary" :disabled="readState.status === 'LOADING'" @click="refresh">{{ readState.status === 'LOADING' ? '读取中' : '重新读取' }}</button><button disabled>暂不支持修改</button></div>
         </section>
 
-        <section class="scope-banner"><strong>查看说明</strong><span>{{ isSynthetic ? '界面预览不代表真实业务结果。' : '当前读取试用数据库中的持久化记录，不代表真实用户生产数据。' }}读取失败会清空旧信息，不显示替代数据。</span></section>
+        <section class="scope-banner"><strong>数据说明</strong><span>当前只读取本地开发数据库的持久化预置记录。读取失败会撤销旧信息，不显示替代数据；外部供应商功能保持不可达。</span></section>
 
         <section v-if="readState.status === 'LOADING'" class="state-panel" data-read-state="LOADING" role="status" aria-live="polite">
           <div class="loading-mark" aria-hidden="true"></div><h2>正在读取</h2><p>旧页面数据已撤销，请稍候。</p>
@@ -166,7 +127,7 @@ watch([activePage, () => (isSynthetic.value ? previewRole.value : 'TRUSTED_ROLE'
         <template v-else>
           <p class="sr-only" role="status" aria-live="polite" :data-read-state="readState.data.items.length === 0 ? 'READY_EMPTY' : 'READY'">{{ readState.data.items.length === 0 ? '只读数据读取完成，当前没有可查看记录' : `只读数据读取完成，共 ${readState.data.items.length} 条记录` }}</p>
           <AdminOrderSandboxDetail v-if="activePage==='A140' && selectedOrderRef" :order-ref="selectedOrderRef" @close="selectedOrderRef=null" />
-          <AdminWorkspace v-else :projection="readState.data" @navigate="safeNavigate" @select-order="selectOrder" />
+          <AdminWorkspace v-else :projection="readState.data" @navigate="safeNavigate" @select-order="selectOrder" @changed="refresh" />
         </template>
       </main>
     </div>
