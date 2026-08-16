@@ -23,7 +23,7 @@ import java.util.*;
 @Profile("release-mysql")
 @ConditionalOnProperty(name="hz.v1-dev-data.enabled",havingValue="true")
 @RequestMapping("/admin-command/v1")
-final class V1AdminCommandController {
+class V1AdminCommandController {
     private static final Set<String> RESOURCES=Set.of("cities","directory-entries","holidays","news","products","product-mappings","channels","price-versions");
     private static final Set<String> ACTIONS=Set.of("submit","publish","unpublish","enable","disable");
     private final JdbcTemplate jdbc;

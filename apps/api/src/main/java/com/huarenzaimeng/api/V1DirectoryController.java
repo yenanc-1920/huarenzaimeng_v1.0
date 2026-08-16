@@ -20,7 +20,7 @@ import java.util.Set;
 @RestController
 @Profile("release-mysql")
 @RequestMapping("/api/v1/directory")
-final class V1DirectoryController {
+class V1DirectoryController {
     private static final Set<String> REPORT_REASONS=Set.of("INCORRECT_INFO","CLOSED","PHONE_INVALID","ADDRESS_INVALID","OTHER");
     private final V1DevelopmentDataService data;
     private final JdbcTemplate jdbc;
