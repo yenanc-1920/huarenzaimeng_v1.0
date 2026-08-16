@@ -56,6 +56,13 @@ function removeGeneratedTarget(target) {
 
 try {
   run('git diff check', 'git', ['diff', '--check'])
+  run('DEV startup blockers', mvn, [
+    ...mavenBase,
+    '-pl', 'apps/api', '-am',
+    '-Dtest=ReleaseSecretBoundaryValidatorTest,DevelopmentFlywayMigrationRunnerTest,BuildSelectionContractTest',
+    '-Dsurefire.failIfNoSpecifiedTests=false',
+    'test'
+  ])
   run('admin contracts', npm, ['run', 'test:contracts'], join(root, 'apps', 'admin-web'))
   run('admin build', npm, ['run', 'build'], join(root, 'apps', 'admin-web'))
   run('miniapp contracts', npm, ['run', 'test:frontend-contracts'], join(root, 'apps', 'miniapp'))

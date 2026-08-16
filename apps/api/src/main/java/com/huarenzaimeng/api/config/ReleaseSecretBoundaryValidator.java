@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @Profile("release-mysql")
@@ -26,7 +27,7 @@ final class ReleaseSecretBoundaryValidator {
             "hz.it-session.buyer-authorized-order-refs");
 
     ReleaseSecretBoundaryValidator(Environment environment) {
-        requireReleaseProfileOnly(environment.getActiveProfiles());
+        requireApprovedReleaseProfiles(environment);
         requireValue(environment, "hz.persistence.mode", "mysql");
         requireValue(environment, "hz.p014.mode", "disabled");
         requireValue(environment, "hz.p014.fixture-mode", "no-default");
@@ -41,9 +42,16 @@ final class ReleaseSecretBoundaryValidator {
         TEST_IDENTITY_PROPERTIES.forEach(property -> requireAbsent(property, environment.getProperty(property)));
     }
 
-    private static void requireReleaseProfileOnly(String[] activeProfiles) {
+    private static void requireApprovedReleaseProfiles(Environment environment) {
+        String[] activeProfiles = environment.getActiveProfiles();
         List<String> profiles = Arrays.stream(activeProfiles).map(String::trim).filter(value -> !value.isEmpty()).toList();
-        if (!profiles.equals(List.of("release-mysql"))) {
+        Set<String> profileSet = Set.copyOf(profiles);
+        boolean releaseOnly = profiles.size() == 1 && profileSet.equals(Set.of("release-mysql"));
+        boolean isolatedDevelopment = profiles.size() == 2
+                && profileSet.equals(Set.of("release-mysql", "local-mysql"))
+                && environment.getProperty("hz.dev-function-release.enabled", Boolean.class, false)
+                && environment.getProperty("hz.v1-dev-data.enabled", Boolean.class, false);
+        if (!releaseOnly && !isolatedDevelopment) {
             throw invalid("spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");
         }
     }

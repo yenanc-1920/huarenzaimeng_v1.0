@@ -12,5 +12,15 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Fail fast on DEV startup wiring
+        run: >-
+          mvn -B -ntp -s .mvn/settings.xml -pl apps/api -am
+          -Dtest=ReleaseSecretBoundaryValidatorTest,DevelopmentFlywayMigrationRunnerTest,BuildSelectionContractTest
+          -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Build exact DEV image
         run: docker build --file Dockerfile.dev --tag huaren-api-dev:predeploy .
