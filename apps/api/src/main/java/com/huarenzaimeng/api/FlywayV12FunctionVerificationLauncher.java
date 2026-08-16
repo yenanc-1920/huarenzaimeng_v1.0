@@ -13,6 +13,7 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.MigrationState;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.annotation.Bean;
@@ -195,6 +196,7 @@ public final class FlywayV12FunctionVerificationLauncher {
 
     @Configuration(proxyBeanMethods = false)
     @Profile("release-mysql")
+    @ConditionalOnProperty(name = ENABLED_PROPERTY, havingValue = "true")
     static class IsolatedFlywayConfiguration {
         @Bean
         Flyway isolatedFlyway(

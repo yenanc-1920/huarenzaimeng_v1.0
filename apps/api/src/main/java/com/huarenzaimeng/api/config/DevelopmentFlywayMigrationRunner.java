@@ -5,6 +5,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -22,7 +23,8 @@ final class DevelopmentFlywayMigrationRunner implements ApplicationRunner {
     private final Flyway flyway;
     private final String expectedDatabase;
 
-    DevelopmentFlywayMigrationRunner(DataSource dataSource, Flyway flyway,
+    DevelopmentFlywayMigrationRunner(DataSource dataSource,
+            @Qualifier("releaseFlyway") Flyway flyway,
             @Value("${hz.dev-database-name}") String expectedDatabase) {
         this.dataSource = dataSource;
         this.flyway = flyway;

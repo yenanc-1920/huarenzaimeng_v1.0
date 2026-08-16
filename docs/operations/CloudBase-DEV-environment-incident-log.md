@@ -68,6 +68,28 @@
 - 验证结果：修正后全量门禁成功进入并完成后端测试，715 项、失败 0、错误 0、跳过 65。
 - 状态：已关闭。
 
+### ENV-DEV-003：普通 DEV 服务误装配一次性 Flyway Bean
+
+- 时间：2026-08-17（Asia/Dhaka）
+- 首次失败提交：`ddf9a23`
+- 现象：镜像构建成功，但容器启动时 `DevelopmentFlywayMigrationRunner` 发现两个 `Flyway` Bean：`isolatedFlyway` 与 `releaseFlyway`；Spring 无法选择依赖，8080 未监听，健康检查连接被拒绝。
+- 根因：一次性 V12 功能验证器的嵌套 `IsolatedFlywayConfiguration` 只有 `release-mysql` Profile，没有绑定自身启用开关，因而被普通 API 组件扫描；同时 DEV 迁移器未显式限定 `releaseFlyway`。
+- 处理：为隔离配置增加 `hz.data-integration.flyway-v12-function-verification-enabled=true` 条件；为 DEV 迁移器增加 `@Qualifier("releaseFlyway")`。
+- 预防门禁：必须验证隔离配置的显式开关契约、DEV 迁移器的 Bean 限定契约，并在完整容器构建后验证普通 API 启动链。
+- 定向验证：19 项通过，失败 0、错误 0；完整后端 717 项通过，失败 0、错误 0、跳过 65。
+- 云上结果：待完整门禁通过并发布固定提交后确认。
+- 状态：代码与本地全量验证已完成；精确 Docker 构建及云上验证未完成。
+
+### ENV-LOCAL-003：PowerShell 拆分 Maven 测试与系统属性参数
+
+- 时间：2026-08-17（Asia/Dhaka）
+- 现象：未加引号的逗号分隔测试名触发 PowerShell `MissingArgument`；未独立加引号的 `-Dsurefire.failIfNoSpecifiedTests=false` 被 Maven 解析为生命周期阶段。
+- 根因：PowerShell 对逗号与 `-D` 参数的命令行解析先于 Maven。
+- 处理：将 `-Dtest=...,...`、`-Dsurefire...` 和 `-Dmaven.repo.local=...` 分别作为完整的加引号参数传递。
+- 预防门禁：人工定向测试只用于首因定位；最终结论统一使用 Node 门禁脚本的参数数组调用，不拼接 Maven 长命令。
+- 验证结果：修正参数后定向 19/19 与完整门禁后端 717/717 均通过。
+- 状态：已关闭。
+
 ## 部署前全量门禁
 
 必须按相同固定提交依次通过：
@@ -95,12 +117,12 @@ node tools/run-dev-deployment-gate.mjs
 
 ## 当前结论
 
-- 固定源码提交：`ddf9a23c566220e8318309b110a201ca6f468316`
+- 当前候选：在 `dev` 本地分支上完成 ENV-DEV-003 修复，尚未推送触发 CloudBase。
 - 后台契约、状态、类型检查和构建：通过。
 - 小程序正式 API 契约、微信开发构建与 appservice 加载：通过。
-- 后端全量：715 项，失败 0、错误 0、跳过 65，`BUILD SUCCESS`。
+- 后端全量：717 项，失败 0、错误 0、跳过 65，`BUILD SUCCESS`。
 - release JAR：确认不含 `db/devdata`。
-- DEV JAR：确认包含 `db/devdata` 与 V14；SHA-256=`AA0D5C120AED3E04653E8F3D73D9CEE14BB5BA578534010A48EC625C0658F300`。
+- DEV JAR：确认包含 `db/devdata` 与 V14；本次候选制品 SHA-256 以提交后固定门禁摘要为准。
 - Docker 门禁：本机 Docker 不可用，尚未执行；GitHub PR 工作流已准备使用真实 Docker 构建 `Dockerfile.dev`。
 - 当前门禁裁定：`NEEDS_DOCKER`，P0=1（精确 DEV Docker 镜像尚未构建），P1=0。
 - 当前部署裁定：`NO-GO`，不得继续通过微修复直接触发部署。
