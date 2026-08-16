@@ -1,0 +1,16 @@
+name: dev-predeploy-gate
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+jobs:
+  exact-dev-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build exact DEV image
+        run: docker build --file Dockerfile.dev --tag huaren-api-dev:predeploy .
