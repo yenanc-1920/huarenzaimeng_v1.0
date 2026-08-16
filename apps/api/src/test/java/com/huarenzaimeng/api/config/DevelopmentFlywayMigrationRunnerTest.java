@@ -12,8 +12,26 @@ import java.sql.Statement;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Qualifier;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 
 class DevelopmentFlywayMigrationRunnerTest {
+    @Test
+    void explicitlySelectsReleaseFlywayWhenOtherFlywayBeansExist() {
+        Constructor<?> constructor = DevelopmentFlywayMigrationRunner.class.getDeclaredConstructors()[0];
+        Annotation[] annotations = constructor.getParameterAnnotations()[1];
+        Qualifier qualifier = null;
+        for (Annotation annotation : annotations) {
+            if (annotation instanceof Qualifier candidate) {
+                qualifier = candidate;
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertNotNull(qualifier);
+        org.junit.jupiter.api.Assertions.assertEquals("releaseFlyway", qualifier.value());
+    }
+
     @Test
     void migratesExactlyOnceWhenDatabaseIdentityMatches() throws Exception {
         DataSource source = mock(DataSource.class);

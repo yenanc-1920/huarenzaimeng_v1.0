@@ -7,6 +7,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,6 +15,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class FlywayV12FunctionVerificationLauncherTest {
+    @Test
+    void isolatedConfigurationRequiresExplicitFunctionEnablement() {
+        ConditionalOnProperty condition = FlywayV12FunctionVerificationLauncher.IsolatedFlywayConfiguration.class
+                .getAnnotation(ConditionalOnProperty.class);
+        org.junit.jupiter.api.Assertions.assertNotNull(condition);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(
+                new String[] {FlywayV12FunctionVerificationLauncher.ENABLED_PROPERTY}, condition.name());
+        org.junit.jupiter.api.Assertions.assertEquals("true", condition.havingValue());
+    }
+
     @Test void exactPreMigratesOnceAndRequiresPost() throws Exception {
         FakeRuntime runtime = runtime(FlywayV12FunctionVerificationLauncher.FunctionState.PRE_V10,
                 FlywayV12FunctionVerificationLauncher.FunctionState.POST_V12);
