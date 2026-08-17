@@ -14,7 +14,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/** Empty-database-only bootstrap and read-only terminal verifier for PROD. */
+/** Empty/PRE_V10 bootstrap and read-only terminal verifier for PROD. */
 @Component
 @Profile("release-mysql & prod-mysql")
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -42,7 +42,7 @@ final class ProdFlywayBootstrapRunner implements ApplicationRunner {
         try {
             requireDatabaseIdentity();
             if (initializeEmptyDatabase) {
-                requireCompletelyEmptyDatabase();
+                requireApprovedInitializationSource();
                 flyway.migrate();
             }
             requirePostV14WithoutDevelopmentSeeds();
@@ -66,15 +66,43 @@ final class ProdFlywayBootstrapRunner implements ApplicationRunner {
         }
     }
 
-    private void requireCompletelyEmptyDatabase() throws Exception {
+    private void requireApprovedInitializationSource() throws Exception {
+        long tableCount;
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(
                      "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()")) {
-            if (!result.next() || result.getLong(1) != 0L || result.next()) {
-                throw new IllegalStateException("PROD_INITIALIZATION_REQUIRES_EMPTY_DATABASE");
+            if (!result.next()) throw new IllegalStateException("PROD_INITIALIZATION_SOURCE_INVALID");
+            tableCount = result.getLong(1);
+            if (result.next()) throw new IllegalStateException("PROD_INITIALIZATION_SOURCE_INVALID");
+        }
+        if (tableCount == 0L) return;
+        if (tableCount != 20L) throw new IllegalStateException("PROD_INITIALIZATION_SOURCE_INVALID");
+
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet history = statement.executeQuery(
+                     "SELECT COUNT(*), COUNT(DISTINCT version), "
+                             + "MIN(CAST(version AS UNSIGNED)), MAX(CAST(version AS UNSIGNED)), "
+                             + "SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), "
+                             + "SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), "
+                             + "SUM(CASE WHEN installed_rank = CAST(version AS UNSIGNED) THEN 1 ELSE 0 END) "
+                             + "FROM flyway_schema_history WHERE version IS NOT NULL")) {
+            if (!history.next()
+                    || history.getLong(1) != 10L
+                    || history.getLong(2) != 10L
+                    || history.getLong(3) != 1L
+                    || history.getLong(4) != 10L
+                    || history.getLong(5) != 10L
+                    || history.getLong(6) != 0L
+                    || history.getLong(7) != 10L
+                    || history.next()) {
+                throw new IllegalStateException("PROD_INITIALIZATION_SOURCE_INVALID");
             }
         }
+        // This also verifies that the applied V1-V10 checksums match the fixed
+        // migration scripts before the interrupted initialization is resumed.
+        flyway.validate();
     }
 
     private void requirePostV14WithoutDevelopmentSeeds() throws Exception {
