@@ -99,7 +99,7 @@ class ProdFlywayBootstrapRunnerTest {
         when(connection.createStatement()).thenReturn(statement);
         when(statement.executeQuery("SELECT DATABASE()")) .thenReturn(identity);
         when(statement.executeQuery(startsWith("SELECT COUNT(*), COUNT(DISTINCT version)"))).thenReturn(history);
-        when(statement.executeQuery(startsWith("SELECT COUNT(*) FROM information_schema.tables"))).thenReturn(seeds);
+        when(statement.executeQuery("SELECT COUNT(*) FROM hz_v1_dev_seed_registry")).thenReturn(seeds);
         return new Fixture(source, flyway, database);
     }
 
