@@ -39,7 +39,7 @@ jobs:
       - name: Verify exact CloudBase container contract without a duplicate cold build
         shell: bash
         run: |
-          test "$(grep -c '^ENTRYPOINT \["java","-jar","/app/app.jar"\]$' Dockerfile)" -eq 1
+          test "$(grep -Fxc 'ENTRYPOINT ["java", "-jar", "/app/app.jar"]' Dockerfile)" -eq 1
           test -f apps/api/target/api-0.1.0-SNAPSHOT.jar
           jar tf apps/api/target/api-0.1.0-SNAPSHOT.jar | grep -qx 'BOOT-INF/classes/application-stage-mysql.yml'
           jar tf apps/api/target/api-0.1.0-SNAPSHOT.jar | grep -qx 'BOOT-INF/classes/db/migration/V14__add_v1_business_read_models.sql'
