@@ -18,6 +18,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require the exact DEV deployment commit
+        if: github.event_name != 'pull_request'
+        run: |
+          git fetch --no-tags origin deploy/dev:refs/remotes/origin/deploy/dev
+          node tools/verify-environment-promotion.mjs --environment TEST --upstream-ref refs/remotes/origin/deploy/dev
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

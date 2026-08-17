@@ -115,6 +115,25 @@
 - 云上结果：待固定修复提交部署后回填。
 - 状态：代码与定向测试已关闭；提交、推送、部署未执行。
 
+### ENV-REL-006：四环境使用不同提交，后级环境未复用前级已验证对象
+
+- 时间：2026-08-18（Asia/Dhaka）
+- 现象：DEV、TEST、STAGE 的部署顺利不能证明 PROD 使用的代码可运行；四个环境分支及 deploy 分支实际指向不同提交。
+- 根因：四套工作流分别从各自分支构建并部署，只验证当前分支，没有校验目标提交等于上一环境已经验收的 deploy 提交。
+- 处理：TEST 必须精确等于 `deploy/dev`，STAGE 必须精确等于 `deploy/test`，PROD 必须精确等于 `deploy/stage`；不接受 cherry-pick 后的新 SHA 冒充同一制品。
+- 预防门禁：`tools/verify-environment-promotion.mjs` 在耗时全量门禁之前校验提交身份；三套后级 workflow 已接入。
+- 制品边界：TEST/STAGE/PROD 使用同一 Dockerfile 与相同源码提交，但 CloudBase 分环境重建镜像，当前只能证明“同提交、同构建输入”，不能证明镜像摘要字节相同；DEV 因包含本地预置数据使用 `Dockerfile.dev`，明确不属于同镜像。
+- 状态：本地实现完成，单元测试 3/3 通过；尚未提交、推送或触发云构建。
+
+### ENV-CLOUD-005：网关短时 503 与应用业务 503 混淆
+
+- 时间：2026-08-18（Asia/Dhaka）
+- 现象：DEV 曾短时返回 nginx HTML 503，随后在无代码和配置修改的情况下恢复；应用自身的启动 Gate 503 则返回 JSON。
+- 处理：验收器同时记录 HTTP 状态、响应类型和结构；非 JSON 归为网关/平台层，JSON 业务信封归为应用层，不再根据单个 503 直接改代码。
+- 预防门禁：`tools/verify-cloudbase-environments.mjs` 对四环境依次执行健康、时间、目录、城市、资讯共 20 个只读检查点，默认不重试。
+- 验证结果：2026-08-18 本轮 20/20 均为 HTTP 200、JSON 且契约通过。
+- 状态：已关闭；精确平台触发原因未证明，不冒充已定位。
+
 ## 部署前全量门禁
 
 必须按相同固定提交依次通过：
@@ -140,7 +159,7 @@ node tools/run-dev-deployment-gate.mjs
 
 如本机没有 Docker，该命令必须返回非零并报告 `NEEDS_DOCKER`。完整 GO 应由具备 Docker 的 GitHub PR 门禁获得。
 
-## 当前结论
+## 2026-08-17 当时结论（历史记录）
 
 - 当前候选：在 `dev` 本地分支上完成 ENV-DEV-003 修复，尚未推送触发 CloudBase。
 - 后台契约、状态、类型检查和构建：通过。
@@ -151,3 +170,10 @@ node tools/run-dev-deployment-gate.mjs
 - Docker 门禁：本机 Docker 不可用，尚未执行；GitHub PR 工作流已准备使用真实 Docker 构建 `Dockerfile.dev`。
 - 当前门禁裁定：`NEEDS_DOCKER`，P0=1（精确 DEV Docker 镜像尚未构建），P1=0。
 - 当前部署裁定：`NO-GO`，不得继续通过微修复直接触发部署。
+
+## 2026-08-18 四环境只读验收补充
+
+- DEV/TEST/STAGE/PROD 的 `/actuator/health` 均为 `UP`。
+- 四环境的时间概览、指定运营商目录、城市、资讯接口共 16 个业务检查点均返回 HTTP 200、JSON 业务信封并通过结构校验。
+- 本轮只读验收合计 20/20 GO；未写数据库、未触发部署、未自动重试。
+- 下一次晋级必须先消除分支 SHA 漂移，再按 DEV -> TEST -> STAGE -> PROD 单向推进。
