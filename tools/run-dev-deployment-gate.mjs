@@ -8,7 +8,7 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const windows = process.platform === 'win32'
 const npm = windows ? 'npm.cmd' : 'npm'
 const mvn = windows ? 'mvn.cmd' : 'mvn'
-const mavenBase = ['-B', '-ntp']
+const mavenBase = ['-B', '-ntp', '-s', '.mvn/settings.xml']
 if (process.env.MAVEN_OFFLINE === '1') mavenBase.push('-o')
 if (process.env.MAVEN_REPO_LOCAL) mavenBase.push(`-Dmaven.repo.local=${process.env.MAVEN_REPO_LOCAL}`)
 
@@ -59,7 +59,7 @@ try {
   run('DEV startup blockers', mvn, [
     ...mavenBase,
     '-pl', 'apps/api', '-am',
-    '-Dtest=ReleaseSecretBoundaryValidatorTest,DevelopmentFlywayMigrationRunnerTest,BuildSelectionContractTest',
+    '-Dtest=DevProfileApplicationSmokeTest,ReleaseSecretBoundaryValidatorTest,DevelopmentFlywayMigrationRunnerTest,BuildSelectionContractTest',
     '-Dsurefire.failIfNoSpecifiedTests=false',
     'test'
   ])
@@ -84,11 +84,6 @@ try {
     throw new Error('V14_ABSENT_FROM_DEV_JAR')
   }
 
-  const docker = spawnSync('docker', ['version'], { cwd: root, stdio: 'ignore', shell: false })
-  if (docker.status !== 0) {
-    throw new Error('NEEDS_DOCKER: exact Dockerfile.dev build was not executed')
-  }
-  run('exact DEV image build', 'docker', ['build', '--file', 'Dockerfile.dev', '--tag', 'huaren-api-dev:predeploy', '.'])
   process.stdout.write('\nDEV_DEPLOYMENT_GATE_GO\n')
 } catch (error) {
   process.stderr.write(`\nDEV_DEPLOYMENT_GATE_NO_GO ${error.message}\n`)

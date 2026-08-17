@@ -22,21 +22,25 @@ class BuildSelectionContractTest {
     }
 
     @Test
-    void containerBuildRunsTestsBeforePackagingAndDefaultsToMock() throws IOException {
+    void containerBuildPackagesWithoutRepeatingCiTestsAndDefaultsToMock() throws IOException {
         String dockerfile = Files.readString(PROJECT_ROOT.resolve("Dockerfile"));
-        int test = dockerfile.indexOf("clean test");
-        int packaging = dockerfile.indexOf("package -DskipTests");
-        assertThat(test).isGreaterThanOrEqualTo(0);
-        assertThat(packaging).isGreaterThan(test);
-        assertThat(dockerfile).contains("SPRING_PROFILES_ACTIVE=mock")
+        String devDockerfile = Files.readString(PROJECT_ROOT.resolve("Dockerfile.dev"));
+        String gate = Files.readString(PROJECT_ROOT.resolve(".github/workflows/dev-predeploy-gate.yml"));
+        assertThat(dockerfile).contains("package -DskipTests")
+                .doesNotContain("clean test")
+                .contains("SPRING_PROFILES_ACTIVE=mock")
                 .contains("FROM node:24-alpine AS admin-web-build")
                 .contains("VITE_ADMIN_DATA_MODE=PROJECT_API_PROXY")
-                .contains("npm run test:contracts && npm run build")
+                .contains("npm run build")
                 .contains("COPY --from=admin-web-build /workspace/apps/admin-web/dist apps/api/src/main/resources/static")
                 .contains("USER 10001:10001")
                 .contains("--chown=10001:10001")
                 .contains("ENTRYPOINT [\"java\", \"-jar\", \"/app/app.jar\"]")
                 .doesNotContain("-Dloader.main=com.huarenzaimeng.api.FlywayV12FunctionVerificationLauncher");
+        assertThat(devDockerfile).contains("package -DskipTests -Plocal-devdata")
+                .doesNotContain("clean test");
+        assertThat(gate).contains("run-dev-fast-gate.mjs")
+                .contains("run-dev-deployment-gate.mjs");
         assertThat(Files.readString(PROJECT_ROOT.resolve("apps/api/src/main/java/com/huarenzaimeng/api/MockFlowController.java")))
                 .contains("@Profile({\"mock\", \"test\"})");
     }

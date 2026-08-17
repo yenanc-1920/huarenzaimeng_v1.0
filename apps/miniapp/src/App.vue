@@ -6,13 +6,13 @@
 @import "./styles/shared.css";
 
 page {
-  --brand: #2357a5;
-  --brand-strong: #173e79;
+  --brand: #195bb8;
+  --brand-strong: #142540;
   --surface: #ffffff;
-  --background: #f4f6f9;
-  --text: #172033;
-  --muted: #697487;
-  --line: #e5eaf0;
+  --background: #f7f9fc;
+  --text: #142540;
+  --muted: #68768c;
+  --line: #dde4ee;
   --success: #17875b;
   --unknown: #a76500;
   --risk: #bd4242;
