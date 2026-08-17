@@ -50,3 +50,10 @@ powershell -ExecutionPolicy Bypass -File tools\Invoke-DevReleaseGate.ps1 -SkipCo
 - `prod`：不得启用 `local-mysql`、开发预置数据或测试 profile；真实支付/充值上线门禁另行执行。
 
 任何环境都不得共享数据库名、业务账号密码、Flyway 密码或第三方 Secret。模板文件只保留键名和占位符，不提交真实凭据。
+# STAGE 环境发布约定
+
+- GitHub 源分支固定为 `stage`，完整门禁通过后才推进 `deploy/stage`。
+- 微信云托管服务固定为 `huaren-api-stage`，数据库固定为 `huarenzaimeng_stage`。
+- 激活 Profile 固定为 `release-mysql,stage-mysql`；普通 `Dockerfile`、端口 `8080`。
+- STAGE 不加载 `db/devdata`，不启用微信支付和充值供应商。
+- 应用启动前先核对 `SELECT DATABASE()`，只有精确命中配置库才执行 Flyway；迁移失败不重试。

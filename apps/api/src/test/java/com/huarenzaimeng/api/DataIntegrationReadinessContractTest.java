@@ -374,7 +374,12 @@ class DataIntegrationReadinessContractTest {
     }
 
     @Test void repository_root_resolution_rejects_zero_candidates() throws Exception {
-        var fixture = java.nio.file.Files.createTempDirectory("data-root-zero-");
+        // The test JVM deliberately redirects java.io.tmpdir beneath the worktree so
+        // framework temp files stay isolated. A default temp directory would therefore
+        // have the real repository as an ancestor and would not be a zero-candidate
+        // fixture. Anchor this negative fixture beneath user.home instead.
+        var fixture = java.nio.file.Files.createTempDirectory(
+                java.nio.file.Path.of(System.getProperty("user.home")), "data-root-zero-");
         try {
             assertThat(org.assertj.core.api.Assertions.catchThrowable(
                     () -> resolveRepositoryRoot(fixture)))
@@ -387,7 +392,9 @@ class DataIntegrationReadinessContractTest {
     }
 
     @Test void repository_root_resolution_rejects_nested_multiple_candidates() throws Exception {
-        var fixture = java.nio.file.Files.createTempDirectory("data-root-multiple-");
+        var fixtureRoot = java.nio.file.Path.of("target").toAbsolutePath();
+        java.nio.file.Files.createDirectories(fixtureRoot);
+        var fixture = java.nio.file.Files.createTempDirectory(fixtureRoot, "data-root-multiple-");
         try {
             var outer = fixture.resolve("outer");
             var nested = outer.resolve("apps/api/nested");

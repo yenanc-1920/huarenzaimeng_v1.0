@@ -1,0 +1,53 @@
+name: stage-predeploy-gate
+
+on:
+  pull_request:
+    branches: [stage]
+  push:
+    branches: [stage]
+  workflow_dispatch:
+
+concurrency:
+  group: stage-predeploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-stage-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            apps/admin-web/package-lock.json
+            apps/miniapp/package-lock.json
+      - run: npm ci
+        working-directory: apps/admin-web
+      - run: npm ci
+        working-directory: apps/miniapp
+      - name: Full deterministic STAGE gate
+        run: node tools/run-stage-deployment-gate.mjs
+      - name: Build exact STAGE image without repeating tests
+        run: docker build --file Dockerfile --tag huaren-api-stage:${{ github.sha }} .
+
+  promote-deploy-branch:
+    if: github.event_name == 'push'
+    needs: full-stage-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Advance deployment branch only after the full gate
+        run: git push origin HEAD:refs/heads/deploy/stage

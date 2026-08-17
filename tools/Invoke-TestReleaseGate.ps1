@@ -1,12 +1,17 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet('test', 'stage')]
+    [string]$EnvironmentName = 'test',
+    [ValidateRange(1024, 65535)]
+    [int]$ServerPort = 18081
+)
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $runtimeRoot = 'E:\workspace\huarenzaimeng\.runtime\mysql-dev'
 $credentialFile = Join-Path $runtimeRoot 'credentials.clixml'
 $mysql = 'E:\workspace\huarenzaimeng\.runtime\mysql-5.7.44-winx64\bin\mysql.exe'
-$gateId = 'test_gate_' + (Get-Date -Format 'yyyyMMdd_HHmmss') + '_' + ([guid]::NewGuid().ToString('N').Substring(0, 8))
+$gateId = $EnvironmentName + '_gate_' + (Get-Date -Format 'yyyyMMdd_HHmmss') + '_' + ([guid]::NewGuid().ToString('N').Substring(0, 8))
 $database = 'huarenzaimeng_' + $gateId
 $gateOutput = Join-Path $runtimeRoot (Join-Path 'gates' $gateId)
 $appProcess = $null
@@ -43,7 +48,7 @@ function Wait-Health([int]$seconds) {
     do {
         if ($appProcess.HasExited) { throw "TEST_APPLICATION_EXITED code=$($appProcess.ExitCode)" }
         try {
-            $response = Invoke-RestMethod -Uri 'http://127.0.0.1:18081/actuator/health' -TimeoutSec 3
+            $response = Invoke-RestMethod -Uri "http://127.0.0.1:$ServerPort/actuator/health" -TimeoutSec 3
             if ($response.status -eq 'UP') { return }
         } catch { Start-Sleep -Seconds 1 }
     } while ((Get-Date) -lt $deadline)
@@ -87,8 +92,8 @@ FLUSH PRIVILEGES;
 
     $appPassword = Get-PlainPassword $credentials.App.Password
     $jdbc = "jdbc:mysql://127.0.0.1:3307/${database}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Dhaka"
-    $env:SPRING_PROFILES_ACTIVE = 'release-mysql,test-mysql'
-    $env:SERVER_PORT = '18081'
+    $env:SPRING_PROFILES_ACTIVE = "release-mysql,$EnvironmentName-mysql"
+    $env:SERVER_PORT = "$ServerPort"
     $env:HZ_DATASOURCE_URL = $jdbc
     $env:SPRING_DATASOURCE_USERNAME = $credentials.App.UserName
     $env:SPRING_DATASOURCE_PASSWORD = $appPassword
@@ -111,7 +116,7 @@ FLUSH PRIVILEGES;
     $seedCount = Invoke-AppScalar "SELECT (SELECT COUNT(*) FROM $database.hz_city) + (SELECT COUNT(*) FROM $database.hz_platform_product);" $appPassword
     if ($seedCount -ne '0') { throw "TEST_DEVELOPMENT_DATA_PRESENT count=$seedCount" }
 
-    Write-Output "TEST_RELEASE_GATE_PASS gate=$gateId migrations=14 devSeedRows=0 health=UP"
+    Write-Output "$($EnvironmentName.ToUpperInvariant())_RELEASE_GATE_PASS gate=$gateId migrations=14 devSeedRows=0 health=UP"
 } finally {
     if ($appProcess -and -not $appProcess.HasExited) {
         Stop-Process -Id $appProcess.Id -ErrorAction SilentlyContinue

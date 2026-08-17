@@ -1,0 +1,50 @@
+package com.huarenzaimeng.api.config;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import javax.sql.DataSource;
+import org.flywaydb.core.Flyway;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+
+/** One-shot schema migration for the isolated CloudBase STAGE database. */
+@Component
+@Profile("release-mysql & stage-mysql")
+@ConditionalOnProperty(name = "hz.environment.migration-enabled", havingValue = "true")
+@Order(Ordered.HIGHEST_PRECEDENCE)
+final class StageFlywayMigrationRunner implements ApplicationRunner {
+    private final DataSource dataSource;
+    private final Flyway flyway;
+    private final String expectedDatabase;
+
+    StageFlywayMigrationRunner(DataSource dataSource,
+            @Qualifier("releaseFlyway") Flyway flyway,
+            @Value("${hz.environment.database-name}") String expectedDatabase) {
+        this.dataSource = dataSource;
+        this.flyway = flyway;
+        this.expectedDatabase = expectedDatabase;
+    }
+
+    @Override
+    public void run(ApplicationArguments args) throws Exception {
+        if (expectedDatabase == null || expectedDatabase.isBlank()) {
+            throw new IllegalStateException("STAGE_DATABASE_NAME_REQUIRED");
+        }
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT DATABASE()")) {
+            if (!result.next() || !expectedDatabase.equals(result.getString(1)) || result.next()) {
+                throw new IllegalStateException("STAGE_DATABASE_IDENTITY_MISMATCH");
+            }
+        }
+        flyway.migrate();
+    }
+}
