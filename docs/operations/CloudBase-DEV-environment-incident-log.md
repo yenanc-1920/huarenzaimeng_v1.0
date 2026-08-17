@@ -1,8 +1,8 @@
-# CloudBase DEV 环境问题台账与部署前门禁
+# CloudBase 环境问题台账与部署前门禁
 
 ## 目的
 
-本文件是 DEV 环境问题的唯一追加台账。云托管部署只用于验证已通过门禁的固定提交，不再用于发现本地可发现的问题。
+本文件是 DEV、TEST、STAGE、PROD 环境问题的唯一追加台账。云托管部署只用于验证已通过门禁的固定提交，不再用于发现本地可发现的问题。
 
 每次问题必须记录：编号、时间、固定提交、现象、根因、处理、预防门禁、验证结果和云上结果。没有完成预防门禁的修复不得标记关闭。
 
@@ -101,6 +101,19 @@
 - 定向验证：快速启动阻断组 16/16 通过（Profile 边界 11、Flyway 装配 3、Docker 构建选择 2），失败 0、错误 0。
 - 云上结果：未验证；修复未推送、未部署。
 - 状态：代码已修复，门禁验证中。
+
+### ENV-PROD-001：单行聚合结果读取游标越界，业务 Gate 永久停在启动中
+
+- 时间：2026-08-18（Asia/Dhaka）
+- 首次确认版本：`huaren-api-prod-009`，基线提交 `2f147f4`
+- 现象：容器与 `/actuator/health` 均为 UP，但业务接口持续返回 `503 SERVICE_STARTING`；日志显示 `ENVIRONMENT_FLYWAY_BOOTSTRAP_FAILED` 和 `java.sql.SQLException: After end of result set`。
+- 数据库事实：数据库身份为 `huarenzaimeng_prod`；Flyway V1-V14 共 14/14 成功、失败 0；`hz_v1_dev_seed_registry` 存在且行数为 0，符合 PROD 边界。
+- 根因：启动 Runner 对单行 `COUNT(*)` 结果先调用第二次 `ResultSet.next()` 验证“没有第二行”，随后才调用 `getLong(1)` 读取第一行；真实 MySQL 驱动已把游标移动到结果集末尾并抛出异常。旧 Mockito 测试桩允许越界读取，导致本地门禁假通过。
+- 处理：所有单行结果必须按“首行存在 -> 在当前行读取全部字段 -> 再检查不存在第二行”的顺序读取；测试桩加入真实游标位置约束，越界读取必须抛出 `After end of result set`。
+- 预防门禁：数据库 Runner 的单行查询测试必须使用严格游标语义；禁止用 `when(next()).thenReturn(true, false)` 搭配无状态 `getLong()` 冒充 JDBC 行为。
+- 定向验证：严格 Runner、PROD 双 Profile 启动、发布边界与构建选择共 27/27 通过，失败 0、错误 0；日志无 `ENVIRONMENT_FLYWAY_BOOTSTRAP_FAILED`；离线 API 打包 `BUILD SUCCESS`。
+- 云上结果：待固定修复提交部署后回填。
+- 状态：代码与定向测试已关闭；提交、推送、部署未执行。
 
 ## 部署前全量门禁
 

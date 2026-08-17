@@ -120,12 +120,30 @@ final class ProdFlywayBootstrapRunner {
         }
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement();
+             ResultSet registry = statement.executeQuery(
+                     "SELECT COUNT(*) FROM information_schema.tables "
+                             + "WHERE table_schema = DATABASE() AND table_name = 'hz_v1_dev_seed_registry'")) {
+            if (!registry.next()) {
+                throw new IllegalStateException("ENVIRONMENT_DEVELOPMENT_SEED_STATE_INVALID");
+            }
+            boolean registryPresent = registry.getLong(1) == 1L;
+            if (registry.next()) {
+                throw new IllegalStateException("ENVIRONMENT_DEVELOPMENT_SEED_STATE_INVALID");
+            }
+            if (developmentDataExpected && !registryPresent) {
+                throw new IllegalStateException("ENVIRONMENT_DEVELOPMENT_SEED_STATE_INVALID");
+            }
+            if (!registryPresent) return;
+        }
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
              ResultSet seeds = statement.executeQuery("SELECT COUNT(*) FROM hz_v1_dev_seed_registry")) {
-            if (!seeds.next() || seeds.next()) {
+            if (!seeds.next()) {
                 throw new IllegalStateException("ENVIRONMENT_DEVELOPMENT_SEED_STATE_INVALID");
             }
             long seedCount = seeds.getLong(1);
-            if ((developmentDataExpected && seedCount == 0L)
+            if (seeds.next()
+                    || (developmentDataExpected && seedCount == 0L)
                     || (!developmentDataExpected && seedCount != 0L)) {
                 throw new IllegalStateException("ENVIRONMENT_DEVELOPMENT_SEED_STATE_INVALID");
             }

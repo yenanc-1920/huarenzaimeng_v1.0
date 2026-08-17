@@ -28,6 +28,7 @@ class ProdProfileApplicationSmokeTest {
 
     @MockBean DataSource dataSource;
     @MockBean(name = "releaseFlyway") Flyway releaseFlyway;
+    @MockBean ProdFlywayBootstrapRunner prodFlywayBootstrapRunner;
     @Test void exactCloudBaseProdProfilePairLoadsWithoutDevelopmentData() {
         assertThat(context).isNotNull();
         assertThat(context.getBean(ProdFlywayBootstrapRunner.class)).isNotNull();

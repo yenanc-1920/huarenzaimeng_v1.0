@@ -9,7 +9,9 @@ import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
@@ -65,6 +67,15 @@ class ProdFlywayBootstrapRunnerTest {
         org.assertj.core.api.Assertions.assertThat(state.isReady()).isTrue();
     }
 
+    @Test void acceptsEmptyDevelopmentRegistryOutsideDevelopment() throws Exception {
+        Fixture fixture = fixture("huarenzaimeng_prod", true, 0L);
+        ReleaseMigrationState state = new ReleaseMigrationState();
+
+        runner(fixture, state, false, false).migrateAndVerify();
+
+        org.assertj.core.api.Assertions.assertThat(state.isReady()).isTrue();
+    }
+
     @Test void duplicateReadyEventsExecuteBootstrapExactlyOnce() throws Exception {
         Fixture fixture = fixture("huarenzaimeng_prod", false);
         ProdFlywayBootstrapRunner runner = runner(fixture, new ReleaseMigrationState(), true, false);
@@ -82,13 +93,18 @@ class ProdFlywayBootstrapRunnerTest {
     }
 
     private static Fixture fixture(String database, boolean registryPresent) throws Exception {
+        return fixture(database, registryPresent, registryPresent ? 1L : 0L);
+    }
+
+    private static Fixture fixture(String database, boolean registryPresent, long seedCount) throws Exception {
         DataSource source = mock(DataSource.class);
         Connection connection = mock(Connection.class);
         Statement statement = mock(Statement.class);
         Flyway flyway = mock(Flyway.class);
         ResultSet identity = single(database);
         ResultSet history = mock(ResultSet.class);
-        ResultSet seeds = single(registryPresent ? 1L : 0L);
+        ResultSet registry = single(registryPresent ? 1L : 0L);
+        ResultSet seeds = single(seedCount);
         when(history.next()).thenReturn(true, false);
         when(history.getLong(1)).thenReturn(14L);
         when(history.getLong(2)).thenReturn(14L);
@@ -99,16 +115,32 @@ class ProdFlywayBootstrapRunnerTest {
         when(connection.createStatement()).thenReturn(statement);
         when(statement.executeQuery("SELECT DATABASE()")) .thenReturn(identity);
         when(statement.executeQuery(startsWith("SELECT COUNT(*), COUNT(DISTINCT version)"))).thenReturn(history);
+        when(statement.executeQuery(startsWith("SELECT COUNT(*) FROM information_schema.tables"))).thenReturn(registry);
         when(statement.executeQuery("SELECT COUNT(*) FROM hz_v1_dev_seed_registry")).thenReturn(seeds);
         return new Fixture(source, flyway, database);
     }
 
     private static ResultSet single(Object value) throws Exception {
         ResultSet result = mock(ResultSet.class);
-        when(result.next()).thenReturn(true, false);
-        if (value instanceof String string) when(result.getString(1)).thenReturn(string);
-        if (value instanceof Long number) when(result.getLong(1)).thenReturn(number);
+        AtomicInteger cursor = new AtomicInteger(-1);
+        when(result.next()).thenAnswer(ignored -> cursor.incrementAndGet() == 0);
+        if (value instanceof String string) {
+            when(result.getString(1)).thenAnswer(ignored -> {
+                requireCurrentRow(cursor);
+                return string;
+            });
+        }
+        if (value instanceof Long number) {
+            when(result.getLong(1)).thenAnswer(ignored -> {
+                requireCurrentRow(cursor);
+                return number;
+            });
+        }
         return result;
+    }
+
+    private static void requireCurrentRow(AtomicInteger cursor) throws SQLException {
+        if (cursor.get() != 0) throw new SQLException("After end of result set");
     }
 
     private record Fixture(DataSource source, Flyway flyway, String database) {}
