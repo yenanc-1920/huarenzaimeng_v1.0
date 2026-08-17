@@ -51,7 +51,13 @@ final class ReleaseSecretBoundaryValidator {
                 && profileSet.equals(Set.of("release-mysql", "local-mysql"))
                 && environment.getProperty("hz.dev-function-release.enabled", Boolean.class, false)
                 && environment.getProperty("hz.v1-dev-data.enabled", Boolean.class, false);
-        if (!releaseOnly && !isolatedDevelopment) {
+        boolean isolatedTest = profiles.size() == 2
+                && profileSet.equals(Set.of("release-mysql", "test-mysql"))
+                && "test".equals(environment.getProperty("hz.environment.name"))
+                && environment.getProperty("hz.environment.migration-enabled", Boolean.class, false)
+                && environment.getProperty("hz.environment.function-release-enabled", Boolean.class, false)
+                && !environment.getProperty("hz.v1-dev-data.enabled", Boolean.class, false);
+        if (!releaseOnly && !isolatedDevelopment && !isolatedTest) {
             throw invalid("spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");
         }
     }

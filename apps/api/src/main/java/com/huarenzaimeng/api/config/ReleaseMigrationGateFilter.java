@@ -34,17 +34,18 @@ public final class ReleaseMigrationGateFilter extends OncePerRequestFilter {
             "/assets/index-wztt079N.css",
             "/assets/logo-C5G5A9bI.png");
     private final ReleaseMigrationState state;
-    private final boolean developmentFunctionReleaseEnabled;
+    private final boolean nonProductionFunctionReleaseEnabled;
 
     ReleaseMigrationGateFilter(ReleaseMigrationState state,
-            @Value("${hz.dev-function-release.enabled:false}") boolean developmentFunctionReleaseEnabled) {
+            @Value("${hz.dev-function-release.enabled:false}") boolean developmentFunctionReleaseEnabled,
+            @Value("${hz.environment.function-release-enabled:false}") boolean environmentFunctionReleaseEnabled) {
         this.state = state;
-        this.developmentFunctionReleaseEnabled = developmentFunctionReleaseEnabled;
+        this.nonProductionFunctionReleaseEnabled = developmentFunctionReleaseEnabled || environmentFunctionReleaseEnabled;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return developmentFunctionReleaseEnabled || state.isReady();
+        return nonProductionFunctionReleaseEnabled || state.isReady();
     }
 
     @Override

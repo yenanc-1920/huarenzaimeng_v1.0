@@ -14,10 +14,10 @@ import static org.mockito.Mockito.doAnswer;
 
 class ReleaseMigrationGateFilterTest {
     private final ReleaseMigrationState state = new ReleaseMigrationState();
-    private final ReleaseMigrationGateFilter filter = new ReleaseMigrationGateFilter(state, false);
+    private final ReleaseMigrationGateFilter filter = new ReleaseMigrationGateFilter(state, false, false);
 
     @Test void explicitDevelopmentFunctionReleaseBypassesClosedGate() throws Exception {
-        ReleaseMigrationGateFilter developmentFilter = new ReleaseMigrationGateFilter(state, true);
+        ReleaseMigrationGateFilter developmentFilter = new ReleaseMigrationGateFilter(state, true, false);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin-read/v1/pages/A120");
         FilterChain chain = mock(FilterChain.class);
         MockHttpServletResponse response = new MockHttpServletResponse();

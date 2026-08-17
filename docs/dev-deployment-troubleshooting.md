@@ -38,6 +38,9 @@ powershell -ExecutionPolicy Bypass -File tools\Invoke-DevReleaseGate.ps1 -SkipCo
 | DEV-ENV-007 | 本地 JDBC 报参数串是“过长标识符” | PowerShell 将 `$database?` 误解析为变量名的一部分，库名被吃掉 | JDBC 字符串使用 `${database}?` 显式变量边界 | 一次性真实 MySQL 启动门禁 |
 | DEV-ENV-008 | 健康接口先 UP，但 Flyway 历史仍为 0 | Tomcat 已监听时异步迁移尚未完成，过早读取历史表 | 健康 UP 后继续轮询 Flyway：版本迁移 14、失败 0、最高版本 14 | `Invoke-DevReleaseGate.ps1` 双阶段等待 |
 | DEV-ENV-009 | 历史表尚未创建时轮询直接终止 | 用“查询不存在表”的异常作为等待条件 | 先查 `information_schema.tables`，存在后再读历史 | 同上 |
+| DEV-ENV-010 | 云托管显示镜像发布成功，但容器持续 502/503；日志为 `Access denied for user 'huaren_app'` | 服务环境变量中的应用账号密码与云 MySQL 当前密码不一致；镜像发布成功不等于应用启动成功 | 在云 MySQL 重置 `huaren_app` 密码，并将同一个值更新到对应服务的 `SPRING_DATASOURCE_PASSWORD`；不得把密码写入仓库或日志 | 发布后必须同时通过容器健康检查和真实数据库读接口；四环境密码分别维护，不复制旧环境密文 |
+| TEST-ENV-001 | 本地真实 MySQL 门禁先看到健康 UP，但迁移历史尚未到 V14 | Web 端口就绪早于一次性迁移完成 | TEST 门禁分别等待迁移历史达到 14/0/14，再检查健康；不得把首次健康响应当成迁移完成 | `Invoke-TestReleaseGate.ps1` 固定双阶段等待，且断言开发预置数据为 0 |
+| TEST-ENV-002 | 完整测试出现大量 JUnit/Mockito `AccessDeniedException`，或仓库根目录负例在项目内临时目录误判 | Windows 系统 Temp 权限污染；临时目录放在仓库内部又会改变“无仓库祖先”负例的前提 | Surefire 子 JVM 通过 `argLine` 使用仓库同级的专用临时目录；本地沙箱验证可用 `TEST_JUNIT_TMP` 指向仓库外可写目录 | TEST 工作流与本地门禁统一隔离临时目录；业务失败与执行环境失败分开统计 |
 
 ## 四环境边界
 
