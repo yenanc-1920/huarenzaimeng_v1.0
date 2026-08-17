@@ -3,42 +3,66 @@ package com.huarenzaimeng.api.config;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /** Empty/PRE_V10 bootstrap and read-only terminal verifier for PROD. */
 @Component
 @Profile("release-mysql & prod-mysql")
-@Order(Ordered.HIGHEST_PRECEDENCE)
-final class ProdFlywayBootstrapRunner implements ApplicationRunner {
+final class ProdFlywayBootstrapRunner {
+    private static final Logger LOG = LoggerFactory.getLogger(ProdFlywayBootstrapRunner.class);
     private final DataSource dataSource;
     private final Flyway flyway;
     private final ReleaseMigrationState state;
     private final String expectedDatabase;
     private final boolean initializeEmptyDatabase;
+    private final Executor executor;
+    private final AtomicBoolean started = new AtomicBoolean();
 
     ProdFlywayBootstrapRunner(DataSource dataSource,
             @Qualifier("releaseFlyway") Flyway flyway,
             ReleaseMigrationState state,
             @Value("${hz.environment.database-name}") String expectedDatabase,
             @Value("${hz.environment.initialize-empty-database:false}") boolean initializeEmptyDatabase) {
+        this(dataSource, flyway, state, expectedDatabase, initializeEmptyDatabase,
+                ProdFlywayBootstrapRunner::startDaemonWorker);
+    }
+
+    ProdFlywayBootstrapRunner(DataSource dataSource, Flyway flyway,
+            ReleaseMigrationState state, String expectedDatabase,
+            boolean initializeEmptyDatabase, Executor executor) {
         this.dataSource = dataSource;
         this.flyway = flyway;
         this.state = state;
         this.expectedDatabase = expectedDatabase;
         this.initializeEmptyDatabase = initializeEmptyDatabase;
+        this.executor = executor;
     }
 
-    @Override
-    public void run(ApplicationArguments args) throws Exception {
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
+        if (!started.compareAndSet(false, true)) return;
+        executor.execute(() -> {
+            try {
+                migrateAndVerify();
+                LOG.info("PROD_FLYWAY_BOOTSTRAP_READY");
+            } catch (Exception failure) {
+                LOG.error("PROD_FLYWAY_BOOTSTRAP_FAILED", failure);
+            }
+        });
+    }
+
+    void migrateAndVerify() throws Exception {
         try {
             requireDatabaseIdentity();
             if (initializeEmptyDatabase) {
@@ -51,6 +75,12 @@ final class ProdFlywayBootstrapRunner implements ApplicationRunner {
             state.failed();
             throw failure;
         }
+    }
+
+    private static void startDaemonWorker(Runnable command) {
+        Thread worker = new Thread(command, "prod-flyway-bootstrap");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private void requireDatabaseIdentity() throws Exception {

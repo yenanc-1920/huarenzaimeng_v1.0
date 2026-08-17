@@ -41,6 +41,8 @@ powershell -ExecutionPolicy Bypass -File tools\Invoke-DevReleaseGate.ps1 -SkipCo
 | DEV-ENV-010 | 云托管显示镜像发布成功，但容器持续 502/503；日志为 `Access denied for user 'huaren_app'` | 服务环境变量中的应用账号密码与云 MySQL 当前密码不一致；镜像发布成功不等于应用启动成功 | 在云 MySQL 重置 `huaren_app` 密码，并将同一个值更新到对应服务的 `SPRING_DATASOURCE_PASSWORD`；不得把密码写入仓库或日志 | 发布后必须同时通过容器健康检查和真实数据库读接口；四环境密码分别维护，不复制旧环境密文 |
 | TEST-ENV-001 | 本地真实 MySQL 门禁先看到健康 UP，但迁移历史尚未到 V14 | Web 端口就绪早于一次性迁移完成 | TEST 门禁分别等待迁移历史达到 14/0/14，再检查健康；不得把首次健康响应当成迁移完成 | `Invoke-TestReleaseGate.ps1` 固定双阶段等待，且断言开发预置数据为 0 |
 | TEST-ENV-002 | 完整测试出现大量 JUnit/Mockito `AccessDeniedException`，或仓库根目录负例在项目内临时目录误判 | Windows 系统 Temp 权限污染；临时目录放在仓库内部又会改变“无仓库祖先”负例的前提 | Surefire 子 JVM 通过 `argLine` 使用仓库同级的专用临时目录；本地沙箱验证可用 `TEST_JUNIT_TMP` 指向仓库外可写目录 | TEST 工作流与本地门禁统一隔离临时目录；业务失败与执行环境失败分开统计 |
+| PROD-ENV-001 | 空库首次迁移执行到 V10 后出现 `Communications link failure / Connection reset` | 云 MySQL 连接在迁移过程中被基础设施重置；Flyway 无失败记录，但库已不再为空 | 只允许从 20 张表、V1-V10 连续成功、失败 0、installed_rank 与版本一致且 `flyway.validate()` checksum 通过的固定 PRE_V10 恢复；其他非空状态失败关闭 | `ProdFlywayBootstrapRunnerTest` 锁定空库、精确 PRE_V10、错误库、未知非空状态和开发种子拒绝 |
+| PROD-ENV-002 | 镜像构建成功，Spring Context 已初始化但云托管报 8080 `connection refused`，且没有应用 `Caused by` | PROD 在应用启动主线程同步执行数据库迁移，云托管 TCP 探针在端口完成监听前终止实例 | 应用先完成 8080 监听；`ApplicationReadyEvent` 后由唯一 daemon worker 执行受控迁移；迁移期间业务 Gate 保持关闭，精确 POST_V14 后才开放 | 启动器定向测试锁定单次事件、重复事件不重跑、失败关闭；完整 PROD gate 后才允许推进 `deploy/prod` |
 
 ## 四环境边界
 

@@ -19,8 +19,7 @@ class ProdFlywayBootstrapRunnerTest {
         Fixture fixture = fixture("huarenzaimeng_prod", 0L, true, 0L);
         ReleaseMigrationState state = new ReleaseMigrationState();
 
-        new ProdFlywayBootstrapRunner(fixture.source, fixture.flyway, state,
-                "huarenzaimeng_prod", true).run(null);
+        runner(fixture, state, true).onApplicationReady();
 
         verify(fixture.flyway).migrate();
         org.assertj.core.api.Assertions.assertThat(state.isReady()).isTrue();
@@ -30,8 +29,7 @@ class ProdFlywayBootstrapRunnerTest {
         Fixture fixture = fixture("huarenzaimeng_prod", 37L, true, 0L);
         ReleaseMigrationState state = new ReleaseMigrationState();
 
-        new ProdFlywayBootstrapRunner(fixture.source, fixture.flyway, state,
-                "huarenzaimeng_prod", false).run(null);
+        runner(fixture, state, false).onApplicationReady();
 
         verify(fixture.flyway, never()).migrate();
         org.assertj.core.api.Assertions.assertThat(state.isReady()).isTrue();
@@ -42,8 +40,7 @@ class ProdFlywayBootstrapRunnerTest {
         ReleaseMigrationState state = new ReleaseMigrationState();
 
         assertThrows(IllegalStateException.class, () ->
-                new ProdFlywayBootstrapRunner(fixture.source, fixture.flyway, state,
-                        "huarenzaimeng_prod", true).run(null));
+                runner(fixture, state, true).migrateAndVerify());
 
         verify(fixture.flyway, never()).migrate();
         org.assertj.core.api.Assertions.assertThat(state.phase())
@@ -53,8 +50,7 @@ class ProdFlywayBootstrapRunnerTest {
     @Test void resumesOnlyAnExactValidatedPreV10Initialization() throws Exception {
         Fixture fixture = fixture("huarenzaimeng_prod", 20L, true, 0L);
 
-        new ProdFlywayBootstrapRunner(fixture.source, fixture.flyway,
-                new ReleaseMigrationState(), "huarenzaimeng_prod", true).run(null);
+        runner(fixture, new ReleaseMigrationState(), true).onApplicationReady();
 
         verify(fixture.flyway).validate();
         verify(fixture.flyway).migrate();
@@ -64,8 +60,7 @@ class ProdFlywayBootstrapRunnerTest {
         Fixture fixture = fixture("huarenzaimeng_prod", 20L, false, 0L);
 
         assertThrows(IllegalStateException.class, () ->
-                new ProdFlywayBootstrapRunner(fixture.source, fixture.flyway,
-                        new ReleaseMigrationState(), "huarenzaimeng_prod", true).run(null));
+                runner(fixture, new ReleaseMigrationState(), true).migrateAndVerify());
 
         verify(fixture.flyway, never()).migrate();
     }
@@ -74,8 +69,23 @@ class ProdFlywayBootstrapRunnerTest {
         Fixture fixture = fixture("huarenzaimeng_prod", 37L, true, 1L);
 
         assertThrows(IllegalStateException.class, () ->
-                new ProdFlywayBootstrapRunner(fixture.source, fixture.flyway,
-                        new ReleaseMigrationState(), "huarenzaimeng_prod", false).run(null));
+                runner(fixture, new ReleaseMigrationState(), false).migrateAndVerify());
+    }
+
+    @Test void duplicateReadyEventsExecuteBootstrapExactlyOnce() throws Exception {
+        Fixture fixture = fixture("huarenzaimeng_prod", 0L, true, 0L);
+        ProdFlywayBootstrapRunner runner = runner(fixture, new ReleaseMigrationState(), true);
+
+        runner.onApplicationReady();
+        runner.onApplicationReady();
+
+        verify(fixture.flyway).migrate();
+    }
+
+    private static ProdFlywayBootstrapRunner runner(Fixture fixture,
+            ReleaseMigrationState state, boolean initialize) {
+        return new ProdFlywayBootstrapRunner(fixture.source, fixture.flyway, state,
+                "huarenzaimeng_prod", initialize, Runnable::run);
     }
 
     private static Fixture fixture(String database, long existingTables,
