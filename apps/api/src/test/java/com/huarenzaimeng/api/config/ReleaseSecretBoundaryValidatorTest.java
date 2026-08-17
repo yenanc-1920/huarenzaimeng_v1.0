@@ -64,17 +64,26 @@ class ReleaseSecretBoundaryValidatorTest {
     @Test void acceptsExactProdProfilePairWithoutDevelopmentData() {
         MockEnvironment environment = releaseEnvironment()
                 .withProperty("hz.environment.name", "prod")
-                .withProperty("hz.environment.function-release-enabled", "true")
+                .withProperty("hz.environment.function-release-enabled", "false")
                 .withProperty("hz.v1-dev-data.enabled", "false");
         environment.setActiveProfiles("release-mysql", "prod-mysql");
         assertThatCode(() -> new ReleaseSecretBoundaryValidator(environment))
                 .doesNotThrowAnyException();
     }
 
+    @Test void rejectsProdProfileWhenFunctionReleaseBypassIsEnabled() {
+        MockEnvironment environment = releaseEnvironment()
+                .withProperty("hz.environment.name", "prod")
+                .withProperty("hz.environment.function-release-enabled", "true")
+                .withProperty("hz.v1-dev-data.enabled", "false");
+        environment.setActiveProfiles("release-mysql", "prod-mysql");
+        assertRejected(environment, "spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");
+    }
+
     @Test void rejectsProdProfileWhenEnvironmentIdentityIsStage() {
         MockEnvironment environment = releaseEnvironment()
                 .withProperty("hz.environment.name", "stage")
-                .withProperty("hz.environment.function-release-enabled", "true")
+                .withProperty("hz.environment.function-release-enabled", "false")
                 .withProperty("hz.v1-dev-data.enabled", "false");
         environment.setActiveProfiles("release-mysql", "prod-mysql");
         assertRejected(environment, "spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");

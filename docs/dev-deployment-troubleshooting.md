@@ -45,6 +45,7 @@ powershell -ExecutionPolicy Bypass -File tools\Invoke-DevReleaseGate.ps1 -SkipCo
 | PROD-ENV-002 | 镜像构建成功，Spring Context 已初始化但云托管报 8080 `connection refused`，且没有应用 `Caused by` | PROD 在应用启动主线程同步执行数据库迁移，云托管 TCP 探针在端口完成监听前终止实例 | 应用先完成 8080 监听；`ApplicationReadyEvent` 后由唯一 daemon worker 执行受控迁移；迁移期间业务 Gate 保持关闭，精确 POST_V14 后才开放 | 启动器定向测试锁定单次事件、重复事件不重跑、失败关闭；完整 PROD gate 后才允许推进 `deploy/prod` |
 | PROD-ENV-003 | `ProdFlywayBootstrapRunner: No default constructor found` | 启动器为测试保留了第二个注入执行器的构造器，Spring 面对多个未标注构造器无法选择生产构造器 | 生产构造器显式标记 `@Autowired`，测试构造器继续只供同包测试注入同步执行器 | PROD profile smoke test 不再 mock 启动器，必须实例化真实 Bean |
 | PROD-ENV-004 | 已改为 `ApplicationReadyEvent` 异步迁移，但应用仍可能在 `Started ApiApplication` 前阻塞 | 旧 `ReleaseMigrationReadyVerifier` 仍是同步 `ApplicationRunner`，会在 PROD 启动主线程读取旧授权材料并连接数据库 | `prod-mysql` 物理不装配旧 verifier；PROD 只由 `ProdFlywayBootstrapRunner` 管理迁移和 Gate 状态 | PROD profile smoke test 断言启动器存在且旧 verifier Bean 为 0 |
+| PROD-ENV-005 | 关闭 PROD 功能旁路后启动报 `RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES` | release Profile 校验器错误地要求 PROD 的 `function-release-enabled=true`，与迁移完成前必须关闭业务 Gate 的安全边界相反 | PROD 固定只接受 `function-release-enabled=false`；为 true 时明确失败关闭 | `ReleaseSecretBoundaryValidatorTest` 同时锁定 false 正例和 true 拒绝负例 |
 
 ## 四环境边界
 
