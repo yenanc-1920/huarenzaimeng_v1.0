@@ -38,6 +38,7 @@ public class ReleaseFlywayConfiguration {
     }
 
     @Bean
+    @Profile("!prod-mysql")
     ReleaseMigrationReadyVerifier releaseMigrationReadyVerifier(Flyway releaseFlyway,
             DataSource dataSource, ReleaseMigrationState state) {
         var store = ReleaseMigrationAuthorizationStore.fixed(Clock.systemUTC());

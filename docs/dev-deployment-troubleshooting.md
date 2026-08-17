@@ -43,6 +43,8 @@ powershell -ExecutionPolicy Bypass -File tools\Invoke-DevReleaseGate.ps1 -SkipCo
 | TEST-ENV-002 | 完整测试出现大量 JUnit/Mockito `AccessDeniedException`，或仓库根目录负例在项目内临时目录误判 | Windows 系统 Temp 权限污染；临时目录放在仓库内部又会改变“无仓库祖先”负例的前提 | Surefire 子 JVM 通过 `argLine` 使用仓库同级的专用临时目录；本地沙箱验证可用 `TEST_JUNIT_TMP` 指向仓库外可写目录 | TEST 工作流与本地门禁统一隔离临时目录；业务失败与执行环境失败分开统计 |
 | PROD-ENV-001 | 空库首次迁移执行到 V10 后出现 `Communications link failure / Connection reset` | 云 MySQL 连接在迁移过程中被基础设施重置；Flyway 无失败记录，但库已不再为空 | 只允许从 20 张表、V1-V10 连续成功、失败 0、installed_rank 与版本一致且 `flyway.validate()` checksum 通过的固定 PRE_V10 恢复；其他非空状态失败关闭 | `ProdFlywayBootstrapRunnerTest` 锁定空库、精确 PRE_V10、错误库、未知非空状态和开发种子拒绝 |
 | PROD-ENV-002 | 镜像构建成功，Spring Context 已初始化但云托管报 8080 `connection refused`，且没有应用 `Caused by` | PROD 在应用启动主线程同步执行数据库迁移，云托管 TCP 探针在端口完成监听前终止实例 | 应用先完成 8080 监听；`ApplicationReadyEvent` 后由唯一 daemon worker 执行受控迁移；迁移期间业务 Gate 保持关闭，精确 POST_V14 后才开放 | 启动器定向测试锁定单次事件、重复事件不重跑、失败关闭；完整 PROD gate 后才允许推进 `deploy/prod` |
+| PROD-ENV-003 | `ProdFlywayBootstrapRunner: No default constructor found` | 启动器为测试保留了第二个注入执行器的构造器，Spring 面对多个未标注构造器无法选择生产构造器 | 生产构造器显式标记 `@Autowired`，测试构造器继续只供同包测试注入同步执行器 | PROD profile smoke test 不再 mock 启动器，必须实例化真实 Bean |
+| PROD-ENV-004 | 已改为 `ApplicationReadyEvent` 异步迁移，但应用仍可能在 `Started ApiApplication` 前阻塞 | 旧 `ReleaseMigrationReadyVerifier` 仍是同步 `ApplicationRunner`，会在 PROD 启动主线程读取旧授权材料并连接数据库 | `prod-mysql` 物理不装配旧 verifier；PROD 只由 `ProdFlywayBootstrapRunner` 管理迁移和 Gate 状态 | PROD profile smoke test 断言启动器存在且旧 verifier Bean 为 0 |
 
 ## 四环境边界
 

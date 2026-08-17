@@ -28,11 +28,10 @@ class ProdProfileApplicationSmokeTest {
 
     @MockBean DataSource dataSource;
     @MockBean(name = "releaseFlyway") Flyway releaseFlyway;
-    @MockBean ProdFlywayBootstrapRunner prodFlywayBootstrapRunner;
-    @MockBean ReleaseMigrationReadyVerifier releaseMigrationReadyVerifier;
-
     @Test void exactCloudBaseProdProfilePairLoadsWithoutDevelopmentData() {
         assertThat(context).isNotNull();
+        assertThat(context.getBean(ProdFlywayBootstrapRunner.class)).isNotNull();
+        assertThat(context.getBeansOfType(ReleaseMigrationReadyVerifier.class)).isEmpty();
         assertThat(context.getEnvironment().getActiveProfiles())
                 .containsExactly("release-mysql", "prod-mysql");
         assertThat(context.getEnvironment().getProperty("hz.v1-dev-data.enabled", Boolean.class))

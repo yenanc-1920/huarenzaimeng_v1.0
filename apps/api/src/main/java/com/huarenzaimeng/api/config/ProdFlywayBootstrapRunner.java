@@ -9,6 +9,7 @@ import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -29,6 +30,7 @@ final class ProdFlywayBootstrapRunner {
     private final Executor executor;
     private final AtomicBoolean started = new AtomicBoolean();
 
+    @Autowired
     ProdFlywayBootstrapRunner(DataSource dataSource,
             @Qualifier("releaseFlyway") Flyway flyway,
             ReleaseMigrationState state,
