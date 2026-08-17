@@ -36,8 +36,17 @@ jobs:
         working-directory: apps/miniapp
       - name: Full deterministic STAGE gate
         run: node tools/run-stage-deployment-gate.mjs
-      - name: Build exact STAGE image without repeating tests
-        run: docker build --file Dockerfile --tag huaren-api-stage:${{ github.sha }} .
+      - name: Verify exact CloudBase container contract without a duplicate cold build
+        shell: bash
+        run: |
+          test "$(grep -c '^ENTRYPOINT \["java","-jar","/app/app.jar"\]$' Dockerfile)" -eq 1
+          test -f apps/api/target/api-0.1.0-SNAPSHOT.jar
+          jar tf apps/api/target/api-0.1.0-SNAPSHOT.jar | grep -qx 'BOOT-INF/classes/application-stage-mysql.yml'
+          jar tf apps/api/target/api-0.1.0-SNAPSHOT.jar | grep -qx 'BOOT-INF/classes/db/migration/V14__add_v1_business_read_models.sql'
+          if jar tf apps/api/target/api-0.1.0-SNAPSHOT.jar | grep -q 'BOOT-INF/classes/db/devdata/'; then
+            exit 1
+          fi
+          sha256sum apps/api/target/api-0.1.0-SNAPSHOT.jar
 
   promote-deploy-branch:
     if: github.event_name == 'push'
