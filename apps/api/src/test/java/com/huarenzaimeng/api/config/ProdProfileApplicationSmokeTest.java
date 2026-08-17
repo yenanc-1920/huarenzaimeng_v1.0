@@ -19,7 +19,7 @@ import org.springframework.test.context.ActiveProfiles;
         "SPRING_FLYWAY_PASSWORD=smoke_password",
         "HZ_ENV_DATABASE_NAME=huarenzaimeng_prod",
         "HZ_ENV_INITIALIZE_EMPTY_DATABASE=true",
-        "HZ_ENV_FUNCTION_RELEASE_ENABLED=true",
+        "HZ_ENV_FUNCTION_RELEASE_ENABLED=false",
         "HZ_ADMIN_BOOTSTRAP_ENABLED=false"
 })
 @ActiveProfiles({"release-mysql", "prod-mysql"})
