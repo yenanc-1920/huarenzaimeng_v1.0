@@ -14,18 +14,18 @@ import static org.mockito.Mockito.doAnswer;
 
 class ReleaseMigrationGateFilterTest {
     private final ReleaseMigrationState state = new ReleaseMigrationState();
-    private final ReleaseMigrationGateFilter filter = new ReleaseMigrationGateFilter(state, false, false);
+    private final ReleaseMigrationGateFilter filter = new ReleaseMigrationGateFilter(state);
 
-    @Test void explicitDevelopmentFunctionReleaseBypassesClosedGate() throws Exception {
-        ReleaseMigrationGateFilter developmentFilter = new ReleaseMigrationGateFilter(state, true, false);
+    @Test void noEnvironmentCanBypassClosedGate() throws Exception {
+        ReleaseMigrationGateFilter developmentFilter = new ReleaseMigrationGateFilter(state);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin-read/v1/pages/A120");
         FilterChain chain = mock(FilterChain.class);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         developmentFilter.doFilter(request, response, chain);
 
-        verify(chain).doFilter(request, response);
-        assertThat(response.getStatus()).isEqualTo(200);
+        verifyNoInteractions(chain);
+        assertThat(response.getStatus()).isEqualTo(503);
     }
 
     @Test void allowsExactBrowserShapedGetAllowlistWithoutContentLength() throws Exception {

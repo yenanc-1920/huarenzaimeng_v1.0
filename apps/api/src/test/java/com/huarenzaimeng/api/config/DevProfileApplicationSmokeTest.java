@@ -32,7 +32,7 @@ class DevProfileApplicationSmokeTest {
 
     @MockBean DataSource dataSource;
     @MockBean(name = "releaseFlyway") Flyway releaseFlyway;
-    @MockBean DevelopmentFlywayMigrationRunner developmentFlywayMigrationRunner;
+    @MockBean ProdFlywayBootstrapRunner environmentFlywayBootstrapRunner;
     @MockBean ReleaseMigrationReadyVerifier releaseMigrationReadyVerifier;
 
     @Test void exactCloudBaseDevelopmentProfilePairLoadsTheApplicationGraph() {

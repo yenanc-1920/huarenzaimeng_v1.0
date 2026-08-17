@@ -28,7 +28,7 @@ class StageProfileApplicationSmokeTest {
 
     @MockBean DataSource dataSource;
     @MockBean(name = "releaseFlyway") Flyway releaseFlyway;
-    @MockBean StageFlywayMigrationRunner stageFlywayMigrationRunner;
+    @MockBean ProdFlywayBootstrapRunner environmentFlywayBootstrapRunner;
     @MockBean ReleaseMigrationReadyVerifier releaseMigrationReadyVerifier;
 
     @Test void exactCloudBaseStageProfilePairLoadsWithoutDevelopmentData() {

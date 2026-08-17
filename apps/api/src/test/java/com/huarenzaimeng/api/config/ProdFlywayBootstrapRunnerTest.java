@@ -16,65 +16,58 @@ import org.junit.jupiter.api.Test;
 
 class ProdFlywayBootstrapRunnerTest {
     @Test void initializesOnlyAnEmptyExactProdDatabaseAndMarksReady() throws Exception {
-        Fixture fixture = fixture("huarenzaimeng_prod", 0L, true, 0L);
+        Fixture fixture = fixture("huarenzaimeng_prod", false);
         ReleaseMigrationState state = new ReleaseMigrationState();
 
-        runner(fixture, state, true).onApplicationReady();
+        runner(fixture, state, true, false).onApplicationReady();
 
         verify(fixture.flyway).migrate();
         org.assertj.core.api.Assertions.assertThat(state.isReady()).isTrue();
     }
 
     @Test void restartVerifiesTerminalStateWithoutMigrating() throws Exception {
-        Fixture fixture = fixture("huarenzaimeng_prod", 37L, true, 0L);
+        Fixture fixture = fixture("huarenzaimeng_prod", false);
         ReleaseMigrationState state = new ReleaseMigrationState();
 
-        runner(fixture, state, false).onApplicationReady();
+        runner(fixture, state, false, false).onApplicationReady();
 
         verify(fixture.flyway, never()).migrate();
         org.assertj.core.api.Assertions.assertThat(state.isReady()).isTrue();
     }
 
     @Test void rejectsWrongDatabaseBeforeMigration() throws Exception {
-        Fixture fixture = fixture("huarenzaimeng_stage", 0L, true, 0L);
+        Fixture fixture = fixture("huarenzaimeng_stage", false);
         ReleaseMigrationState state = new ReleaseMigrationState();
 
         assertThrows(IllegalStateException.class, () ->
-                runner(fixture, state, true).migrateAndVerify());
+                new ProdFlywayBootstrapRunner(fixture.source, fixture.flyway, state,
+                        "huarenzaimeng_prod", true, false, Runnable::run).migrateAndVerify());
 
         verify(fixture.flyway, never()).migrate();
         org.assertj.core.api.Assertions.assertThat(state.phase())
                 .isEqualTo(ReleaseMigrationState.Phase.FAILED);
     }
 
-    @Test void resumesOnlyAnExactValidatedPreV10Initialization() throws Exception {
-        Fixture fixture = fixture("huarenzaimeng_prod", 20L, true, 0L);
+    @Test void rejectsDevelopmentRegistryOutsideDevelopment() throws Exception {
+        Fixture fixture = fixture("huarenzaimeng_prod", true);
 
-        runner(fixture, new ReleaseMigrationState(), true).onApplicationReady();
+        assertThrows(IllegalStateException.class, () ->
+                runner(fixture, new ReleaseMigrationState(), false, false).migrateAndVerify());
+    }
 
-        verify(fixture.flyway).validate();
+    @Test void acceptsDevelopmentRegistryOnlyForDevelopment() throws Exception {
+        Fixture fixture = fixture("huarenzaimeng_dev", true);
+        ReleaseMigrationState state = new ReleaseMigrationState();
+
+        runner(fixture, state, true, true).migrateAndVerify();
+
         verify(fixture.flyway).migrate();
-    }
-
-    @Test void rejectsInitializationWhenDatabaseIsUnknownNonEmptyState() throws Exception {
-        Fixture fixture = fixture("huarenzaimeng_prod", 20L, false, 0L);
-
-        assertThrows(IllegalStateException.class, () ->
-                runner(fixture, new ReleaseMigrationState(), true).migrateAndVerify());
-
-        verify(fixture.flyway, never()).migrate();
-    }
-
-    @Test void rejectsDevelopmentSeedRows() throws Exception {
-        Fixture fixture = fixture("huarenzaimeng_prod", 37L, true, 1L);
-
-        assertThrows(IllegalStateException.class, () ->
-                runner(fixture, new ReleaseMigrationState(), false).migrateAndVerify());
+        org.assertj.core.api.Assertions.assertThat(state.isReady()).isTrue();
     }
 
     @Test void duplicateReadyEventsExecuteBootstrapExactlyOnce() throws Exception {
-        Fixture fixture = fixture("huarenzaimeng_prod", 0L, true, 0L);
-        ProdFlywayBootstrapRunner runner = runner(fixture, new ReleaseMigrationState(), true);
+        Fixture fixture = fixture("huarenzaimeng_prod", false);
+        ProdFlywayBootstrapRunner runner = runner(fixture, new ReleaseMigrationState(), true, false);
 
         runner.onApplicationReady();
         runner.onApplicationReady();
@@ -83,44 +76,31 @@ class ProdFlywayBootstrapRunnerTest {
     }
 
     private static ProdFlywayBootstrapRunner runner(Fixture fixture,
-            ReleaseMigrationState state, boolean initialize) {
+            ReleaseMigrationState state, boolean migrationEnabled, boolean developmentDataExpected) {
         return new ProdFlywayBootstrapRunner(fixture.source, fixture.flyway, state,
-                "huarenzaimeng_prod", initialize, Runnable::run);
+                fixture.database, migrationEnabled, developmentDataExpected, Runnable::run);
     }
 
-    private static Fixture fixture(String database, long existingTables,
-            boolean validPreV10, long seedRows) throws Exception {
+    private static Fixture fixture(String database, boolean registryPresent) throws Exception {
         DataSource source = mock(DataSource.class);
         Connection connection = mock(Connection.class);
         Statement statement = mock(Statement.class);
         Flyway flyway = mock(Flyway.class);
         ResultSet identity = single(database);
-        ResultSet tables = single(existingTables);
-        ResultSet preHistory = mock(ResultSet.class);
         ResultSet history = mock(ResultSet.class);
-        ResultSet seeds = single(seedRows);
+        ResultSet seeds = single(registryPresent ? 1L : 0L);
         when(history.next()).thenReturn(true, false);
         when(history.getLong(1)).thenReturn(14L);
         when(history.getLong(2)).thenReturn(14L);
         when(history.getLong(3)).thenReturn(14L);
         when(history.getLong(4)).thenReturn(14L);
         when(history.getLong(5)).thenReturn(0L);
-        when(preHistory.next()).thenReturn(true, false);
-        when(preHistory.getLong(1)).thenReturn(validPreV10 ? 10L : 9L);
-        when(preHistory.getLong(2)).thenReturn(10L);
-        when(preHistory.getLong(3)).thenReturn(1L);
-        when(preHistory.getLong(4)).thenReturn(10L);
-        when(preHistory.getLong(5)).thenReturn(10L);
-        when(preHistory.getLong(6)).thenReturn(0L);
-        when(preHistory.getLong(7)).thenReturn(10L);
         when(source.getConnection()).thenReturn(connection);
         when(connection.createStatement()).thenReturn(statement);
         when(statement.executeQuery("SELECT DATABASE()")) .thenReturn(identity);
-        when(statement.executeQuery(startsWith("SELECT COUNT(*) FROM information_schema.tables"))).thenReturn(tables);
         when(statement.executeQuery(startsWith("SELECT COUNT(*), COUNT(DISTINCT version)"))).thenReturn(history);
-        when(statement.executeQuery(startsWith("SELECT COUNT(*), COUNT(DISTINCT version), MIN"))).thenReturn(preHistory);
-        when(statement.executeQuery("SELECT COUNT(*) FROM hz_v1_dev_seed_registry")).thenReturn(seeds);
-        return new Fixture(source, flyway);
+        when(statement.executeQuery(startsWith("SELECT COUNT(*) FROM information_schema.tables"))).thenReturn(seeds);
+        return new Fixture(source, flyway, database);
     }
 
     private static ResultSet single(Object value) throws Exception {
@@ -131,5 +111,5 @@ class ProdFlywayBootstrapRunnerTest {
         return result;
     }
 
-    private record Fixture(DataSource source, Flyway flyway) {}
+    private record Fixture(DataSource source, Flyway flyway, String database) {}
 }

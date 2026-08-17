@@ -62,3 +62,22 @@ powershell -ExecutionPolicy Bypass -File tools\Invoke-DevReleaseGate.ps1 -SkipCo
 - 激活 Profile 固定为 `release-mysql,stage-mysql`；普通 `Dockerfile`、端口 `8080`。
 - STAGE 不加载 `db/devdata`，不启用微信支付和充值供应商。
 - 应用启动前先核对 `SELECT DATABASE()`，只有精确命中配置库才执行 Flyway；迁移失败不重试。
+# 统一环境启动链（2026-08-18）
+
+DEV、TEST、STAGE、PROD 统一使用同一个环境 Flyway bootstrap：应用端口先启动，业务 API 保持
+`SERVICE_STARTING`，后台线程只执行一次 Flyway，数据库身份、V1-V14 成功记录和开发种子边界全部
+核验通过后才开放业务。迁移失败不重试，状态保持 FAILED。
+
+环境仅通过以下配置区分：
+
+- `SPRING_PROFILES_ACTIVE=release-mysql,<dev/test/stage/prod>-mysql`（DEV 仍使用 `local-mysql`）
+- `HZ_ENV_DATABASE_NAME`（DEV 兼容 `HZ_DEV_DATABASE_NAME`）
+- `HZ_ENV_MIGRATION_ENABLED=true`
+- 只有 DEV 的 `hz.v1-dev-data.enabled=true`；TEST/STAGE/PROD 必须为 false
+
+`HZ_ENV_FUNCTION_RELEASE_ENABLED` 和 `HZ_DEV_FUNCTION_RELEASE_ENABLED` 不再参与 profile 合法性，
+也不能绕过迁移门禁；云平台可删除这两个旧变量。PROD 不加载 `db/devdata`，且 seed registry
+必须物理不存在。
+
+部署前分别运行 `Invoke-DevReleaseGate.ps1`、`Invoke-TestReleaseGate.ps1`、
+`Invoke-StageReleaseGate.ps1`、`Invoke-ProdReleaseGate.ps1`。任何一项失败都不得推送对应部署分支。
