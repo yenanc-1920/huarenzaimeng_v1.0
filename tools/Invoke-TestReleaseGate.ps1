@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('test', 'stage')]
+    [ValidateSet('test', 'stage', 'prod')]
     [string]$EnvironmentName = 'test',
     [ValidateRange(1024, 65535)]
     [int]$ServerPort = 18081
@@ -101,7 +101,11 @@ FLUSH PRIVILEGES;
     $env:SPRING_FLYWAY_PASSWORD = Get-PlainPassword $credentials.Migrator.Password
     $env:SPRING_FLYWAY_CONNECT_RETRIES = '0'
     $env:HZ_ENV_DATABASE_NAME = $database
-    $env:HZ_ENV_MIGRATION_ENABLED = 'true'
+    if ($EnvironmentName -eq 'prod') {
+        $env:HZ_ENV_INITIALIZE_EMPTY_DATABASE = 'true'
+    } else {
+        $env:HZ_ENV_MIGRATION_ENABLED = 'true'
+    }
     $env:HZ_ENV_FUNCTION_RELEASE_ENABLED = 'true'
     $env:HZ_ADMIN_BOOTSTRAP_ENABLED = 'false'
 
@@ -122,7 +126,7 @@ FLUSH PRIVILEGES;
         Stop-Process -Id $appProcess.Id -ErrorAction SilentlyContinue
         $appProcess.WaitForExit(10000) | Out-Null
     }
-    Remove-Item Env:SPRING_PROFILES_ACTIVE,Env:SERVER_PORT,Env:HZ_DATASOURCE_URL,Env:SPRING_DATASOURCE_USERNAME,Env:SPRING_DATASOURCE_PASSWORD,Env:SPRING_FLYWAY_USER,Env:SPRING_FLYWAY_PASSWORD,Env:SPRING_FLYWAY_CONNECT_RETRIES,Env:HZ_ENV_DATABASE_NAME,Env:HZ_ENV_MIGRATION_ENABLED,Env:HZ_ENV_FUNCTION_RELEASE_ENABLED,Env:HZ_ADMIN_BOOTSTRAP_ENABLED -ErrorAction SilentlyContinue
+    Remove-Item Env:SPRING_PROFILES_ACTIVE,Env:SERVER_PORT,Env:HZ_DATASOURCE_URL,Env:SPRING_DATASOURCE_USERNAME,Env:SPRING_DATASOURCE_PASSWORD,Env:SPRING_FLYWAY_USER,Env:SPRING_FLYWAY_PASSWORD,Env:SPRING_FLYWAY_CONNECT_RETRIES,Env:HZ_ENV_DATABASE_NAME,Env:HZ_ENV_MIGRATION_ENABLED,Env:HZ_ENV_INITIALIZE_EMPTY_DATABASE,Env:HZ_ENV_FUNCTION_RELEASE_ENABLED,Env:HZ_ADMIN_BOOTSTRAP_ENABLED -ErrorAction SilentlyContinue
     if ($credentials) {
         try { Invoke-RootSql "DROP DATABASE IF EXISTS $database;" } catch { Write-Warning 'TEST_GATE_DATABASE_CLEANUP_FAILED' }
     }

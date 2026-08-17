@@ -1,0 +1,14 @@
+spring:
+  flyway:
+    locations: classpath:db/migration
+hz:
+  environment:
+    name: prod
+    database-name: ${HZ_ENV_DATABASE_NAME}
+    initialize-empty-database: ${HZ_ENV_INITIALIZE_EMPTY_DATABASE:false}
+    function-release-enabled: ${HZ_ENV_FUNCTION_RELEASE_ENABLED:false}
+  v1-dev-data:
+    enabled: false
+  external-integrations:
+    wechat-payment-enabled: false
+    topup-provider-enabled: false

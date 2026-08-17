@@ -1,0 +1,106 @@
+package com.huarenzaimeng.api.config;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import javax.sql.DataSource;
+import org.flywaydb.core.Flyway;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+
+/** Empty-database-only bootstrap and read-only terminal verifier for PROD. */
+@Component
+@Profile("release-mysql & prod-mysql")
+@Order(Ordered.HIGHEST_PRECEDENCE)
+final class ProdFlywayBootstrapRunner implements ApplicationRunner {
+    private final DataSource dataSource;
+    private final Flyway flyway;
+    private final ReleaseMigrationState state;
+    private final String expectedDatabase;
+    private final boolean initializeEmptyDatabase;
+
+    ProdFlywayBootstrapRunner(DataSource dataSource,
+            @Qualifier("releaseFlyway") Flyway flyway,
+            ReleaseMigrationState state,
+            @Value("${hz.environment.database-name}") String expectedDatabase,
+            @Value("${hz.environment.initialize-empty-database:false}") boolean initializeEmptyDatabase) {
+        this.dataSource = dataSource;
+        this.flyway = flyway;
+        this.state = state;
+        this.expectedDatabase = expectedDatabase;
+        this.initializeEmptyDatabase = initializeEmptyDatabase;
+    }
+
+    @Override
+    public void run(ApplicationArguments args) throws Exception {
+        try {
+            requireDatabaseIdentity();
+            if (initializeEmptyDatabase) {
+                requireCompletelyEmptyDatabase();
+                flyway.migrate();
+            }
+            requirePostV14WithoutDevelopmentSeeds();
+            state.ready();
+        } catch (Exception failure) {
+            state.failed();
+            throw failure;
+        }
+    }
+
+    private void requireDatabaseIdentity() throws Exception {
+        if (expectedDatabase == null || expectedDatabase.isBlank()) {
+            throw new IllegalStateException("PROD_DATABASE_NAME_REQUIRED");
+        }
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("SELECT DATABASE()")) {
+            if (!result.next() || !expectedDatabase.equals(result.getString(1)) || result.next()) {
+                throw new IllegalStateException("PROD_DATABASE_IDENTITY_MISMATCH");
+            }
+        }
+    }
+
+    private void requireCompletelyEmptyDatabase() throws Exception {
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()")) {
+            if (!result.next() || result.getLong(1) != 0L || result.next()) {
+                throw new IllegalStateException("PROD_INITIALIZATION_REQUIRES_EMPTY_DATABASE");
+            }
+        }
+    }
+
+    private void requirePostV14WithoutDevelopmentSeeds() throws Exception {
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet history = statement.executeQuery(
+                     "SELECT COUNT(*), COUNT(DISTINCT version), MAX(CAST(version AS UNSIGNED)), "
+                             + "SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), "
+                             + "SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) "
+                             + "FROM flyway_schema_history WHERE version IS NOT NULL")) {
+            if (!history.next()
+                    || history.getLong(1) != 14L
+                    || history.getLong(2) != 14L
+                    || history.getLong(3) != 14L
+                    || history.getLong(4) != 14L
+                    || history.getLong(5) != 0L
+                    || history.next()) {
+                throw new IllegalStateException("PROD_FLYWAY_TERMINAL_STATE_INVALID");
+            }
+        }
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet seeds = statement.executeQuery("SELECT COUNT(*) FROM hz_v1_dev_seed_registry")) {
+            if (!seeds.next() || seeds.getLong(1) != 0L || seeds.next()) {
+                throw new IllegalStateException("PROD_DEVELOPMENT_SEED_FORBIDDEN");
+            }
+        }
+    }
+}
