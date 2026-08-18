@@ -13,6 +13,17 @@
 
 四份 JSON 也不包含数据库真实密码或任何已配置秘密。`[REPLACE_...]` 是待配置标记，不是可部署默认值；看到任一该标记都必须停止发布。
 
+### 已冻结的服务与域名映射
+
+| 环境 | 云托管服务 | HTTPS域名 | 小程序构建命令 |
+|---|---|---|---|
+| DEV | `huaren-api-dev` | `https://dev.guiye.xyz` | `npm run build:mp-weixin:dev` |
+| TEST | `huaren-api-test` | `https://test.guiye.xyz` | `npm run build:mp-weixin:test` |
+| STAGE | `huaren-api-stage` | `https://stage.guiye.xyz` | `npm run build:mp-weixin:stage` |
+| PROD | `huaren-api-prod` | `https://api.guiye.xyz` | `npm run build:mp-weixin:prod`（也是默认构建） |
+
+四个服务位于同一已确认CloudBase环境`prod-d3g9ntdmsdf9d7877`，但服务、数据库、账号和秘密仍按四环境隔离。小程序目标环境在构建期固定，PROD包不能由终端用户运行时切换到非生产服务。构建映射的代码源为`apps/miniapp/config/release-environments.json`，不得只在微信开发者工具中手改产物。
+
 ### 兼容性规则
 
 - 环境变量调整采用“保留现有键、只新增或修改已确认键”的方式；候选代码尚未晋级前，不提前删除旧分支仍可能读取的变量。
