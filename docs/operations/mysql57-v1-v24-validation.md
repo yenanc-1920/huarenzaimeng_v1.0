@@ -1,12 +1,12 @@
-# MySQL 5.7 V1→V22 临时库验证方案
+# MySQL 5.7 V1→V24 临时库验证方案
 
 ## 1. 证据边界
 
 本方案只验证候选迁移在独立 MySQL 5.7 临时库中的结构演进，不证明开发、测试、预发或生产业务库可迁移，也不构成生产发布证据。当前批次只完成脚本和静态合同测试，不连接数据库。
 
-脚本：`apps/api/scripts/mysql57-validation/Invoke-MySql57V1ToV22Validation.ps1`
+脚本：`apps/api/scripts/mysql57-validation/Invoke-MySql57V1ToV24Validation.ps1`
 
-迁移基线必须是连续且唯一的 V1–V22。脚本运行时记录 Git commit、脚本 SHA-256、V1–V22 清单 SHA-256、RunId、临时库名、`@@server_uuid`、`VERSION()`、Flyway 终态计数、表计数和 UTC 时间。
+迁移基线必须是连续且唯一的 V1–V24。脚本运行时记录 Git commit、脚本 SHA-256、V1–V24 清单 SHA-256、RunId、临时库名、`@@server_uuid`、`VERSION()`、Flyway 终态计数、表计数和 UTC 时间。
 
 ## 2. 强制安全边界
 
@@ -24,18 +24,18 @@
 
 | 场景 | 第一步 | 升级 | 幂等检查 | 终态 |
 |---|---|---|---|---|
-| EMPTY | 使用预创建空临时库 | V1→V22 | 同一授权运行再次执行 target=22 | 22/22 成功，0 失败 |
-| V14 | 预创建空库后 V1→V14 并核验 current=14 | V15→V22 | 同上 | 22/22 成功，0 失败 |
-| V21 | 预创建空库后 V1→V21 并核验 current=21 | V22 | 同上 | 22/22 成功，0 失败 |
+| EMPTY | 使用预创建空临时库 | V1→V24 | 同一授权运行再次执行 target=24 | 24/24 成功，0 失败 |
+| V14 | 预创建空库后 V1→V14 并核验 current=14 | V15→V24 | 同上 | 24/24 成功，0 失败 |
+| V21 | 预创建空库后 V1→V21 并核验 current=21 | V22→V24 | 同上 | 24/24 成功，0 失败 |
 
-再次执行 target=22 是同一验证运行中的预定幂等检查，不是失败重试。任何失败后都不得再次执行 `Execute`。
+再次执行 target=24 是同一验证运行中的预定幂等检查，不是失败重试。任何失败后都不得再次执行 `Execute`。
 
 ## 4. 使用流程
 
 ### 4.1 Dry-run（零连接）
 
 ```powershell
-& .\apps\api\scripts\mysql57-validation\Invoke-MySql57V1ToV22Validation.ps1 `
+& .\apps\api\scripts\mysql57-validation\Invoke-MySql57V1ToV24Validation.ps1 `
   -RunId a1b2c3d4 `
   -Scenario EMPTY
 ```
@@ -43,7 +43,7 @@
 ### 4.2 只读预检
 
 ```powershell
-& .\apps\api\scripts\mysql57-validation\Invoke-MySql57V1ToV22Validation.ps1 `
+& .\apps\api\scripts\mysql57-validation\Invoke-MySql57V1ToV24Validation.ps1 `
   -RunId a1b2c3d4 `
   -Scenario EMPTY `
   -Action Preflight `
@@ -95,8 +95,9 @@ MySQL 5.7 DDL 可能非事务化。若进程中断、连接重置或 Flyway 失�
 PASS 必须同时满足：
 
 - `DATABASE()` 等于脚本生成的临时库名；server UUID、MySQL 5.7.x 身份在整个运行中一致。
-- V1–V22 共 22 个版本，版本唯一，current=22，success=22，failed=0。
-- Flyway validate 成功；第二次 target=22 不新增历史记录。
+- V1–V24 共 24 个版本，版本唯一，current=24，success=24，failed=0。
+- V22 的同意/注销/自审对象、V23 的履约号码对象、V24 的支付身份与五项预支付字段均存在。
+- Flyway validate 成功；第二次 target=24 不新增历史记录。
 - 证据 JSON 不含密码、AppSecret、连接凭据或业务数据。
 
 任一条件缺失均为 FAIL/NOT_RUN，不允许解释为“基本成功”。

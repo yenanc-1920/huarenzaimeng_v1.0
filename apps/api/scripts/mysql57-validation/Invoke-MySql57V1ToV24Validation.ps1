@@ -40,8 +40,8 @@ $migrationFiles = @(Get-ChildItem -LiteralPath $migrationPath -File -Filter 'V*_
     Where-Object { $_.Name -match '^V(\d+)__.+\.sql$' } |
     Sort-Object { [int]([regex]::Match($_.Name, '^V(\d+)__').Groups[1].Value) })
 $versions = @($migrationFiles | ForEach-Object { [int]([regex]::Match($_.Name, '^V(\d+)__').Groups[1].Value) })
-if (($versions -join ',') -ne ((1..22) -join ',')) {
-    throw 'MIGRATION_MANIFEST_MUST_BE_CONTINUOUS_V1_TO_V22'
+if (($versions -join ',') -ne ((1..24) -join ',')) {
+    throw 'MIGRATION_MANIFEST_MUST_BE_CONTINUOUS_V1_TO_V24'
 }
 $migrationHashes = [ordered]@{}
 foreach ($migrationFile in $migrationFiles) {
@@ -181,7 +181,7 @@ $plan = [ordered]@{
     runId = $RunId
     databaseName = $databaseName
     migrationCount = $migrationFiles.Count
-    highestVersion = 22
+    highestVersion = 24
     scriptSha256 = $scriptHash
     migrationManifestSha256 = $migrationManifestHash
     zeroConnection = ($Action -eq 'DryRun')
@@ -296,20 +296,29 @@ try {
         if ($actual -ne $expected) { throw 'START_STATE_TERMINAL_VERSION_MISMATCH' }
     }
 
-    [void](Invoke-Flyway @('-target=22', 'migrate'))
+    [void](Invoke-Flyway @('-target=24', 'migrate'))
     [void](Invoke-Flyway @('validate'))
     # This is an explicit idempotency check inside the same authorized validation run, not a failure retry.
-    [void](Invoke-Flyway @('-target=22', 'migrate'))
+    [void](Invoke-Flyway @('-target=24', 'migrate'))
 
     $terminal = @(Invoke-MysqlRead "SELECT COUNT(*), COUNT(DISTINCT version), COALESCE(MAX(CAST(version AS UNSIGNED)),0), SUM(CASE WHEN success=1 THEN 1 ELSE 0 END), SUM(CASE WHEN success=0 THEN 1 ELSE 0 END) FROM flyway_schema_history;" -UseDatabase)
     $tableCount = [int]((Invoke-MysqlRead "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_type='BASE TABLE';" -UseDatabase)[0])
     $v22TableCount = [int]((Invoke-MysqlRead "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('buyer_consent_state','buyer_consent_acceptance','buyer_account_closure_request','buyer_pii_cleanup_task');" -UseDatabase)[0])
     $v22AuditColumnCount = [int]((Invoke-MysqlRead "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND ((table_name='hz_content_review_task' AND column_name IN ('self_approved','exception_policy_version')) OR (table_name='hz_v1_admin_audit' AND column_name IN ('self_approved','exception_policy_version')) OR (table_name='hz_content_version_history' AND column_name IN ('self_approved','exception_policy_version')));" -UseDatabase)[0])
-    if ($terminal.Count -ne 1 -or $terminal[0] -ne "22`t22`t22`t22`t0") {
-        throw 'V22_TERMINAL_HISTORY_MISMATCH'
+    $v23TableCount = [int]((Invoke-MysqlRead "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('hz_quote_recipient_pending','hz_order_recipient_fulfillment');" -UseDatabase)[0])
+    $v24TableCount = [int]((Invoke-MysqlRead "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='buyer_wechat_payment_identity';" -UseDatabase)[0])
+    $v24PrepayColumnCount = [int]((Invoke-MysqlRead "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='hz_payment_coordination' AND column_name IN ('prepay_timestamp','prepay_nonce','prepay_package','prepay_sign_type','prepay_pay_sign','prepay_expires_at');" -UseDatabase)[0])
+    if ($terminal.Count -ne 1 -or $terminal[0] -ne "24`t24`t24`t24`t0") {
+        throw 'V24_TERMINAL_HISTORY_MISMATCH'
     }
     if ($v22TableCount -ne 4 -or $v22AuditColumnCount -ne 6) {
         throw 'V22_TERMINAL_OBJECT_MISMATCH'
+    }
+    if ($v23TableCount -ne 2) {
+        throw 'V23_TERMINAL_OBJECT_MISMATCH'
+    }
+    if ($v24TableCount -ne 1 -or $v24PrepayColumnCount -ne 6) {
+        throw 'V24_TERMINAL_OBJECT_MISMATCH'
     }
 
     $evidence = [ordered]@{
@@ -322,11 +331,14 @@ try {
         gitCommit = Get-GitCommit
         scriptSha256 = $scriptHash
         migrationManifestSha256 = $migrationManifestHash
-        migrationCount = 22
+        migrationCount = 24
         terminalHistory = $terminal[0]
         tableCount = $tableCount
         v22TableCount = $v22TableCount
         v22AuditColumnCount = $v22AuditColumnCount
+        v23TableCount = $v23TableCount
+        v24TableCount = $v24TableCount
+        v24PrepayColumnCount = $v24PrepayColumnCount
         startedAtUtc = $startedAt.ToString('O')
         finishedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
         evidenceBoundary = 'TEMPORARY_MYSQL57_VALIDATION_ONLY_NOT_PRODUCTION_EVIDENCE'
