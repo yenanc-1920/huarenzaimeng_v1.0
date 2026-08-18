@@ -53,6 +53,10 @@ hz:
   recipient-retention:
     scheduler-enabled: ${HZ_RECIPIENT_RETENTION_SCHEDULER_ENABLED:false}
     scheduler-delay-ms: ${HZ_RECIPIENT_RETENTION_SCHEDULER_DELAY_MS:86400000}
+  topup-provider:
+    # Real WINLA transport remains unreachable until both switches and credentials are explicit.
+    mode: ${HZ_TOPUP_PROVIDER_MODE:disabled}
+    winla-enabled: ${HZ_WINLA_ENABLED:false}
   buyer-closure:
     cleanup:
       scheduler-enabled: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_ENABLED:false}

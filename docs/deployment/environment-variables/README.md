@@ -50,6 +50,10 @@
 | `HZ_BUYER_AUTH_ENABLED` | `false` | `false` | 真实微信身份验收前保持关闭 |
 | `HZ_BUYER_AUTH_PROVIDER_MODE` | `disabled` | `disabled` | 启用真实登录时才切换为`wechat-code2session` |
 | `HZ_WECHAT_IDENTITY_ENABLED` | `false` | `false` | 与provider mode双开关，真实验收前关闭 |
+| `HZ_TOPUP_PROVIDER_MODE` | `disabled` | `disabled` | 真实充值验收前保持关闭；启用值仅允许`winla` |
+| `HZ_WINLA_ENABLED` | `false` | `false` | 与provider mode双开关，单独打开会启动失败 |
+| `HZ_WINLA_UID` | 秘密占位 | 秘密占位 | 赢啦账号；平台环境变量维护，不在聊天或Git填写真实值 |
+| `HZ_WINLA_API_KEY` | 秘密占位 | 秘密占位 | 赢啦API Key；每个环境按实际隔离能力配置 |
 | `HZ_BUYER_AUTH_IDENTITY_PEPPER` | 秘密占位 | 秘密占位 | 至少32字符、每环境独立，不得与code pepper相同 |
 | `HZ_BUYER_AUTH_CODE_PEPPER` | 秘密占位 | 秘密占位 | 至少32字符、每环境独立 |
 | `HZ_BUYER_CONSENT_USER_AGREEMENT_VERSION` | `2026-08-28` | `2026-08-28` | 当前有效用户协议版本 |
@@ -75,7 +79,7 @@ JSON 中数据库 URL、账号和密码均为占位符；不替换就不应部�
 | `hz.wechat-pay.merchant-id` / `HZ_WECHAT_PAY_MERCHANT_ID` | 支付启用时必填，按环境受控配置 |
 | `hz.wechat-pay.allowed-certificate-serials` / `HZ_WECHAT_PAY_ALLOWED_CERTIFICATE_SERIALS` | 支付通知允许序列号集合；未配置时通知失败关闭 |
 
-AppID/AppSecret已由平台侧单独维护，因此不重复出现在JSON；V23候选会通过`HZ_WECHAT_APP_ID/HZ_WECHAT_APP_SECRET`读取它们。WINLA 当前正式 Bean 固定为 Disabled，代码没有可安全启用的 WINLA 环境变量；不得自行添加猜测的 URL/token/signing key。
+AppID/AppSecret已由平台侧单独维护，因此不重复出现在JSON；候选会通过`HZ_WECHAT_APP_ID/HZ_WECHAT_APP_SECRET`读取它们。WINLA候选只接受固定官方HTTPS端点，URL不能通过环境变量覆盖；模板包含账号/API Key占位符，但双开关仍固定关闭，不能据此宣称真实充值可用。
 
 ### 3.2 release 中禁止或只用于隔离测试
 
@@ -149,7 +153,7 @@ AppID/AppSecret已由平台侧单独维护，因此不重复出现在JSON；V23�
 |---|---|---|
 | 微信登录 | `HZ_BUYER_AUTH_ENABLED=false`、provider disabled、identity disabled | 平台秘密、预期AppID绑定、真机验收；三开关按受控步骤切换 |
 | 微信支付 | Disabled port | 商户/证书/回调配置、验签解密与小额支付退款授权 |
-| WINLA充值 | Disabled port，且无启用变量 | 书面协议、真实adapter、余额/IP/签名/金额/回调验收 |
+| WINLA充值 | `HZ_TOPUP_PROVIDER_MODE=disabled`、`HZ_WINLA_ENABLED=false` | 账号/API Key、余额、出口IP白名单、回调地址、签名/金额/状态小额验收；两开关最后切换 |
 | P021测试只读 | `HZ_P021_MODE=disabled` | 只能在独立证据服务使用，不进入四环境正式服务 |
 | 管理员bootstrap | `false` 且token必须为空 | 使用受控初始化流程，不在普通发布中打开 |
 | 外部恢复scheduler | 默认关闭 | 频率、预算、租约和真实provider查询能力验收 |

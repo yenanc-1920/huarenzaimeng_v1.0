@@ -23,6 +23,7 @@
 - raw 金额只接受非负十进制文本，按冻结的供应商 scale 使用 `UNNECESSARY` 精确转换；前导零可规范化，额外小数、溢出、非数字、币种错配均进入 `UNKNOWN`，不得判定成功。
 - 适配器是 raw 到 canonical 的唯一转换边界；协调器只消费已经验证的 canonical 金额和币种。
 - 同一 provider request 或 provider reference 的不同参数必须冲突关闭，不能覆盖历史事实。
+- WINLA `yj`、`yh`、提交/查询 `price` 以人民币元解析；回调 `order_money` 以人民币分解析。内部统一为 CNY 分，最终扣款权威以已验签回调 `order_money` 为准。
 
 ### 2.2 状态与查询
 
@@ -32,17 +33,17 @@
 
 ### 2.3 回调与绑定
 
-- 回调必须先由适配器验签，再绑定 merchant order、provider ref、SKU、recipient digest、原始金额和币种。
+- 回调必须先由适配器验签，再绑定回调实际提供的 merchant order、provider ref、原始金额和币种。WINLA回调不提供SKU和手机号，不伪称外部已核验；二者继续绑定提交前不可变内部快照。
 - 任一字段缺失、无法精确映射或与提交快照不一致时保持 `UNKNOWN`；不得用供应商“成功”文本越过绑定校验。
 - 回调收件、状态单调推进、余额释放和业务事件必须幂等；重复回调只产生一个业务事件。
 
 ### 2.4 孟加拉号码
 
 - 接受本地 `01xxxxxxxxx`、`8801xxxxxxxxx` 和 `008801xxxxxxxxx` 形式，统一规范为 `8801[3-9]xxxxxxxx`；其他号码拒绝。
-- 供应商提交使用受信订单权益快照中的号码、SKU、金额和币种，不接受客户端自报。
-- 真实 WINLA 字段名、签名 canonical 串、scale、回调字段和应答协议尚未取得书面合同，因此真实适配器保持 `NO_GO_REAL_PROVIDER_CONTRACT`。
+- 供应商提交使用受信订单权益快照中的号码、SKU、金额和币种，不接受客户端自报；仅在WINLA传输末端把规范号码转换为首位带`0`的本地格式 `01xxxxxxxxx`。
+- WINLA API v5 文档已冻结固定HTTPS路径与MD5 canonical签名；商务对接已确认 `yj/yh/price` 为人民币元、`order_money` 为人民币分，后者是最终扣款权威。回调成功应答正文、重试周期和来源IP仍待书面确认，因此保持 `NO_GO_REAL_PROVIDER_CONTRACT`。
 
-候选现状：供应商无关协调、金额规范化、状态机、回调绑定、余额/限额和恢复任务已存在；生产 Bean 当前仍固定装配 Disabled WINLA 端口，没有环境变量可把它安全地切到真实网络。
+候选现状：供应商无关协调、CNY成本预占、元/分金额规范化、状态机、验签回调、余额/限额和恢复任务已存在；真实传输采用双开关和缺凭据启动失败，默认仍为 Disabled。固定Fake和本地门禁不等于真实WINLA联调或资金证据。
 
 ## 3. A130 定价草稿默认值
 

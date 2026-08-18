@@ -11,7 +11,7 @@ public interface TopupProviderPort {
     CallbackResult verifyCallback(CallbackEnvelope envelope);
 
     record Command(String merchantOrderRef,String requestRef,String providerSku,String recipient,
-                   long faceValueMinor,String targetCurrency,String requestDigest) {}
+                   long providerAmountMinor,String providerCurrency,String requestDigest) {}
     record CallbackEnvelope(String callbackId,String timestamp,String nonce,String signature,String body) {}
     sealed interface Result permits Accepted,Rejected,Unknown {}
     record Accepted(String providerRef,String state,String evidenceRef) implements Result {}
