@@ -38,6 +38,11 @@ tmp/
 **/.tmp-*/
 .cache/
 /.runtime/
+/.gate-temp/
+/.codex-tmp/
+/stage-gate.log
+/stage-mysql-gate.log
+/target-readiness.log
 
 # Local databases and runtime data
 *.db

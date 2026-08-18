@@ -1,5 +1,10 @@
 # PROD 部署就绪记录（2026-08-17）
 
+> 历史证据说明：本文保留当时 V1-V14 的部署记录。当前候选环境变量以
+> `docs/deployment/environment-variables/cloudbase-prod.env.json` 和同目录 `README.md`
+> 为准；外部能力决策以 `docs/architecture/V1-INTEGRATION-AND-OPERATING-DECISIONS.md` 为准。
+> 模板中的占位符、Disabled外部端口和未验收真实协议均不构成当前可部署/可交易结论。
+
 ## 固定范围
 
 - Git 分支：`prod`，门禁通过后自动提升到 `deploy/prod`

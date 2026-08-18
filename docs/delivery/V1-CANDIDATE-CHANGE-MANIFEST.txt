@@ -1,0 +1,182 @@
+ M Dockerfile
+ M Dockerfile.dev
+ M apps/admin-web/scripts/assert-admin-contracts.mjs
+ M apps/admin-web/src/App.vue
+ D apps/admin-web/src/api/admin-order-sandbox.ts
+ M apps/admin-web/src/components/A130ChannelPanel.vue
+ M apps/admin-web/src/components/AdminCreatePanel.vue
+ D apps/admin-web/src/components/AdminOrderSandboxDetail.vue
+ M apps/admin-web/src/components/AdminRecordEditor.vue
+ M apps/admin-web/src/components/AdminWorkspace.vue
+ M apps/admin-web/src/components/workspaces/A100Workspace.vue
+ M apps/admin-web/src/components/workspaces/A110Workspace.vue
+ M apps/admin-web/src/components/workspaces/A120Workspace.vue
+ M apps/admin-web/src/components/workspaces/A130Workspace.vue
+ M apps/admin-web/src/components/workspaces/A140Workspace.vue
+ M apps/admin-web/src/components/workspaces/ManagedContentWorkspace.vue
+ M apps/admin-web/src/env.d.ts
+ M apps/admin-web/src/style.css
+ M apps/api/src/main/java/com/huarenzaimeng/api/AdminReadController.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/AdminReadMapper.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/AdminReadService.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/ContentController.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/ReleaseBuyerFlowController.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/V1AdminCommandController.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/adminauth/AdminSessionFilter.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/buyerauth/BuyerAuthService.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/buyerauth/BuyerAuthStore.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/buyerauth/JdbcBuyerAuthStore.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/buyerauth/WechatCode2SessionPort.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/config/ProdFlywayBootstrapRunner.java
+ M apps/api/src/main/java/com/huarenzaimeng/api/config/ProjectAuthenticationFilter.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/AdminReadServiceTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/BuildSelectionContractTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/ContentApiContractTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/V1PersistentDevelopmentDataContractTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/adminauth/AdminSessionFilterTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/buyerauth/BuyerAuthServiceTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/config/DevProfileApplicationSmokeTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/config/ProdFlywayBootstrapRunnerTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/config/ProdProfileApplicationSmokeTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/config/StageProfileApplicationSmokeTest.java
+ M apps/api/src/test/java/com/huarenzaimeng/api/config/TestProfileApplicationSmokeTest.java
+ M apps/miniapp/package.json
+ M apps/miniapp/scripts/assert-development-api-contracts.mjs
+ M apps/miniapp/scripts/assert-frontend-contracts.mjs
+ M apps/miniapp/scripts/verify-mp-weixin-output.mjs
+ M apps/miniapp/src/api/client.ts
+ M apps/miniapp/src/api/mock.ts
+ M apps/miniapp/src/api/order-creation-contract.ts
+ M apps/miniapp/src/api/p014-topup-contract.ts
+ D apps/miniapp/src/api/p014-topup-synthetic.ts
+ M apps/miniapp/src/api/project-contract.ts
+ M apps/miniapp/src/api/temporal-overview-contract.ts
+ M apps/miniapp/src/api/topup-recovery-contract.ts
+ M apps/miniapp/src/domain/command-identity.ts
+ M apps/miniapp/src/domain/life-content-page-executor.ts
+ M apps/miniapp/src/domain/types.ts
+ M apps/miniapp/src/pages.json
+ M apps/miniapp/src/pages/auth/expired.vue
+ M apps/miniapp/src/pages/directory/detail.vue
+ M apps/miniapp/src/pages/directory/list.vue
+ M apps/miniapp/src/pages/index/index.vue
+ M apps/miniapp/src/pages/life-content/detail.vue
+ M apps/miniapp/src/pages/life-content/list.vue
+ M apps/miniapp/src/pages/order/detail.vue
+ M apps/miniapp/src/pages/order/list.vue
+ M apps/miniapp/src/pages/order/progress.vue
+ M apps/miniapp/src/pages/order/recovery.vue
+ M apps/miniapp/src/pages/payment/status.vue
+ M apps/miniapp/src/pages/recharge/quote.vue
+ M apps/miniapp/src/pages/recharge/select.vue
+ M apps/miniapp/src/pages/refund/status.vue
+ M apps/miniapp/src/styles/shared.css
+?? Dockerfile.prod
+?? Dockerfile.stage
+?? Dockerfile.test
+?? apps/admin-web/src/api/admin-a140-detail.ts
+?? apps/admin-web/src/api/admin-workflow.ts
+?? apps/admin-web/src/components/AdminOrderDetail.vue
+?? apps/admin-web/src/components/workspaces/A121Workspace.vue
+?? apps/admin-web/src/components/workspaces/A122Workspace.vue
+?? apps/admin-web/src/components/workspaces/B002Dashboard.vue
+?? apps/api/src/main/java/com/huarenzaimeng/api/AdminA140DetailService.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/AdminWorkflowController.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/AdminWorkflowService.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/BusinessEventOutboxDispatcher.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/BusinessEventStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/FxRatePort.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/JdbcBusinessEventStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/ProviderCatalogPort.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/ReleaseQuoteOrderService.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/buyerauth/WeChatIdentityPort.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/DisabledWeChatPayAdapter.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/JdbcPaymentOrderSnapshotPort.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/JdbcWeChatPayStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/PaymentCoordinationConfiguration.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/PaymentOrderSnapshotPort.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/WeChatPayCoordinator.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/WeChatPayNotificationController.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/WeChatPayPort.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/WeChatPaymentRecoveryHandler.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/payment/WeChatRefundRecoveryHandler.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/recovery/JdbcRecoveryManualReviewStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/recovery/JdbcRecoveryTaskStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/recovery/RecoveryManualReviewStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/recovery/RecoverySchedulingConfiguration.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/recovery/RecoveryTaskScheduler.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/recovery/RecoveryTaskStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/recovery/RecoveryTaskWorker.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/BangladeshPhoneNumber.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/BuyerTopupController.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/JdbcProviderExchangeStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/JdbcProviderExposureStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/JdbcTopupEligibilityPort.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/JdbcTopupStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/ProviderExchangeStore.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/TopupCoordinationConfiguration.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/TopupCoordinator.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/TopupEligibilityPort.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/TopupProviderPort.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/WinlaTopupAdapter.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/WinlaTopupCallbackController.java
+?? apps/api/src/main/java/com/huarenzaimeng/api/topup/WinlaTopupRecoveryHandler.java
+?? apps/api/src/main/resources/db/migration/V15__add_v1_admin_workflow_history.sql
+?? apps/api/src/main/resources/db/migration/V16__add_payment_topup_coordination.sql
+?? apps/api/src/main/resources/db/migration/V17__add_release_quote_order_snapshots.sql
+?? apps/api/src/main/resources/db/migration/V18__add_business_event_transactional_outbox.sql
+?? apps/api/src/main/resources/db/migration/V19__add_unknown_recovery_task.sql
+?? apps/api/src/main/resources/db/migration/V20__add_provider_exposure_limits.sql
+?? apps/api/src/main/resources/db/migration/V21__add_provider_exchange_attempt.sql
+?? apps/api/src/test/java/com/huarenzaimeng/api/AdminA140DetailControllerTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/AdminA140DetailServiceTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/AdminWorkflowContractTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/AdminWorkflowRbacBehaviorTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/BusinessEventLinkerTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/BusinessEventTransactionalOutboxTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/BuyerPaymentHttpBoundaryTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/ContainerEntrypointProcessTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/PricingCalculatorTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/ReleaseQuoteOrderControllerTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/ReleaseQuoteOrderMigrationContractTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/ReleaseQuoteOrderServiceTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/TransactionalOutboxWiringContractTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/V15MigrationGateTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/V16CoordinationMigrationContractTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/V1AdminCommandRbacBehaviorTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/V1PricingSourceBehaviorTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/buyerauth/BuyerSessionFilterBoundaryTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/buyerauth/WeChatIdentityBoundaryTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/payment/JdbcPaymentOrderSnapshotPortTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/payment/JdbcWeChatPayStoreConcurrencyTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/payment/JdbcWeChatPayStoreOutboxTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/payment/WeChatPayCallbackHttpBoundaryTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/payment/WeChatPayCoordinatorTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/recovery/JdbcRecoveryManualReviewStoreTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/recovery/JdbcRecoveryTaskStoreTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/recovery/RecoverySchedulerDefaultTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/recovery/V19RecoveryTaskMigrationContractTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/topup/JdbcProviderExchangeStoreTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/topup/JdbcProviderExposureStoreTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/topup/JdbcTopupStoreConcurrencyTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/topup/JdbcTopupStoreOutboxTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/topup/TopupCoordinatorTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/topup/TopupHttpBoundaryTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/topup/V20ProviderExposureMigrationContractTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/topup/V21ProviderExchangeMigrationContractTest.java
+?? apps/api/src/test/java/com/huarenzaimeng/api/topup/WinlaTopupAdapterContractTest.java
+?? apps/miniapp/scripts/assert-formal-runtime-contracts.mjs
+?? apps/miniapp/scripts/fixtures/p014-topup-synthetic.ts
+?? apps/miniapp/src/api/formal-transaction-client.ts
+?? apps/miniapp/src/api/formal-transaction-contract.ts
+?? apps/miniapp/src/api/wechat-one-time-code.ts
+?? apps/miniapp/src/api/wechat-payment-port.ts
+?? apps/miniapp/src/components/BottomNav.vue
+?? apps/miniapp/src/domain/formal-status-copy.ts
+?? apps/miniapp/src/pages/profile/index.vue
+?? apps/miniapp/src/pages/recharge/products.vue
+?? docs/delivery/V1-DELIVERY-RECOVERY-PLAN.md
+?? docs/delivery/V1-LOCAL-ACCEPTANCE-REPORT.md
+?? modules/core/src/main/java/com/huarenzaimeng/core/BusinessEventLinker.java
+?? modules/core/src/main/java/com/huarenzaimeng/core/PricingCalculator.java
+?? tools/container-entrypoint.sh
