@@ -2,6 +2,7 @@ package com.huarenzaimeng.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Profile;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,6 +85,8 @@ final class ReleaseQuoteOrderService {
                         p.operatorCode(), p.productRef(), p.productVersion(), entitlement, p.priceVersionRef(),
                         p.priceVersion(), price, amountMinor, "CNY", p.operatorSetVersion(), p.catalogVersion(),
                         validTs, snapshotDigest, nowTs);
+                jdbc.update("INSERT INTO hz_quote_recipient_pending(quote_ref,recipient_plain,recipient_digest,recipient_masked,expires_at,created_at) VALUES(?,?,?,?,?,?)",
+                        quoteRef, normalizedPhone, phoneDigest, phoneMasked, validTs, nowTs);
                 return findQuote(subject, idempotencyKey);
             });
             if (created == null) throw new IllegalStateException("quote transaction returned no result");
@@ -101,9 +104,9 @@ final class ReleaseQuoteOrderService {
         if (replay != null) return requireDigest(replay, requestDigest);
         try {
             OrderView created = transactions.execute(status -> {
+                QuoteRow q = lockQuote(subject, quoteRef);
                 OrderView lockedReplay = findOrderForUpdate(subject, idempotencyKey);
                 if (lockedReplay != null) return requireDigest(lockedReplay, requestDigest);
-                QuoteRow q = lockQuote(subject, quoteRef);
                 if (!q.validUntil().isAfter(clock.instant())) throw new FlowRejectedException("QUOTE_EXPIRED");
                 Integer current = jdbc.queryForObject("SELECT COUNT(*) FROM hz_platform_product p JOIN hz_price_version v ON v.platform_product_ref=p.platform_product_ref JOIN hz_operator_support_batch b ON b.supported_operator_set_version=? AND b.batch_state='ACTIVE' AND b.effective_from<=CURRENT_TIMESTAMP(3) AND b.expires_at>CURRENT_TIMESTAMP(3) JOIN hz_operator_membership m ON m.supported_operator_set_version=b.supported_operator_set_version AND m.operator_code=p.operator_code AND m.membership_state='SUPPORTED' JOIN hz_product_catalog c ON c.catalog_version=? AND c.supported_operator_set_version=b.supported_operator_set_version AND c.catalog_state='ACTIVE' AND c.effective_from<=CURRENT_TIMESTAMP(3) AND c.expires_at>CURRENT_TIMESTAMP(3) WHERE p.platform_product_ref=? AND p.operator_code=? AND p.aggregate_version=? AND p.enable_state='ENABLED' AND v.price_version_ref=? AND v.aggregate_version=? AND v.price_state='ACTIVE' AND v.effective_from<=CURRENT_TIMESTAMP(3) AND v.effective_until>CURRENT_TIMESTAMP(3) AND c.catalog_version=(SELECT MAX(c2.catalog_version) FROM hz_product_catalog c2 WHERE c2.supported_operator_set_version=b.supported_operator_set_version AND c2.catalog_state='ACTIVE' AND c2.effective_from<=CURRENT_TIMESTAMP(3) AND c2.expires_at>CURRENT_TIMESTAMP(3))", Integer.class,
                         q.operatorSetVersion(),q.catalogVersion(),q.productRef(),q.operatorCode(),q.productVersion(),q.priceVersionRef(),q.priceVersion());
@@ -118,12 +121,27 @@ final class ReleaseQuoteOrderService {
                         Map.entry("snapshotDigest",q.snapshotDigest())));
                 String orderDigest=sha256(requestDigest,quoteSnapshot,q.entitlement(),q.price(),subject);
                 String priceDigest=sha256("PRICE_SNAPSHOT",q.price());
+                PendingRecipient recipient = lockPendingRecipient(q.quoteRef());
+                if (!recipient.digest().equals(q.phoneDigest()) || !recipient.masked().equals(q.phoneMasked())) {
+                    throw new FlowRejectedException("QUOTE_RECIPIENT_BINDING_CONFLICT");
+                }
                 jdbc.update("INSERT INTO hz_release_order_snapshot(order_ref,quote_ref,project_subject_ref,request_ref,idempotency_key,request_digest,quote_snapshot,entitlement_snapshot,price_snapshot,price_version_ref,final_amount_minor,currency,price_snapshot_digest,quote_snapshot_digest,snapshot_digest,created_at) VALUES(?,?,?,?,?,?,CAST(? AS JSON),CAST(? AS JSON),CAST(? AS JSON),?,?,?,?,?,?,?)",
                         orderRef,quoteRef,subject,requestRef,idempotencyKey,requestDigest,quoteSnapshot,q.entitlement(),q.price(),q.priceVersionRef(),q.finalAmountMinor(),q.currency(),priceDigest,q.snapshotDigest(),orderDigest,nowTs);
+                jdbc.update("INSERT INTO hz_order_recipient_fulfillment(order_ref,recipient_plain,recipient_digest,recipient_masked,retention_state,terminal_at,retention_until,created_at,updated_at) VALUES(?,?,?,?,'ACTIVE',NULL,NULL,?,?)",
+                        orderRef, recipient.plain(), recipient.digest(), recipient.masked(), nowTs, nowTs);
+                FulfillmentEntitlement fulfillment = fulfillmentEntitlement(q.entitlement());
+                jdbc.update("INSERT INTO hz_order_fulfillment_snapshot(merchant_order_ref,buyer_subject_ref,provider_sku,recipient,face_value_minor,target_currency,entitlement_digest,entitlement_state,created_at) VALUES(?,?,?,?,?,?,?,'READY',?)",
+                        orderRef, subject, fulfillment.providerSku(), recipient.masked(), fulfillment.faceValueMinor(), fulfillment.targetCurrency(),
+                        sha256("FULFILLMENT", orderRef, fulfillment.providerSku(), recipient.digest(), Long.toString(fulfillment.faceValueMinor()), fulfillment.targetCurrency()), nowTs);
                 return findOrder(subject,idempotencyKey);
             });
             if (created == null) throw new IllegalStateException("order transaction returned no result");
             return created;
+        } catch (FlowRejectedException race) {
+            if (!"QUOTE_RECIPIENT_NOT_AVAILABLE".equals(race.getMessage())) throw race;
+            OrderView existing=findOrder(subject,idempotencyKey);
+            if(existing==null)throw race;
+            return requireDigest(existing,requestDigest);
         } catch (DuplicateKeyException race) {
             OrderView existing=findOrder(subject,idempotencyKey);
             if(existing==null)throw new FlowRejectedException("ORDER_IDEMPOTENCY_CONFLICT");
@@ -148,6 +166,22 @@ final class ReleaseQuoteOrderService {
                 (rs,n)->new QuoteRow(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6),rs.getLong(7),rs.getString(8),rs.getString(9),rs.getLong(10),rs.getString(11),rs.getLong(12),rs.getString(13),rs.getLong(14),rs.getLong(15),rs.getTimestamp(16).toInstant(),rs.getString(17)),subject,quoteRef);
         return rows.stream().findFirst().orElseThrow(()->new FlowRejectedException("QUOTE_NOT_AVAILABLE"));
     }
+    private PendingRecipient lockPendingRecipient(String quoteRef){
+        List<PendingRecipient> rows=jdbc.query("SELECT recipient_plain,recipient_digest,recipient_masked FROM hz_quote_recipient_pending WHERE quote_ref=? FOR UPDATE",
+                (rs,n)->new PendingRecipient(rs.getString(1),rs.getString(2),rs.getString(3)),quoteRef);
+        return rows.stream().findFirst().orElseThrow(()->new FlowRejectedException("QUOTE_RECIPIENT_NOT_AVAILABLE"));
+    }
+    private FulfillmentEntitlement fulfillmentEntitlement(String entitlement){
+        try{
+            JsonNode root=json.readTree(entitlement);
+            if(root!=null&&root.isTextual())root=json.readTree(root.textValue());
+            if(root==null||!root.isObject())throw new IllegalArgumentException();
+            String sku=root.path("providerSku").asText("");
+            BigDecimal denomination=root.path("denominationBdt").decimalValue();
+            if(!sku.matches("[A-Za-z0-9._:-]{1,128}")||denomination.signum()<=0||denomination.scale()>2)throw new IllegalArgumentException();
+            return new FulfillmentEntitlement(sku,denomination.movePointRight(2).longValueExact(),"BDT");
+        }catch(Exception invalid){throw new FlowRejectedException("FULFILLMENT_ENTITLEMENT_INVALID");}
+    }
     private QuoteView findQuote(String s,String k){return queryQuote("",s,k);}
     private QuoteView findQuoteForUpdate(String s,String k){return queryQuote(" FOR UPDATE",s,k);}
     private QuoteView queryQuote(String lock,String s,String k){return jdbc.query("SELECT quote_ref,request_ref,request_digest,phone_digest,phone_masked,operator_code,platform_product_ref,price_version_ref,final_amount_minor,currency,catalog_version,valid_until,snapshot_digest FROM hz_release_quote_snapshot WHERE project_subject_ref=? AND idempotency_key=?"+lock,(rs,n)->new QuoteView(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6),rs.getString(7),rs.getString(8),BigDecimal.valueOf(rs.getLong(9),2),rs.getString(10),rs.getLong(11),rs.getTimestamp(12).toInstant(),rs.getString(13)),s,k).stream().findFirst().orElse(null);}
@@ -167,4 +201,6 @@ final class ReleaseQuoteOrderService {
     record OrderView(String orderRef,String quoteRef,String requestRef,@JsonIgnore String requestDigest,String snapshotDigest,String orderState,String paymentState,String deliveryState,String refundState,long projectionVersion,long aggregateVersion){}
     private record TrustedProduct(String productRef,String operatorCode,String productType,String displayName,String benefitText,String providerCode,String providerSku,BigDecimal denominationBdt,Long dataAllowanceMb,Integer voiceMinutes,Integer smsCount,String validityText,long productVersion,String priceVersionRef,BigDecimal finalAmountCny,String fxSnapshotRef,String supplierSourceRef,long priceVersion,long operatorSetVersion,long catalogVersion){}
     private record QuoteRow(String quoteRef,String requestDigest,String phoneDigest,String phoneMasked,String operatorCode,String productRef,long productVersion,String entitlement,String priceVersionRef,long priceVersion,String price,long finalAmountMinor,String currency,long operatorSetVersion,long catalogVersion,Instant validUntil,String snapshotDigest){}
+    private record PendingRecipient(String plain,String digest,String masked){}
+    private record FulfillmentEntitlement(String providerSku,long faceValueMinor,String targetCurrency){}
 }

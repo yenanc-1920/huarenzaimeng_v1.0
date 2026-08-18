@@ -60,6 +60,9 @@ class ReleaseQuoteOrderServiceTest {
             var a=pool.submit(call);var b=pool.submit(call);
             assertThat(a.get()).isEqualTo(b.get());
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM hz_release_order_snapshot",Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT recipient_plain FROM hz_order_recipient_fulfillment",String.class)).isEqualTo("+8801712345678");
+            assertThat(jdbc.queryForObject("SELECT recipient FROM hz_order_fulfillment_snapshot",String.class)).contains("****");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM hz_quote_recipient_pending",Integer.class)).isEqualTo(1);
         }finally{pool.shutdownNow();}
     }
 
@@ -111,6 +114,9 @@ class ReleaseQuoteOrderServiceTest {
         jdbc.execute("CREATE TABLE hz_order(order_ref VARCHAR(64) PRIMARY KEY,project_subject_ref VARCHAR(128),quote_ref VARCHAR(64) UNIQUE,order_state VARCHAR(32),payment_state VARCHAR(32),upstream_debit_state VARCHAR(32),delivery_state VARCHAR(32),refund_state VARCHAR(32),projection_version BIGINT,aggregate_version BIGINT,allowed_action VARCHAR(64),environment VARCHAR(32),evidence_level VARCHAR(8),authority_state VARCHAR(24),created_at TIMESTAMP,updated_at TIMESTAMP)");
         jdbc.execute("CREATE TABLE hz_release_quote_snapshot(quote_ref VARCHAR(64) PRIMARY KEY,project_subject_ref VARCHAR(128),request_ref VARCHAR(128),idempotency_key VARCHAR(128),request_digest CHAR(64),phone_digest CHAR(64),phone_masked VARCHAR(32),operator_code VARCHAR(64),platform_product_ref VARCHAR(64),product_aggregate_version BIGINT,entitlement_snapshot JSON,price_version_ref VARCHAR(64),price_aggregate_version BIGINT,price_snapshot JSON,final_amount_minor BIGINT,currency CHAR(3),supported_operator_set_version BIGINT,catalog_version BIGINT,valid_until TIMESTAMP,snapshot_digest CHAR(64),created_at TIMESTAMP,UNIQUE(project_subject_ref,idempotency_key),UNIQUE(project_subject_ref,request_ref))");
         jdbc.execute("CREATE TABLE hz_release_order_snapshot(order_ref VARCHAR(64) PRIMARY KEY,quote_ref VARCHAR(64) UNIQUE,project_subject_ref VARCHAR(128),request_ref VARCHAR(128),idempotency_key VARCHAR(128),request_digest CHAR(64),quote_snapshot JSON,entitlement_snapshot JSON,price_snapshot JSON,price_version_ref VARCHAR(64),final_amount_minor BIGINT,currency CHAR(3),price_snapshot_digest CHAR(64),quote_snapshot_digest CHAR(64),snapshot_digest CHAR(64),created_at TIMESTAMP,UNIQUE(project_subject_ref,idempotency_key),UNIQUE(project_subject_ref,request_ref))");
+        jdbc.execute("CREATE TABLE hz_quote_recipient_pending(quote_ref VARCHAR(64) PRIMARY KEY,recipient_plain VARCHAR(32),recipient_digest CHAR(64),recipient_masked VARCHAR(32),expires_at TIMESTAMP,created_at TIMESTAMP)");
+        jdbc.execute("CREATE TABLE hz_order_recipient_fulfillment(order_ref VARCHAR(64) PRIMARY KEY,recipient_plain VARCHAR(32),recipient_digest CHAR(64),recipient_masked VARCHAR(32),retention_state VARCHAR(24),terminal_at TIMESTAMP,retention_until TIMESTAMP,created_at TIMESTAMP,updated_at TIMESTAMP)");
+        jdbc.execute("CREATE TABLE hz_order_fulfillment_snapshot(merchant_order_ref VARCHAR(64) PRIMARY KEY,buyer_subject_ref VARCHAR(128),provider_sku VARCHAR(128),recipient VARCHAR(32),face_value_minor BIGINT,target_currency CHAR(3),entitlement_digest CHAR(64),entitlement_state VARCHAR(24),created_at TIMESTAMP)");
     }
     private static String sha256ForAssertion(String... parts){try{var md=java.security.MessageDigest.getInstance("SHA-256");for(String part:parts){md.update(part.getBytes(java.nio.charset.StandardCharsets.UTF_8));md.update((byte)0);}return java.util.HexFormat.of().formatHex(md.digest());}catch(Exception e){throw new AssertionError(e);}}
 }

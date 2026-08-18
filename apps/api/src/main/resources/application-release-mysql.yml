@@ -50,6 +50,9 @@ hz:
   buyer-consent:
     user-agreement-version: ${HZ_BUYER_CONSENT_USER_AGREEMENT_VERSION:}
     privacy-policy-version: ${HZ_BUYER_CONSENT_PRIVACY_POLICY_VERSION:}
+  recipient-retention:
+    scheduler-enabled: ${HZ_RECIPIENT_RETENTION_SCHEDULER_ENABLED:false}
+    scheduler-delay-ms: ${HZ_RECIPIENT_RETENTION_SCHEDULER_DELAY_MS:86400000}
   buyer-closure:
     cleanup:
       scheduler-enabled: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_ENABLED:false}
