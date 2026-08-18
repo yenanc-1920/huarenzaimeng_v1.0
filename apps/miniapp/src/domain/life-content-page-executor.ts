@@ -39,7 +39,7 @@ export interface LifeContentDetailPageState {
 
 export interface LifeContentAnonymousReadApi {
   getList():Promise<LifeContentListResult>
-  getDetail(contentRef:string,contentVersion:string):Promise<LifeContentDetailResult>
+  getDetail(contentRef:string,contentVersion:string|null):Promise<LifeContentDetailResult>
 }
 
 const NOOP_PROBE:LifeContentRuntimeProbe = Object.freeze({
@@ -74,7 +74,7 @@ export async function executeLifeContentDetailRead(
   state:LifeContentDetailPageState,
   api:Pick<LifeContentAnonymousReadApi,'getDetail'>,
   contentRef:string,
-  contentVersion:string,
+  contentVersion:string|null,
   trigger:LifeContentReadTrigger='FIRST_ENTRY',
   probe:LifeContentRuntimeProbe=NOOP_PROBE,
 ):Promise<void> {
@@ -82,7 +82,7 @@ export async function executeLifeContentDetailRead(
   state.item=null
   state.viewState='LOADING'
   probe.event('LIFE_CONTENT_DETAIL_READ_START')
-  if(!contentRef||!contentVersion){state.viewState='READ_ERROR';return}
+  if(!contentRef){state.viewState='READ_ERROR';return}
   if(trigger==='USER_RETRY')probe.increment('UserRetry')
   probe.increment('QueryCall')
   try{
@@ -108,7 +108,8 @@ export function revokeLifeContentDetail(
 }
 
 export function buildLifeContentDetailRoute(item:Pick<LifeContentSummary,'contentRef'|'contentVersion'>):string {
-  return `/pages/life-content/detail?contentRef=${encodeURIComponent(item.contentRef)}&contentVersion=${encodeURIComponent(item.contentVersion)}`
+  const version=item.contentVersion?`&contentVersion=${encodeURIComponent(item.contentVersion)}`:''
+  return `/pages/life-content/detail?contentRef=${encodeURIComponent(item.contentRef)}${version}`
 }
 
 export function navigateToLifeContentDetail(

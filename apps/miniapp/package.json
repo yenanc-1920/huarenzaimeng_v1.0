@@ -7,6 +7,7 @@
     "build:mp-weixin": "node scripts/clean-mp-weixin-output.mjs && uni build -p mp-weixin && node scripts/write-mp-weixin-compat-modules.mjs && node scripts/verify-mp-weixin-output.mjs",
     "build:mp-weixin:dev": "node scripts/clean-mp-weixin-output.mjs && uni build -p mp-weixin --mode wechat-development && node scripts/write-mp-weixin-compat-modules.mjs && node scripts/verify-mp-weixin-output.mjs",
     "test:frontend-contracts": "node scripts/assert-development-api-contracts.mjs",
+    "test:formal-runtime-contracts": "node --experimental-strip-types scripts/assert-formal-runtime-contracts.mjs",
     "preflight:p021-visual": "node scripts/preflight-p021-visual-evidence.mjs --preflight"
     ,"test:p021-it-collector": "node scripts/test-p021-it-page-collector.mjs"
   },

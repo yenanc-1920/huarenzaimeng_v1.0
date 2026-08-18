@@ -1,4 +1,13 @@
-import { parseP014Response, type P014CreateCommand, type P014OriginalResultQuery, type P014Projection, type P014Response } from './p014-topup-contract.ts'
+import { parseP014Response, type P014OriginalResultQuery, type P014Projection, type P014Response } from '../../src/api/p014-topup-contract.ts'
+
+interface LegacyP014CreateCommand {
+  commandId:string; idempotencyKey:string; topupCreationPrecondition:'TOPUP_INTENT_MUST_NOT_EXIST'
+  sessionVersion:number; authorizationSetRef:string; expectedProjectionVersion:number; expectedAggregateVersion:number
+}
+export function storeP014OriginalWriteIdentity(storage:{setStorageSync(key:string,value:unknown):void},orderRef:string,command:LegacyP014CreateCommand):void{
+  storage.setStorageSync(`p014OriginalWrite:${orderRef}`,{orderRef,commandId:command.commandId,idempotencyKey:command.idempotencyKey,
+    sessionVersion:command.sessionVersion,authorizationSetRef:command.authorizationSetRef})
+}
 
 const now='2026-08-03T00:00:00Z'
 const price={priceSnapshotRef:'PS-P014-SYN-001',totalMinor:125000,currency:'BDT',displayVersion:'DISPLAY-V1',maskedRecipientNumber:'******1234',operatorDisplayName:'示例运营商',productDisplayName:'示例充值套餐',targetFaceValueMinor:100000,targetCurrency:'BDT',expiresAt:'2099-08-03T01:00:00Z'}
@@ -21,7 +30,7 @@ function projection(created:boolean):P014Projection {
 
 const createdOrders=new Set<string>()
 export const p014BuiltinSynthetic=Object.freeze({
-  async create(orderRef:string,command:P014CreateCommand):Promise<P014Response>{
+  async create(orderRef:string,command:LegacyP014CreateCommand):Promise<P014Response>{
     if(orderRef!=='ORDER-P014-SYN-001'||command.topupCreationPrecondition!=='TOPUP_INTENT_MUST_NOT_EXIST') return parseP014Response({requestRef:command.commandId,outcome:'REJECTED',projectCode:'TOPUP_NOT_AVAILABLE',resourceRef:null,aggregateVersion:null,currentProjection:null,retryClass:'NONE',nextPollAt:null})
     const replay=createdOrders.has(orderRef);createdOrders.add(orderRef);const currentProjection=projection(true)
     return parseP014Response({requestRef:command.commandId,outcome:'ACCEPTED',projectCode:replay?'TOPUP_INTENT_REPLAYED':'TOPUP_INTENT_CREATED',resourceRef:currentProjection.topupIntentRef,aggregateVersion:currentProjection.aggregateVersion,currentProjection,retryClass:'NONE',nextPollAt:null})

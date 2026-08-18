@@ -66,16 +66,22 @@ export type CatalogProjection =
   | { operatorQualification: 'UNSUPPORTED'; supportedOperatorSetVersion: number; catalogVersion: number; operatorCode: string; items: []; evidenceSemantics: CatalogEvidenceSemantics }
   | { operatorQualification: 'UNKNOWN'; supportedOperatorSetVersion: null; catalogVersion: null; operatorCode: string; items: []; evidenceSemantics: CatalogEvidenceSemantics }
 
-export type CatalogEvidenceSemantics = 'LOCAL_MOCK_NO_REAL_OPERATOR_FACTS' | 'LOCAL_DATABASE_STATE_NOT_EXTERNAL_OPERATOR_FACT'
+export type CatalogEvidenceSemantics = 'LOCAL_DATABASE_STATE_NOT_EXTERNAL_OPERATOR_FACT'
 
 export interface RechargeSelection {
-  maskedPhone: string
+    recipientPhone: string
+    maskedPhone: string
   operatorCode: string
   operatorName: string
   productRef: string
   denominationRef: string
   itemKind: CatalogItem['itemKind']
   faceValue: Money
+  productType: NonNullable<CatalogItem['productType']>
+  displayName: string
+  benefitText: string
+  validityText: string | null
+  priceVersionRef: string
   supportedOperatorSetVersion: number
   catalogVersion: number
 }
@@ -88,6 +94,13 @@ export interface QuoteSnapshot {
   productRef: string
   denominationRef: string
   productName: string
+  entitlement: {
+    productType: NonNullable<CatalogItem['productType']> | 'UNCONFIRMED'
+    displayName: string
+    benefitText: string
+    validityText: string | null
+    source: 'CATALOG_SNAPSHOT' | 'UNCONFIRMED'
+  }
   faceValue: Money
   total: Money
   priceVersion: string
@@ -100,7 +113,7 @@ export interface QuoteSnapshot {
 }
 
 export type EligibilityResult =
-  | { outcome: 'ELIGIBLE'; maskedPhone: string; operatorCode: string; operatorName: string; caseKey: string }
+  | { outcome: 'ELIGIBLE'; recipientPhone:string; maskedPhone: string; operatorCode: string; operatorName: string; caseKey: string }
   | { outcome: 'UNKNOWN'; maskedPhone: string; caseKey: string; projectCode: 'PREPAY_MNP_UNKNOWN' }
 
 export type OrderSummaryState =
@@ -148,13 +161,13 @@ export type LifeContentRetryClass = 'NONE' | 'USER_INITIATED_READ_ONLY'
 
 export interface LifeContentSummary {
   contentRef: string
-  contentVersion: string
+  contentVersion: string | null
   category: LifeContentCategory
   title: string
   summary: string
-  sourceType: string
-  jurisdiction: string
-  applicableAudience: string
+  sourceType: string | null
+  jurisdiction: string | null
+  applicableAudience: string | null
   publishedAt: string
   updatedAt: string
   effectiveFrom: string
@@ -167,24 +180,24 @@ export interface LifeContentSummary {
 export interface LifeContentDetailItem extends LifeContentSummary { body: string }
 
 export interface LifeContentListResult {
-  requestRef: string
+  requestRef: string | null
   viewState: LifeContentReadState
   projectCode: string
   schemaVersion: 'LIFE_CONTENT_READ_V1'
-  visibilityRuleVersion: string
+  visibilityRuleVersion: string | null
   items: LifeContentSummary[]
   retryClass: LifeContentRetryClass
   nextReadAt: null
 }
 
 export interface LifeContentDetailResult {
-  requestRef: string
+  requestRef: string | null
   viewState: LifeContentDetailState
   projectCode: string
   schemaVersion: 'LIFE_CONTENT_READ_V1'
-  visibilityRuleVersion: string
+  visibilityRuleVersion: string | null
   contentRef: string
-  contentVersion: string
+  contentVersion: string | null
   item: LifeContentDetailItem | null
   retryClass: LifeContentRetryClass
   nextReadAt: null

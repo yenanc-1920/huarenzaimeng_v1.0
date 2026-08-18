@@ -1,5 +1,5 @@
 import type { ProjectSessionProjection } from '../domain/types'
-import { parseProjectQuote, type ProjectAction, type ProjectQuote } from './project-contract.ts'
+import { parseProjectQuote, type ProjectReadAction, type ProjectQuote } from './project-contract.ts'
 
 export const ORDER_CREATION_PRECONDITION = 'ORDER_MUST_NOT_EXIST' as const
 
@@ -32,7 +32,7 @@ export interface OrderCreationProjection {
   priceSnapshot: ProjectQuote
   projectionVersion: number
   aggregateVersion: number
-  allowedActions: ProjectAction[]
+  allowedActions: ProjectReadAction[]
 }
 
 export interface OrderCreationResult {
@@ -54,9 +54,8 @@ const stateCode = (value: unknown): value is OrderCreationState => [
   'AWAITING_PAYMENT','PAYMENT_PROCESSING','PAID_AWAITING_TOPUP','TOPUP_PROCESSING','TOPUP_RESULT_UNKNOWN',
   'DELIVERED','CONFIRMED_NOT_DELIVERED','REFUND_PROCESSING','REFUNDED','DELIVERY_REFUND_CONFLICT_REVIEW','SUPPORT_REVIEW',
 ].includes(String(value))
-const actionCode = (value: unknown): value is ProjectAction['actionCode'] =>
-  value === 'REQUEST_MOCK_PAYMENT' || value === 'CREATE_LOCAL_SYNTHETIC_PAYMENT_INTENT'
-  || value === 'QUERY_LOCAL_SYNTHETIC_PAYMENT_INTENT' || value === 'REQUEST_MOCK_TOPUP' || value === 'WAIT_OR_CONTACT_SUPPORT'
+const readActionCode = (value: unknown): value is ProjectReadAction['actionCode'] =>
+  value === 'REFRESH_ORDER_STATUS' || value === 'CONTACT_SUPPORT' || value === 'SAFE_EXIT'
 
 export function buildOrderCreationCommand(
   identity: { commandId: string; idempotencyKey: string },
@@ -77,13 +76,13 @@ export function buildOrderCreationCommand(
   }
 }
 
-function parseAction(value: unknown, projectionVersion: number, aggregateVersion: number): ProjectAction {
+function parseAction(value: unknown, projectionVersion: number, aggregateVersion: number): ProjectReadAction|null {
   if (!object(value) || !exactKeys(value, ['actionCode','expectedProjectionVersion','expectedAggregateVersion'])
-      || !actionCode(value.actionCode) || !positiveInteger(value.expectedProjectionVersion)
+      || !readActionCode(value.actionCode) || !positiveInteger(value.expectedProjectionVersion)
       || (value.expectedAggregateVersion !== null && !positiveInteger(value.expectedAggregateVersion))
       || value.expectedProjectionVersion !== projectionVersion
       || (value.expectedAggregateVersion !== null && value.expectedAggregateVersion !== aggregateVersion)) {
-    throw new Error('INVALID_ORDER_CREATION_ACTION_DTO')
+    return null
   }
   return { actionCode:value.actionCode, expectedProjectionVersion:value.expectedProjectionVersion,
     expectedAggregateVersion:value.expectedAggregateVersion as number|null }
@@ -102,7 +101,7 @@ export function parseOrderCreationResult(value: unknown): OrderCreationResult {
       || !positiveInteger(projection.projectionVersion) || !positiveInteger(projection.aggregateVersion)
       || !Array.isArray(projection.allowedActions)) throw new Error('INVALID_ORDER_CREATION_PROJECTION_DTO')
   const priceSnapshot = parseProjectQuote(projection.priceSnapshot)
-  const actions = projection.allowedActions.map((action) => parseAction(action, projection.projectionVersion as number, projection.aggregateVersion as number))
+  const actions = projection.allowedActions.map((action) => parseAction(action, projection.projectionVersion as number, projection.aggregateVersion as number)).filter((action):action is ProjectReadAction=>action!==null)
   if (new Set(actions.map((action) => action.actionCode)).size !== actions.length) throw new Error('DUPLICATE_ORDER_CREATION_ACTION_DTO')
   if (value.resourceRef !== projection.orderRef || value.aggregateVersion !== projection.aggregateVersion
       || projection.quoteRef !== priceSnapshot.quoteRef) throw new Error('ORDER_CREATION_RESULT_BINDING_MISMATCH')

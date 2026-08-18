@@ -43,6 +43,7 @@ export async function mockQuote(selection: RechargeSelection): Promise<QuoteSnap
   return {
     orderRef: 'order_mock_001', priceSnapshotRef: 'quote_mock_001', maskedPhone:selection.maskedPhone, operatorCode:selection.operatorCode,
     operatorName:selection.operatorName, productRef:selection.productRef, productName:selection.itemKind==='PRESET_PACKAGE'?'合成预设套餐':'合成预设面额', denominationRef:selection.denominationRef,
+    entitlement:{productType:selection.productType,displayName:selection.displayName,benefitText:selection.benefitText,validityText:selection.validityText,source:'CATALOG_SNAPSHOT'},
     faceValue:selection.faceValue, total, priceVersion:'price-mock-v1', supportedOperatorSetVersion:selection.supportedOperatorSetVersion, catalogVersion:selection.catalogVersion,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(), validUntil: new Date(Date.now() + 10 * 60 * 1000).toISOString(), valid: true,
   }

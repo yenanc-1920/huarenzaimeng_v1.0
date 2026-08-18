@@ -1,7 +1,9 @@
 {
   "pages": [
     {"path":"pages/index/index","style":{"navigationStyle":"custom"}},
+    {"path":"pages/profile/index","style":{"navigationStyle":"custom"}},
     {"path":"pages/recharge/select","style":{"navigationStyle":"custom"}},
+    {"path":"pages/recharge/products","style":{"navigationStyle":"custom"}},
     {"path":"pages/recharge/quote","style":{"navigationStyle":"custom"}},
     {"path":"pages/order/progress","style":{"navigationStyle":"custom"}},
     {"path":"pages/order/detail","style":{"navigationStyle":"custom"}},
@@ -10,7 +12,6 @@
     {"path":"pages/order/list","style":{"navigationStyle":"custom"}},
     {"path":"pages/auth/expired","style":{"navigationStyle":"custom"}},
     {"path":"pages/order/recovery","style":{"navigationStyle":"custom"}},
-    {"path":"pages/support/case","style":{"navigationStyle":"custom"}},
     {"path":"pages/directory/list","style":{"navigationStyle":"custom"}},
     {"path":"pages/directory/detail","style":{"navigationStyle":"custom"}},
     {"path":"pages/life-content/list","style":{"navigationStyle":"custom"}},

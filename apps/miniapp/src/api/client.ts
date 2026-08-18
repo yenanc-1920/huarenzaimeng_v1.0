@@ -13,6 +13,9 @@ import { parseP014Response, P014_BACKEND_IMPLEMENTATION_SHA, type P014Response }
 import { parseP021Response, type P021Response } from './order-detail-contract'
 import { callProjectApi } from './wechat-development-transport'
 import { requireBuyerBearerToken } from './buyer-session-token'
+import { createFormalTransactionClient, type FormalTransactionResponse } from './formal-transaction-client'
+import type { PaymentCreateContext } from './formal-transaction-client'
+import { parseReleaseOrderView, parseReleaseQuoteView, type ReleaseOrderView } from './formal-transaction-contract'
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
 const buyerBaseUrl = (import.meta.env.VITE_BUYER_API_BASE_URL || '/buyer-api/v1').replace(/\/$/, '')
@@ -43,6 +46,14 @@ function requestBody(path: string, method: 'GET' | 'POST', data?: UniNamespace.R
     fail: () => reject(new ProjectApiError('NETWORK_ERROR')),
   }))
 }
+function requestBuyerTransaction(path:string,method:'GET'|'POST',data?:Record<string,unknown>):Promise<FormalTransactionResponse>{
+  if(useWechatDevelopment)return callProjectApi(`${buyerBaseUrl}${path}`,method,data,requireBuyerBearerToken()).then(result=>({statusCode:result.statusCode,body:result.data}))
+  return new Promise((resolve,reject)=>uni.request({
+    url:`${buyerBaseUrl}${path}`,method,data,header:{Authorization:`Bearer ${requireBuyerBearerToken()}`},
+    success:({data:body,statusCode})=>resolve({statusCode,body}),fail:()=>reject(new ProjectApiError('NETWORK_ERROR')),
+  }))
+}
+const formalTransactions=createFormalTransactionClient({request:requestBuyerTransaction})
 function requestAnonymousRead(path:string):Promise<unknown> {
   if(useWechatDevelopment)return callProjectApi(`${baseUrl}${path}`,'GET').then(result=>result.data)
   return new Promise((resolve,reject)=>uni.request({
@@ -99,6 +110,15 @@ async function loadCatalog(operatorCode:string):Promise<CatalogProjection>{
 }
 
 export const api = {
+  createPayment:(orderRef:string,context:PaymentCreateContext)=>formalTransactions.createPayment(orderRef,context),
+  getPaymentStatus:(orderRef:string)=>formalTransactions.paymentStatus(orderRef),
+  queryPaymentOriginal:(orderRef:string)=>formalTransactions.queryPaymentOriginal(orderRef),
+  createRefund:(orderRef:string,refundRef:string,amountMinor:number)=>formalTransactions.createRefund(orderRef,refundRef,amountMinor),
+  getRefundStatus:(orderRef:string,refundRef:string)=>formalTransactions.refundStatus(orderRef,refundRef),
+  queryRefundOriginal:(orderRef:string,refundRef:string)=>formalTransactions.queryRefundOriginal(orderRef,refundRef),
+  submitTopup:(orderRef:string,requestRef:string)=>formalTransactions.submitTopup(orderRef,requestRef),
+  getTopupStatus:(orderRef:string)=>formalTransactions.topupStatus(orderRef),
+  queryTopupOriginal:(orderRef:string)=>formalTransactions.queryTopupOriginal(orderRef),
   checkEligibility: async (phone: string): Promise<EligibilityResult> => {
     if(!phone.trim())throw new ProjectApiError('PHONE_REQUIRED')
     const value=await requestData(`/eligibility?phone=${encodeURIComponent(phone.trim())}`,'GET')
@@ -106,7 +126,7 @@ export const api = {
     const caseKey=`ELIGIBILITY-${value.maskedPhone}`
     return value.operatorCode==='UNKNOWN'
       ?{outcome:'UNKNOWN',maskedPhone:value.maskedPhone,caseKey,projectCode:'PREPAY_MNP_UNKNOWN'}
-      :{outcome:'ELIGIBLE',maskedPhone:value.maskedPhone,operatorCode:value.operatorCode,operatorName:value.operatorName,caseKey}
+      :{outcome:'ELIGIBLE',recipientPhone:`+880${phone.trim().replace(/\D/g,'').replace(/^880/,'').replace(/^0/,'')}`,maskedPhone:value.maskedPhone,operatorCode:value.operatorCode,operatorName:value.operatorName,caseKey}
   },
   async getSupportedOperators():Promise<Array<{operatorCode:string;displayName:string}>>{
     return parseSupportedOperators(await requestData('/catalog?operatorCode=UNKNOWN','GET'))
@@ -116,27 +136,21 @@ export const api = {
     const current=await loadCatalog(selection.operatorCode)
     if(!selectionMatchesCatalog(selection,current))throw new ProjectApiError('CATALOG_SELECTION_STALE')
     const identity=getOrCreateCommand(uni,`create-quote:${localScopeFingerprint(JSON.stringify(selection))}`)
-    const quote = parseProjectQuote(await requestData('/quotes', 'POST', {
-      phone:selection.maskedPhone,operatorCode:selection.operatorCode,productRef:selection.productRef,denominationRef:selection.denominationRef,
-      supportedOperatorSetVersion:selection.supportedOperatorSetVersion,catalogVersion:selection.catalogVersion,
-      commandId:identity.commandId,idempotencyKey:identity.idempotencyKey,mnpState:'CONFIRMED',
-    }))
-    if(quote.operatorCode!==selection.operatorCode||quote.productCode!==selection.productRef||quote.denominationRef!==selection.denominationRef
-      ||quote.supportedOperatorSetVersion!==selection.supportedOperatorSetVersion||quote.catalogVersion!==selection.catalogVersion)throw new ProjectApiError('QUOTE_SELECTION_MISMATCH')
-    return toQuoteSnapshot(quote)
+    const quote=parseReleaseQuoteView(parseAcceptedProjectEnvelope(await requestBody('/quotes','POST',{
+      requestRef:identity.commandId,phone:selection.recipientPhone,productRef:selection.productRef,
+    },baseUrl,{'Idempotency-Key':identity.idempotencyKey})))
+    if(quote.requestRef!==identity.commandId||quote.operatorCode!==selection.operatorCode||quote.productRef!==selection.productRef
+      ||quote.catalogVersion!==selection.catalogVersion||quote.priceVersionRef!==selection.priceVersionRef)throw new ProjectApiError('QUOTE_SELECTION_MISMATCH')
+    const totalMinor=Math.round(quote.finalAmountCny*100)
+    return{orderRef:'',priceSnapshotRef:quote.quoteRef,maskedPhone:quote.phoneMasked,operatorCode:quote.operatorCode,operatorName:selection.operatorName,
+      productRef:quote.productRef,productName:selection.displayName,denominationRef:selection.denominationRef,
+      entitlement:{productType:selection.productType,displayName:selection.displayName,benefitText:selection.benefitText,validityText:selection.validityText,source:'CATALOG_SNAPSHOT'},
+      faceValue:selection.faceValue,total:{minor:totalMinor,currency:quote.currency},priceVersion:quote.priceVersionRef,
+      supportedOperatorSetVersion:selection.supportedOperatorSetVersion,catalogVersion:quote.catalogVersion,expiresAt:quote.validUntil,validUntil:quote.validUntil,valid:Date.parse(quote.validUntil)>Date.now()}
   },
-  async createOrder(quoteRef: string, commandId: string, idempotencyKey: string): Promise<OrderCreationResult> {
-    const command=buildOrderCreationCommand({commandId,idempotencyKey},quoteRef,readSessionProjection(uni))
-    const body=await requestBody('/orders','POST',command)
-    try{return parseOrderCreationResult(body)}catch(error){
-      try{parseAcceptedProjectEnvelope(body)}catch(apiError){
-        if(apiError instanceof ProjectApiError&&apiError.projectCode!=='INVALID_ENVELOPE')throw apiError
-      }
-      throw new ProjectApiError(error instanceof Error?error.message:'INVALID_ORDER_CREATION_RESULT_DTO')
-    }
-  },
-  async confirmPayment(orderRef: string, commandId: string, idempotencyKey: string, expectedProjectionVersion: number, expectedAggregateVersion: number): Promise<ProjectProjection> {
-    return projectProjection(`/orders/${encodeURIComponent(orderRef)}/payment-intents`, 'POST', { commandId, idempotencyKey, expectedProjectionVersion, expectedAggregateVersion })
+  async createOrder(quoteRef: string, commandId: string, idempotencyKey: string): Promise<ReleaseOrderView> {
+    if(!quoteRef||!commandId||!idempotencyKey)throw new ProjectApiError('ORDER_CREATION_INPUT_REQUIRED')
+    return parseReleaseOrderView(parseAcceptedProjectEnvelope(await requestBody('/orders','POST',{requestRef:commandId,quoteRef},baseUrl,{'Idempotency-Key':idempotencyKey})))
   },
   async getP014Progress(orderRef:string):Promise<P014Response>{
     if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
@@ -150,9 +164,9 @@ export const api = {
     if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
     return parseP021Response(await requestTrustedSessionRead(`/orders/${encodeURIComponent(orderRef)}`))
   },
-  async getCoreProjection(orderRef:string):Promise<ProjectProjection>{
+  async getCoreProjection(orderRef:string):Promise<ReleaseOrderView>{
     if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
-    return projectProjection(`/orders/${encodeURIComponent(orderRef)}/projection`,'GET')
+    return parseReleaseOrderView(await requestData(`/orders/${encodeURIComponent(orderRef)}/projection`,'GET'))
   },
   async getProjection(orderRef: string): Promise<OrderProjection> {
     if (!orderRef) throw new Error('ORDER_REF_REQUIRED')
@@ -192,24 +206,25 @@ export const api = {
   async getLifeContentList():Promise<LifeContentListResult> {
     const data=parseAcceptedProjectEnvelope(await requestAnonymousRead('/content/life-items'))
     if(!Array.isArray(data))throw new ProjectApiError('INVALID_LIFE_CONTENT_LIST_DTO')
-    const items=data.map(row=>{if(!record(row)||!requiredText(row.contentRef)||!requiredText(row.category)||!requiredText(row.title)||!requiredText(row.summary)||!requiredText(row.publishedAt)||!requiredText(row.updatedAt)||!requiredText(row.validUntil))throw new ProjectApiError('INVALID_LIFE_CONTENT_ITEM_DTO');return{contentRef:row.contentRef,contentVersion:row.updatedAt,category:row.category as 'LIFE_REMINDER'|'HOLIDAY_EXPLANATION',title:row.title,summary:row.summary,sourceType:'平台发布',jurisdiction:'孟加拉',applicableAudience:'在孟用户',publishedAt:row.publishedAt,updatedAt:row.updatedAt,effectiveFrom:row.publishedAt,effectiveTo:row.validUntil,freshnessState:'CURRENT' as const,coverState:'NOT_CONFIGURED' as const,coverRef:null}})
-    return{requestRef:`LIFE-LIST-${Date.now()}`,viewState:items.length?'READY':'EMPTY',projectCode:items.length?'LIFE_CONTENT_LIST_READY':'LIFE_CONTENT_LIST_EMPTY',schemaVersion:'LIFE_CONTENT_READ_V1',visibilityRuleVersion:'DATABASE_PUBLISH_STATE',items,retryClass:'NONE',nextReadAt:null}
+    const items=data.map(row=>{if(!record(row)||!requiredText(row.contentRef)||!requiredText(row.category)||!requiredText(row.title)||!requiredText(row.summary)||!requiredText(row.publishedAt)||!requiredText(row.updatedAt)||!requiredText(row.validUntil))throw new ProjectApiError('INVALID_LIFE_CONTENT_ITEM_DTO');return{contentRef:row.contentRef,contentVersion:requiredText(row.contentVersion)?row.contentVersion:null,category:row.category as 'LIFE_REMINDER'|'HOLIDAY_EXPLANATION',title:row.title,summary:row.summary,sourceType:requiredText(row.sourceType)?row.sourceType:null,jurisdiction:requiredText(row.jurisdiction)?row.jurisdiction:null,applicableAudience:requiredText(row.applicableAudience)?row.applicableAudience:null,publishedAt:row.publishedAt,updatedAt:row.updatedAt,effectiveFrom:row.publishedAt,effectiveTo:row.validUntil,freshnessState:'CURRENT' as const,coverState:'NOT_CONFIGURED' as const,coverRef:null}})
+    return{requestRef:null,viewState:items.length?'READY':'EMPTY',projectCode:items.length?'LIFE_CONTENT_LIST_READY':'LIFE_CONTENT_LIST_EMPTY',schemaVersion:'LIFE_CONTENT_READ_V1',visibilityRuleVersion:null,items,retryClass:'NONE',nextReadAt:null}
   },
-  async getLifeContentDetail(contentRef:string,contentVersion:string):Promise<LifeContentDetailResult> {
-    if(!contentRef||!contentVersion)throw new ProjectApiError('LIFE_CONTENT_READ_KEY_REQUIRED')
-    const row=parseAcceptedProjectEnvelope(await requestAnonymousRead(`/content/life-items/${encodeURIComponent(contentRef)}?contentVersion=${encodeURIComponent(contentVersion)}`))
+  async getLifeContentDetail(contentRef:string,contentVersion:string|null):Promise<LifeContentDetailResult> {
+    if(!contentRef)throw new ProjectApiError('LIFE_CONTENT_READ_KEY_REQUIRED')
+    const versionQuery=contentVersion?`?contentVersion=${encodeURIComponent(contentVersion)}`:''
+    const row=parseAcceptedProjectEnvelope(await requestAnonymousRead(`/content/life-items/${encodeURIComponent(contentRef)}${versionQuery}`))
     if(!record(row)||row.contentRef!==contentRef||!requiredText(row.category)||!requiredText(row.title)||!requiredText(row.summary)||!requiredText(row.bodyText)||!requiredText(row.publishedAt)||!requiredText(row.updatedAt)||!requiredText(row.validUntil))throw new ProjectApiError('INVALID_LIFE_CONTENT_DETAIL_DTO')
-    const item={contentRef,contentVersion:row.updatedAt,category:row.category as 'LIFE_REMINDER'|'HOLIDAY_EXPLANATION',title:row.title,summary:row.summary,body:row.bodyText,sourceType:requiredText(row.sourceLabel)?row.sourceLabel:'平台发布',jurisdiction:'孟加拉',applicableAudience:'在孟用户',publishedAt:row.publishedAt,updatedAt:row.updatedAt,effectiveFrom:row.publishedAt,effectiveTo:row.validUntil,freshnessState:'CURRENT' as const,coverState:'NOT_CONFIGURED' as const,coverRef:null}
-    return{requestRef:`LIFE-DETAIL-${contentRef}`,viewState:'READY',projectCode:'LIFE_CONTENT_DETAIL_READY',schemaVersion:'LIFE_CONTENT_READ_V1',visibilityRuleVersion:'DATABASE_PUBLISH_STATE',contentRef,contentVersion:item.contentVersion,item,retryClass:'NONE',nextReadAt:null}
+    const item={contentRef,contentVersion:requiredText(row.contentVersion)?row.contentVersion:null,category:row.category as 'LIFE_REMINDER'|'HOLIDAY_EXPLANATION',title:row.title,summary:row.summary,body:row.bodyText,sourceType:requiredText(row.sourceType)?row.sourceType:requiredText(row.sourceLabel)?row.sourceLabel:null,jurisdiction:requiredText(row.jurisdiction)?row.jurisdiction:null,applicableAudience:requiredText(row.applicableAudience)?row.applicableAudience:null,publishedAt:row.publishedAt,updatedAt:row.updatedAt,effectiveFrom:row.publishedAt,effectiveTo:row.validUntil,freshnessState:'CURRENT' as const,coverState:'NOT_CONFIGURED' as const,coverRef:null}
+    return{requestRef:null,viewState:'READY',projectCode:'LIFE_CONTENT_DETAIL_READY',schemaVersion:'LIFE_CONTENT_READ_V1',visibilityRuleVersion:null,contentRef,contentVersion:item.contentVersion,item,retryClass:'NONE',nextReadAt:null}
   },
   async getTemporalOverview() {
     const response=await requestTemporalOverviewRead()
     const data=parseAcceptedProjectEnvelope(response.body)
     if(!record(data)||!requiredText(data.serverTime)||!record(data.dhaka)||!record(data.beijing))throw new ProjectApiError('INVALID_TEMPORAL_OVERVIEW_DTO')
     const referenceInstant=data.serverTime
-    const clock=(source:Record<string,unknown>,cityCode:'DHAKA'|'BEIJING',displayName:string,zoneId:'Asia/Dhaka'|'Asia/Shanghai')=>({cityCode,displayName,zoneId,localDate:String(source.date),localTime:String(source.localTime).slice(0,5),availabilityState:'AVAILABLE' as const})
-    const holiday=(source:Record<string,unknown>,countryCode:'CN'|'BD')=>{const dayType=String(source.dayType);const isHoliday=dayType==='HOLIDAY'||dayType==='REST_DAY';return{countryCode,localDate:String(source.date),state:isHoliday?'CONFIRMED_HOLIDAY' as const:'NO_HOLIDAY_CONFIRMED' as const,holidayId:isHoliday?`${countryCode}-${source.date}-${dayType}`:null,name:dayType==='REST_DAY'?'休息日':dayType==='HOLIDAY'?String(source.holidayName||'节假日'):null,note:null,sourceType:'LOCAL_DATABASE_RULE',sourceCoverageDate:String(source.date),effectiveFrom:new Date(Date.parse(referenceInstant)-86400000).toISOString(),effectiveTo:new Date(Date.parse(referenceInstant)+86400000).toISOString(),version:'DB-RULE-V1'}}
-    response.body={requestRef:`TEMPORAL-${referenceInstant}`,projectCode:'TEMPORAL_OVERVIEW_READY',schemaVersion:'TEMPORAL_OVERVIEW_V1',referenceInstant,generatedAt:referenceInstant,timeZoneRuleVersion:'IANA_DB',clockStaleAfterSeconds:300,clockState:'BOTH_AVAILABLE',clocks:{dhaka:clock(data.dhaka,'DHAKA','达卡','Asia/Dhaka'),beijing:clock(data.beijing,'BEIJING','北京','Asia/Shanghai')},holidayRuleVersion:'LOCAL_DATABASE_RULE',holidays:{china:holiday(data.beijing,'CN'),bangladesh:holiday(data.dhaka,'BD')},retryClass:'NONE'}
+    const clock=(source:Record<string,unknown>,cityCode:'DHAKA'|'BEIJING',displayName:string,zoneId:'Asia/Dhaka'|'Asia/Shanghai')=>{if(!requiredText(source.date)||!requiredText(source.localTime))throw new ProjectApiError('INVALID_TEMPORAL_CLOCK_DTO');return{cityCode,displayName,zoneId,localDate:source.date,localTime:source.localTime.slice(0,5),availabilityState:'AVAILABLE' as const}}
+    const holiday=(source:Record<string,unknown>,countryCode:'CN'|'BD')=>{if(!requiredText(source.date))throw new ProjectApiError('INVALID_TEMPORAL_HOLIDAY_DTO');return{countryCode,localDate:source.date,state:'READ_ERROR' as const,holidayId:null,name:null,note:null,sourceType:null,sourceCoverageDate:null,effectiveFrom:null,effectiveTo:null,version:null}}
+    response.body={requestRef:null,projectCode:'TEMPORAL_OVERVIEW_PARTIAL',schemaVersion:'TEMPORAL_OVERVIEW_V1',referenceInstant,generatedAt:referenceInstant,timeZoneRuleVersion:null,clockStaleAfterSeconds:300,clockState:'BOTH_AVAILABLE',clocks:{dhaka:clock(data.dhaka,'DHAKA','达卡','Asia/Dhaka'),beijing:clock(data.beijing,'BEIJING','北京','Asia/Shanghai')},holidayRuleVersion:null,holidays:{china:holiday(data.beijing,'CN'),bangladesh:holiday(data.dhaka,'BD')},retryClass:'USER_INITIATED_READ_ONLY'}
     return response
   },
 }
