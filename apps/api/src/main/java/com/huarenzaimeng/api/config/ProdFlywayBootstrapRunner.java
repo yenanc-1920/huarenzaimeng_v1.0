@@ -73,7 +73,7 @@ final class ProdFlywayBootstrapRunner {
             if (migrationEnabled) {
                 flyway.migrate();
             }
-            requirePostV14AndExpectedDevelopmentData();
+            requirePostV15AndExpectedDevelopmentData();
             state.ready();
         } catch (Exception failure) {
             state.failed();
@@ -100,7 +100,7 @@ final class ProdFlywayBootstrapRunner {
         }
     }
 
-    private void requirePostV14AndExpectedDevelopmentData() throws Exception {
+    private void requirePostV15AndExpectedDevelopmentData() throws Exception {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement();
              ResultSet history = statement.executeQuery(
@@ -109,10 +109,10 @@ final class ProdFlywayBootstrapRunner {
                              + "SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) "
                              + "FROM flyway_schema_history WHERE version IS NOT NULL")) {
             if (!history.next()
-                    || history.getLong(1) != 14L
-                    || history.getLong(2) != 14L
-                    || history.getLong(3) != 14L
-                    || history.getLong(4) != 14L
+                    || history.getLong(1) != 15L
+                    || history.getLong(2) != 15L
+                    || history.getLong(3) != 15L
+                    || history.getLong(4) != 15L
                     || history.getLong(5) != 0L
                     || history.next()) {
                 throw new IllegalStateException("ENVIRONMENT_FLYWAY_TERMINAL_STATE_INVALID");

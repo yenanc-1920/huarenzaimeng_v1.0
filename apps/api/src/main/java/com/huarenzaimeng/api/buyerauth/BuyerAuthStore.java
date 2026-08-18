@@ -4,6 +4,9 @@ import java.time.Instant;
 import java.util.Optional;
 
 interface BuyerAuthStore {
+    boolean admitLoginWindow(String windowKeyDigest, Instant now, Instant windowEndsAt,
+                             int maximumAttempts, int maximumFailures);
+    void recordLoginWindowOutcome(String windowKeyDigest, boolean succeeded, Instant occurredAt);
     boolean beginLoginAttempt(String environment, String appIdRef, String codeDigest, String attemptRef,
                               String requestRef, Instant createdAt);
     void finishLoginAttempt(String attemptRef, String resultCode, String evidenceRef, Instant completedAt);

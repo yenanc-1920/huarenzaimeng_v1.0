@@ -35,4 +35,12 @@ class AdminSessionFilterTest {
         MockHttpServletRequest request=new MockHttpServletRequest("GET","/api/v1/catalog");
         assertTrue(filter.shouldNotFilter(request)); verifyNoInteractions(auth);
     }
+
+    @Test void workflowRouteIsCoveredByAdminAuthentication() throws Exception {
+        AdminAuthService auth=mock(AdminAuthService.class);when(auth.authenticate(null)).thenReturn(Optional.empty());
+        AdminSessionFilter filter=new AdminSessionFilter(auth);FilterChain chain=mock(FilterChain.class);
+        MockHttpServletRequest request=new MockHttpServletRequest("GET","/admin-workflow/v1/reviews");
+        MockHttpServletResponse response=new MockHttpServletResponse();filter.doFilter(request,response,chain);
+        assertEquals(401,response.getStatus());verifyNoInteractions(chain);
+    }
 }

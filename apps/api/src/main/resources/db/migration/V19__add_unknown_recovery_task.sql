@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS hz_unknown_recovery_task (
+    task_ref VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    aggregate_ref VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    operation_code VARCHAR(40) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    expected_aggregate_version BIGINT UNSIGNED NOT NULL,
+    state_code VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    budget_remaining INT UNSIGNED NOT NULL,
+    deadline DATETIME(3) NOT NULL,
+    next_attempt_at DATETIME(3) NOT NULL,
+    lease_owner VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+    lease_until DATETIME(3) DEFAULT NULL,
+    task_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
+    last_error_code VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+    completed_by_owner VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+    completion_lease_version BIGINT UNSIGNED DEFAULT NULL,
+    manual_review_ref VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+    created_at DATETIME(3) NOT NULL,
+    updated_at DATETIME(3) NOT NULL,
+    PRIMARY KEY (task_ref),
+    UNIQUE KEY uk_hz_unknown_recovery_aggregate_operation (aggregate_ref,operation_code),
+    KEY idx_hz_unknown_recovery_claim (state_code,next_attempt_at,lease_until,deadline)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

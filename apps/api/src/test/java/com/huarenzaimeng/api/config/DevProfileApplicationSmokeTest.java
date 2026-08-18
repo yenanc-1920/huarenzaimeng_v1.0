@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "SPRING_FLYWAY_PASSWORD=smoke_password",
         "HZ_DEV_DATABASE_NAME=huarenzaimeng_dev",
         "HZ_DEV_FUNCTION_RELEASE_ENABLED=true",
+        "HZ_PHONE_DIGEST_HMAC_SECRET=test-only-phone-digest-secret-32-bytes",
         "HZ_ADMIN_BOOTSTRAP_ENABLED=false"
 })
 @ActiveProfiles({"release-mysql", "local-mysql"})

@@ -21,21 +21,24 @@ import java.util.UUID;
 @Service
 @Profile("release-mysql")
 final class BuyerAuthService {
-    private final BuyerAuthStore store; private final WechatCode2SessionPort provider; private final boolean enabled;
+    private final BuyerAuthStore store; private final WeChatIdentityPort provider; private final boolean enabled;
     private final byte[] pepper; private final Duration absoluteTtl; private final Duration idleTtl;
     private final SecureRandom random; private final Clock clock;
+    private final String expectedAppIdRef;
     @Autowired
     BuyerAuthService(BuyerAuthStore store, @Value("${hz.buyer-auth.enabled:false}") boolean enabled,
-                     WechatCode2SessionPort provider,
+                     WeChatIdentityPort provider,
+                     @Value("${hz.buyer-auth.expected-app-id-ref:}") String expectedAppIdRef,
                      @Value("${hz.buyer-auth.identity-pepper:}") String pepper,
                      @Value("${hz.buyer-auth.code-pepper:}") String codePepper) {
-        this(store, provider, enabled, pepper, codePepper, Clock.systemUTC(), new SecureRandom());
+        this(store, provider, enabled, expectedAppIdRef, pepper, codePepper, Clock.systemUTC(), new SecureRandom());
     }
-    BuyerAuthService(BuyerAuthStore store, WechatCode2SessionPort provider, boolean enabled,
-                     String identityPepper, String codePepper, Clock clock, SecureRandom random) {
+    BuyerAuthService(BuyerAuthStore store, WeChatIdentityPort provider, boolean enabled,
+                     String expectedAppIdRef, String identityPepper, String codePepper, Clock clock, SecureRandom random) {
         this.store=store;this.provider=provider;this.enabled=enabled;this.clock=clock;this.random=random;
+        this.expectedAppIdRef=expectedAppIdRef;
         this.pepper=identityPepper.getBytes(StandardCharsets.UTF_8);
-        if (enabled && (identityPepper.length()<32 || codePepper.length()<32 || identityPepper.equals(codePepper))) throw new Rejected("BUYER_AUTH_CONFIGURATION_UNAVAILABLE");
+        if (enabled && (!validProviderValue(expectedAppIdRef) || identityPepper.length()<32 || codePepper.length()<32 || identityPepper.equals(codePepper))) throw new Rejected("BUYER_AUTH_CONFIGURATION_UNAVAILABLE");
         this.codePepper=codePepper.getBytes(StandardCharsets.UTF_8);this.absoluteTtl=Duration.ofHours(24);this.idleTtl=Duration.ofHours(2);
     }
     private final byte[] codePepper;
@@ -43,16 +46,18 @@ final class BuyerAuthService {
         if (!enabled) throw new Rejected("BUYER_AUTH_DISABLED");
         if (!validCode(code) || !validRequestRef(requestRef)) throw new Rejected("LOGIN_REQUEST_INVALID");
         Instant attemptStartedAt=clock.instant();String attemptRef="LOGIN-"+UUID.randomUUID();String providerCallRef="CALL-"+UUID.randomUUID();
+        String windowKeyDigest=sha256(requestRef);
+        if(!store.admitLoginWindow(windowKeyDigest,attemptStartedAt,attemptStartedAt.plus(Duration.ofMinutes(10)),10,5)) throw new Rejected("LOGIN_RATE_LIMITED");
         String codeDigest=hmac(codePepper,code);
         if(!store.beginLoginAttempt("RELEASE","WECHAT_PRIMARY",codeDigest,attemptRef,requestRef,attemptStartedAt)) throw new Rejected("LOGIN_CODE_ALREADY_SUBMITTED");
-        WechatCode2SessionPort.Result exchange;
-        try { exchange=provider.exchange(new WechatCode2SessionPort.Command(code,providerCallRef)); }
-        catch(RuntimeException failure){exchange=new WechatCode2SessionPort.Unknown("CONTROLLED_PROVIDER_FAILURE");}
-        if(exchange instanceof WechatCode2SessionPort.Rejected){store.finishLoginAttempt(attemptRef,"REJECTED",providerCallRef,clock.instant());throw new Rejected("WECHAT_LOGIN_REJECTED");}
-        if(exchange instanceof WechatCode2SessionPort.Unknown){store.finishLoginAttempt(attemptRef,"UNKNOWN",providerCallRef,clock.instant());throw new Rejected("WECHAT_LOGIN_RESULT_UNKNOWN");}
-        WechatCode2SessionPort.Success success=(WechatCode2SessionPort.Success)exchange;
-        if(!validProviderValue(success.appIdRef())||!validProviderValue(success.providerSubject())||!validRequestRef(success.evidenceRef())){
-            store.finishLoginAttempt(attemptRef,"UNKNOWN",providerCallRef,clock.instant());throw new Rejected("WECHAT_LOGIN_RESULT_UNKNOWN");
+        WeChatIdentityPort.Result exchange;
+        try { exchange=provider.exchange(new WeChatIdentityPort.Command(code,providerCallRef)); }
+        catch(RuntimeException failure){exchange=new WeChatIdentityPort.Unknown("CONTROLLED_PROVIDER_FAILURE");}
+        if(exchange instanceof WeChatIdentityPort.Rejected){store.finishLoginAttempt(attemptRef,"REJECTED",providerCallRef,clock.instant());store.recordLoginWindowOutcome(windowKeyDigest,false,clock.instant());throw new Rejected("WECHAT_LOGIN_REJECTED");}
+        if(exchange instanceof WeChatIdentityPort.Unknown){store.finishLoginAttempt(attemptRef,"UNKNOWN",providerCallRef,clock.instant());store.recordLoginWindowOutcome(windowKeyDigest,false,clock.instant());throw new Rejected("WECHAT_LOGIN_RESULT_UNKNOWN");}
+        WeChatIdentityPort.Success success=(WeChatIdentityPort.Success)exchange;
+        if(!expectedAppIdRef.equals(success.appIdRef())||!validProviderValue(success.providerSubject())||!validRequestRef(success.evidenceRef())){
+            store.finishLoginAttempt(attemptRef,"UNKNOWN",providerCallRef,clock.instant());store.recordLoginWindowOutcome(windowKeyDigest,false,clock.instant());throw new Rejected("WECHAT_LOGIN_APPID_MISMATCH");
         }
         Instant sessionIssuedAt=clock.instant();
         String subjectDigest=hmac(pepper,success.providerSubject());byte[] bytes=new byte[32];random.nextBytes(bytes);
@@ -61,6 +66,7 @@ final class BuyerAuthService {
         try {
             BuyerAuthStore.Identity identity=store.establishIdentityAndSession(attemptRef,success.evidenceRef(),success.appIdRef(),subjectDigest,"BUYER-"+UUID.randomUUID(),UUID.randomUUID().toString(),tokenDigest,sessionIssuedAt,absolute,idle,
                     new BuyerAuthStore.Audit("WECHAT_SESSION_ESTABLISHED","SUCCEEDED",subjectDigest,tokenDigest,requestRef,sessionIssuedAt));
+            store.recordLoginWindowOutcome(windowKeyDigest,true,sessionIssuedAt);
             return new SessionResult(token,identity.subjectRef(),absolute);
         } catch(RuntimeException uncertain) { throw new Rejected("BUYER_SESSION_RESULT_UNKNOWN"); }
     }

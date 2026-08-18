@@ -20,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
         "HZ_ENV_DATABASE_NAME=huarenzaimeng_prod",
         "HZ_ENV_INITIALIZE_EMPTY_DATABASE=true",
         "HZ_ENV_FUNCTION_RELEASE_ENABLED=false",
+        "HZ_PHONE_DIGEST_HMAC_SECRET=test-only-phone-digest-secret-32-bytes",
         "HZ_ADMIN_BOOTSTRAP_ENABLED=false"
 })
 @ActiveProfiles({"release-mysql", "prod-mysql"})

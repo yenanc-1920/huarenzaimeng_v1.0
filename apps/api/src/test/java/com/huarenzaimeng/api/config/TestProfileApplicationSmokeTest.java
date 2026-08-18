@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "HZ_ENV_DATABASE_NAME=huarenzaimeng_test",
         "HZ_ENV_MIGRATION_ENABLED=true",
         "HZ_ENV_FUNCTION_RELEASE_ENABLED=true",
+        "HZ_PHONE_DIGEST_HMAC_SECRET=test-only-phone-digest-secret-32-bytes",
         "HZ_ADMIN_BOOTSTRAP_ENABLED=false"
 })
 @ActiveProfiles({"release-mysql", "test-mysql"})

@@ -54,6 +54,18 @@ class AdminReadServiceTest {
         verify(mapper,never()).selectAdminCatalog();
     }
 
+    @Test void contentOperatorA130ProjectionDoesNotExposeCommercialFields() {
+        Map<String,Object> product=new java.util.HashMap<>();
+        product.put("productRef","P-1");product.put("operatorCode","ROBI");product.put("productType","DATA");
+        product.put("displayName","Robi 5GB");product.put("benefitText","5GB");product.put("validityText","30 days");
+        product.put("state","UNDER_REVIEW");product.put("version",2L);product.put("supplierCost","10.00");product.put("fxRate","0.06");product.put("markupRate","0.20");
+        when(mapper.selectPlatformProducts()).thenReturn(List.of(product));
+        AdminReadService.AdminProjection result=service.read("A130","CONTENT_OPERATOR");
+        Object item=((List<?>)result.items()).get(0);
+        assertThat(item).isInstanceOf(AdminReadService.A130ContentItem.class);
+        assertThat(item.toString()).doesNotContain("10.00","0.06","0.20","supplierCost","fxRate","markupRate");
+    }
+
     @Test void a120IncludesPersistedDirectoryReports() {
         when(content.internalList()).thenReturn(new ContentPage<>(List.of(),0));
         when(mapper.selectDirectoryReports()).thenReturn(List.of(Map.ofEntries(

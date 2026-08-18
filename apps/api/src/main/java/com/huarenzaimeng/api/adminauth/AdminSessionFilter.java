@@ -24,7 +24,7 @@ public final class AdminSessionFilter extends OncePerRequestFilter {
 
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return !path.startsWith("/admin-read/") && !path.startsWith("/admin-command/");
+        return !path.startsWith("/admin-read/") && !path.startsWith("/admin-command/") && !path.startsWith("/admin-workflow/");
     }
 
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {

@@ -106,10 +106,10 @@ class ProdFlywayBootstrapRunnerTest {
         ResultSet registry = single(registryPresent ? 1L : 0L);
         ResultSet seeds = single(seedCount);
         when(history.next()).thenReturn(true, false);
-        when(history.getLong(1)).thenReturn(14L);
-        when(history.getLong(2)).thenReturn(14L);
-        when(history.getLong(3)).thenReturn(14L);
-        when(history.getLong(4)).thenReturn(14L);
+        when(history.getLong(1)).thenReturn(15L);
+        when(history.getLong(2)).thenReturn(15L);
+        when(history.getLong(3)).thenReturn(15L);
+        when(history.getLong(4)).thenReturn(15L);
         when(history.getLong(5)).thenReturn(0L);
         when(source.getConnection()).thenReturn(connection);
         when(connection.createStatement()).thenReturn(statement);

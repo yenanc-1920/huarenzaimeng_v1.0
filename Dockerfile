@@ -43,12 +43,13 @@ RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --no-create-home app
 
 COPY --from=build --chown=10001:10001 /workspace/apps/api/target/api-*.jar app.jar
+COPY --chown=10001:10001 tools/container-entrypoint.sh /app/container-entrypoint.sh
+RUN chmod 0555 /app/container-entrypoint.sh
 
 ENV SERVER_PORT=8080
-# Fail closed by default. The Cloud Hosting service must explicitly set
-# SPRING_PROFILES_ACTIVE=release-mysql after the readiness gate.
-ENV SPRING_PROFILES_ACTIVE=mock
+# No profile default is permitted in the formal image. The hosting service must
+# explicitly select one supported release combination; the entrypoint fails closed otherwise.
 EXPOSE 8080
 
 USER 10001:10001
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["/app/container-entrypoint.sh"]

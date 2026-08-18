@@ -17,6 +17,13 @@ class JdbcBuyerAuthStore implements BuyerAuthStore {
     private final JdbcTemplate jdbc;
     JdbcBuyerAuthStore(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
+    @Override @Transactional
+    public boolean admitLoginWindow(String key,Instant now,Instant ends,int maxAttempts,int maxFailures){
+        jdbc.update("INSERT INTO buyer_login_rate_window (window_key_digest,window_started_at,window_ends_at,attempt_count,failure_count,updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE attempt_count=IF(window_ends_at<=VALUES(updated_at),1,attempt_count+1),failure_count=IF(window_ends_at<=VALUES(updated_at),0,failure_count),window_started_at=IF(window_ends_at<=VALUES(updated_at),VALUES(window_started_at),window_started_at),window_ends_at=IF(window_ends_at<=VALUES(updated_at),VALUES(window_ends_at),window_ends_at),updated_at=VALUES(updated_at)",key,ts(now),ts(ends),1,0,ts(now));
+        return jdbc.queryForObject("SELECT attempt_count<=? AND failure_count<? FROM buyer_login_rate_window WHERE window_key_digest=?",Boolean.class,maxAttempts,maxFailures,key);
+    }
+    @Override public void recordLoginWindowOutcome(String key,boolean succeeded,Instant at){if(!succeeded)jdbc.update("UPDATE buyer_login_rate_window SET failure_count=failure_count+1,updated_at=? WHERE window_key_digest=?",ts(at),key);}
+
     @Override public boolean beginLoginAttempt(String environment,String appIdRef,String codeDigest,String attemptRef,String requestRef,Instant createdAt){
         try{jdbc.update("INSERT INTO buyer_login_attempt (attempt_ref,request_ref,environment_code,app_id_ref,code_digest,status_code,created_at) VALUES (?,?,?,?,?,'PENDING',?)",attemptRef,requestRef,environment,appIdRef,codeDigest,ts(createdAt));return true;}catch(DuplicateKeyException duplicate){return false;}
     }

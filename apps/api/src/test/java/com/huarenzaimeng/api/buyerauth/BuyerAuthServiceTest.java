@@ -119,7 +119,7 @@ class BuyerAuthServiceTest {
 
     @Test void providerDelayUsesPostValidationSessionIssuedAtForAllSessionTimes(){
         MemoryStore store=new MemoryStore();MutableClock clock=new MutableClock(NOW);WechatCode2SessionPort delayed=command->{clock.now=clock.now.plus(Duration.ofMinutes(5));return new WechatCode2SessionPort.Success("APP_PRIMARY","provider_subject_synthetic","EVIDENCE-SYNTHETIC");};
-        BuyerAuthService service=new BuyerAuthService(store,delayed,true,ID,CODE,clock,new SecureRandom(new byte[]{4,5,6}));var result=service.establish("one-time-code-delayed","REQUEST-004");
+        BuyerAuthService service=new BuyerAuthService(store,delayed,true,"APP_PRIMARY",ID,CODE,clock,new SecureRandom(new byte[]{4,5,6}));var result=service.establish("one-time-code-delayed","REQUEST-004");
         assertThat(store.issuedAt).isEqualTo(NOW.plus(Duration.ofMinutes(5)));assertThat(result.absoluteExpiresAt()).isEqualTo(store.issuedAt.plus(Duration.ofHours(24)));assertThat(store.active.idleExpiresAt).isEqualTo(store.issuedAt.plus(Duration.ofHours(2)));assertThat(store.audit.occurredAt()).isEqualTo(store.issuedAt);
     }
 
@@ -135,12 +135,15 @@ class BuyerAuthServiceTest {
                 .noneMatch(component->component.contains("boolean")||component.contains("UNKNOWN")||component.contains("Instant")||component.contains("Time"));
     }
 
-    private static BuyerAuthService service(MemoryStore store,WechatCode2SessionPort port,boolean enabled){return new BuyerAuthService(store,port,enabled,ID,CODE,Clock.fixed(NOW,ZoneOffset.UTC),new SecureRandom(new byte[]{1,2,3}));}
+    @Test void appIdMismatchFailsClosedAndWindowCanRateLimit(){MemoryStore store=new MemoryStore();assertCode(service(store,new FakePort(new WechatCode2SessionPort.Success("APP_OTHER","provider_subject_synthetic","EVIDENCE-SYNTHETIC")),true),"appid-mismatch-code","WECHAT_LOGIN_APPID_MISMATCH");store.admitted=false;assertCode(service(store,new FakePort(new WechatCode2SessionPort.Unknown("UNUSED")),true),"rate-limited-code","LOGIN_RATE_LIMITED");}
+    private static BuyerAuthService service(MemoryStore store,WechatCode2SessionPort port,boolean enabled){return new BuyerAuthService(store,port,enabled,"APP_PRIMARY",ID,CODE,Clock.fixed(NOW,ZoneOffset.UTC),new SecureRandom(new byte[]{1,2,3}));}
     private static void assertCode(BuyerAuthService service,String code,String expected){assertThatThrownBy(()->service.establish(code,"REQUEST-VALID")).isInstanceOfSatisfying(BuyerAuthService.Rejected.class,r->assertThat(r.projectCode).isEqualTo(expected));}
     private static final class FakePort implements WechatCode2SessionPort {final Result result;int calls;FakePort(Result r){result=r;}public Result exchange(Command c){calls++;return result;}}
     private static final class MemoryStore implements BuyerAuthStore {
-        final Set<String> codes=ConcurrentHashMap.newKeySet();int attemptWrites,sessionWrites,authReads,idleAdvances,revokes,lastSeenWrites;SessionState active;boolean logoutUnknown;Instant issuedAt;Audit audit;
+        final Set<String> codes=ConcurrentHashMap.newKeySet();int attemptWrites,sessionWrites,authReads,idleAdvances,revokes,lastSeenWrites;SessionState active;boolean logoutUnknown,admitted=true;Instant issuedAt;Audit audit;
         String codeDigest,subjectDigest,tokenDigest;
+        public boolean admitLoginWindow(String key,Instant now,Instant end,int attempts,int failures){return admitted;}
+        public void recordLoginWindowOutcome(String key,boolean succeeded,Instant occurredAt){}
         public synchronized boolean beginLoginAttempt(String e,String a,String d,String ref,String req,Instant at){if(!codes.add(d))return false;attemptWrites++;codeDigest=d;return true;}
         public void finishLoginAttempt(String a,String r,String e,Instant at){}
         public synchronized Identity establishIdentityAndSession(String attempt,String evidence,String app,String sub,String ref,String sid,String token,Instant issued,Instant absolute,Instant idle,Audit audit){sessionWrites++;subjectDigest=sub;tokenDigest=token;issuedAt=issued;this.audit=audit;active=new SessionState(ref,sid,absolute,idle);return new Identity("buyer",ref);}
