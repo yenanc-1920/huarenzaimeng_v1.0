@@ -1,23 +1,30 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { appendReconciliationEvent, loadReconciliation, type ReconciliationAction, type ReconciliationDetail, type ReconciliationEvent, type WorkflowDetail } from '../../api/admin-workflow'
 import type { AdminPageProjection } from '../../domain/admin'
-type Projection = Extract<AdminPageProjection, { pageId: 'A110' }>
-const props = defineProps<{ projection: Projection }>()
-const emit = defineEmits<{ navigate: [pageId: 'A100' | 'A140'] }>()
-const selectedRef = ref(props.projection.items[0]?.reconciliationRef ?? '')
-watch(() => props.projection, value => { selectedRef.value = value.items[0]?.reconciliationRef ?? '' })
-const selected = computed(() => props.projection.items.find(item => item.reconciliationRef === selectedRef.value) ?? props.projection.items[0])
+type Projection = Extract<AdminPageProjection,{pageId:'A110'}>
+const props=defineProps<{projection:Projection}>(); const emit=defineEmits<{navigate:[pageId:'A100'|'A140'];changed:[]}>()
+const selectedRef=ref(props.projection.items[0]?.reconciliationRef??''); const detail=ref<WorkflowDetail<ReconciliationDetail,ReconciliationEvent>|null>(null)
+const loading=ref(false);const submitting=ref(false);const error=ref('');const success=ref('')
+const form=reactive<{actionType:ReconciliationAction;note:string;ownerRef:string;evidenceRef:string}>({actionType:'NOTE',note:'',ownerRef:'',evidenceRef:''})
+const selected=computed(()=>props.projection.items.find(item=>item.reconciliationRef===selectedRef.value)??props.projection.items[0])
+const actions=computed<ReconciliationAction[]>(()=>props.projection.role==='CS'?['CLAIM','NOTE','TRANSFER_REVIEW']:props.projection.role==='FIN'?['CLAIM','NOTE','QUERY_WECHAT','QUERY_PROVIDER','TRANSFER_CS','RESOLVE','CLOSE']:['CLAIM','NOTE','QUERY_WECHAT','QUERY_PROVIDER','TRANSFER_CS','TRANSFER_REVIEW','RESOLVE','CLOSE'])
+const ownerRequired=computed(()=>form.actionType==='CLAIM'||form.actionType.startsWith('TRANSFER_'));const evidenceRequired=computed(()=>['RESOLVE','CLOSE'].includes(form.actionType))
+const canSubmit=computed(()=>!submitting.value&&detail.value&&form.note.trim()&&(!ownerRequired.value||form.ownerRef.trim())&&(!evidenceRequired.value||form.evidenceRef.trim()))
+async function read(){if(!selectedRef.value){detail.value=null;return}loading.value=true;error.value='';try{detail.value=await loadReconciliation(selectedRef.value)}catch(e){detail.value=null;error.value=e instanceof Error?e.message:'差异详情暂不可用'}finally{loading.value=false}}
+watch(()=>props.projection,value=>{selectedRef.value=value.items[0]?.reconciliationRef??''});watch(selectedRef,read,{immediate:true});watch(actions,value=>{if(!value.includes(form.actionType))form.actionType=value[0]??'NOTE'},{immediate:true})
+async function submit(){if(!canSubmit.value||!detail.value)return;submitting.value=true;error.value='';success.value='';try{await appendReconciliationEvent(detail.value.item.reconciliationRef,{...form,expectedVersion:detail.value.item.version,ownerRef:form.ownerRef||undefined,evidenceRef:form.evidenceRef||undefined});await read();success.value='处置记录已追加';form.note='';form.evidenceRef='';emit('changed')}catch(e){error.value=e instanceof Error?e.message:'处置提交失败'}finally{submitting.value=false}}
+const actionLabel=(value:ReconciliationAction)=>({CLAIM:'领取处理',NOTE:'记录核对结果',QUERY_WECHAT:'查询微信支付结果',QUERY_PROVIDER:'查询充值渠道结果',TRANSFER_CS:'转交客服',TRANSFER_REVIEW:'转交复核',RESOLVE:'标记已解决',CLOSE:'关闭差异'}[value])
+const roleLabel=(value:string)=>({FIN:'财务',CS:'客服',SUPER_ADMIN:'超级管理员'}[value]??'角色无法确认')
+const stateLabel=(value:string)=>({OPEN:'待处理',IN_REVIEW:'核对中',RESOLVED:'已解决',CLOSED:'已关闭'}[value]??'状态无法确认')
+const differenceLabel=(value:string)=>({PAYMENT_TOPUP_PENDING:'支付与充值状态待核对',WECHAT_PAYMENT_QUERY:'微信支付结果待核对',WECHAT_REFUND_QUERY:'微信退款结果待核对',WINLA_TOPUP_QUERY:'充值渠道结果待核对'}[value]??'差异类型无法确认')
 </script>
-<template>
-  <section class="work-grid two-column" data-page-id="UX-A110" data-data-origin="LOCAL_DATABASE">
-    <article class="card list-card"><div class="card-head"><div><p class="eyebrow">交易差异</p><h2>支付、充值与退款差异</h2></div><span class="readonly">{{ projection.role }} 只读</span></div>
-      <div v-if="projection.items.length === 0" class="empty-panel">当前授权范围没有交易差异</div>
-      <div v-else class="record-list"><button v-for="item in projection.items" :key="item.reconciliationRef" class="record-row" :class="{ selected: selectedRef === item.reconciliationRef }" @click="selectedRef=item.reconciliationRef"><span><b>{{ item.reconciliationRef }}</b><small>{{ item.orderRef }} · {{ item.differenceType }}</small></span><em>{{ item.state }}</em></button></div>
-    </article>
-    <aside class="card detail-card"><div class="card-head"><div><p class="eyebrow">差异事实</p><h2>{{ selected?.reconciliationRef ?? '暂无差异' }}</h2></div><span class="readonly">不改写终态</span></div>
-      <dl v-if="selected"><div><dt>订单引用</dt><dd>{{ selected.orderRef }}</dd></div><div><dt>差异类型</dt><dd>{{ selected.differenceType }}</dd></div><div><dt>差异金额</dt><dd>{{ selected.amount }} {{ selected.currency }}</dd></div><div><dt>状态</dt><dd>{{ selected.state }}</dd></div><div><dt>负责人</dt><dd>{{ selected.ownerRef ?? '未分配' }}</dd></div><div><dt>发现时间</dt><dd>{{ selected.discoveredAt }}</dd></div><div><dt>更新时间</dt><dd>{{ selected.updatedAt }}</dd></div></dl>
-      <div class="safe-note"><strong>只读边界</strong><p>仅查看开发库交易差异事实；禁止重充、退款、调账或手工修改支付与充值终态。</p></div>
-      <div class="command-actions"><button @click="emit('navigate','A100')">查看客服案件</button><button @click="emit('navigate','A140')">查看订单事实</button></div>
-    </aside>
-  </section>
-</template>
+<template><section class="work-grid two-column" data-page-id="UX-A110" data-data-origin="CURRENT_ENVIRONMENT_DATABASE">
+  <article class="card list-card"><div class="card-head"><div><p class="eyebrow">交易差异</p><h2>支付、充值与退款差异</h2></div><span class="readonly">{{roleLabel(projection.role)}}</span></div><div v-if="projection.items.length===0" class="empty-panel">当前授权范围没有交易差异</div><div v-else class="record-list"><button v-for="item in projection.items" :key="item.reconciliationRef" class="record-row" :class="{selected:selectedRef===item.reconciliationRef}" @click="selectedRef=item.reconciliationRef"><span><b>{{item.reconciliationRef}}</b><small>{{item.orderRef}} · {{differenceLabel(item.differenceType)}}</small></span><em>{{stateLabel(item.state)}}</em></button></div></article>
+  <aside class="card detail-card"><div class="card-head"><div><p class="eyebrow">差异处置</p><h2>{{selected?.reconciliationRef??'暂无差异'}}</h2></div><span class="readonly">不改写交易结果</span></div>
+    <div v-if="loading" class="empty-panel">正在读取差异详情</div><div v-else-if="error&&!detail" class="empty-panel" role="alert">{{error}}</div><template v-else-if="detail"><dl><div><dt>订单引用</dt><dd>{{detail.item.orderRef}}</dd></div><div><dt>差异类型</dt><dd>{{differenceLabel(detail.item.differenceType)}}</dd></div><div><dt>差异金额</dt><dd>{{detail.item.amount}} {{detail.item.currency}}</dd></div><div><dt>状态</dt><dd>{{stateLabel(detail.item.state)}}</dd></div><div><dt>负责人</dt><dd>{{detail.item.ownerRef??'未分配'}}</dd></div><div><dt>更新时间</dt><dd>{{detail.item.updatedAt}}</dd></div></dl>
+      <section class="workflow-form"><h3>追加处置记录</h3><div class="form-grid"><label>处置动作<select v-model="form.actionType"><option v-for="action in actions" :key="action" :value="action">{{actionLabel(action)}}</option></select></label><label>负责人{{ownerRequired?'':'（选填）'}}<input v-model.trim="form.ownerRef" maxlength="120"></label><label>证据编号{{evidenceRequired?'':'（选填）'}}<input v-model.trim="form.evidenceRef" maxlength="120"></label><label class="full-span">核对说明<textarea v-model.trim="form.note" maxlength="1000" placeholder="记录已核对事实和下一步，不执行重充或退款"></textarea></label></div><div class="form-actions"><button class="primary" :disabled="!canSubmit" @click="submit">{{submitting?'提交中':'保存处置记录'}}</button></div></section>
+      <section class="history-list"><h3>处置记录</h3><div v-if="detail.history.length===0" class="empty-panel">暂无处置记录</div><article v-for="event in detail.history" :key="event.eventRef"><strong>{{actionLabel(event.actionType as ReconciliationAction)}}</strong><p>{{event.note}}</p><small>{{event.evidenceRef?`证据 ${event.evidenceRef} · `:''}}{{event.actorRef}} · {{event.createdAt}}</small></article></section>
+      <div class="safe-note warning"><strong>操作边界</strong><p>这里只追加核对与流转记录，不会重复充值、擅自退款、调账或修改支付与充值终态。</p></div><div class="command-actions"><button @click="emit('navigate','A100')">查看客服案件</button><button @click="emit('navigate','A140')">查看订单事实</button></div></template>
+    <p v-if="success" class="form-success" role="status">{{success}}</p><p v-if="error&&detail" class="form-error" role="alert">{{error}}</p>
+  </aside></section></template>

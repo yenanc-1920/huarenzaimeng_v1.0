@@ -1,37 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { transitionAdminObject, updateAdminObject } from '../api/admin-command'
 import AdminCreatePanel from './AdminCreatePanel.vue'
-type Channel = { channelRef: string; providerCode: string; displayName: string; channelPriority: number; state: string; version: number; updatedAt: string }
-const emit = defineEmits<{ changed: [] }>()
-const channels = ref<Channel[]>([]), error = ref(''), reason = ref('开发环境渠道维护'), busy = ref(false)
-async function load() {
-  try {
-    const response = await fetch('/admin-read/v1/pages/A130/channels', { credentials: 'include', headers: { Accept: 'application/json' } })
-    if (!response.ok) throw new Error(response.status === 403 ? '当前角色只能查看商品文案' : '渠道读取失败')
-    const body = await response.json(), items = Array.isArray(body.items) ? body.items : []
-    if (!items.every((item: unknown) => typeof item === 'object' && item !== null && typeof (item as Channel).channelRef === 'string' && Number.isSafeInteger((item as Channel).version))) throw new Error('渠道响应格式不符合约定')
-    channels.value = items; error.value = ''
-  } catch (cause) { channels.value = []; error.value = cause instanceof Error ? cause.message : '渠道读取失败' }
-}
-async function save(item: Channel) {
-  busy.value = true
-  try { await updateAdminObject('channels', item.channelRef, { expectedVersion: item.version, reason: reason.value, providerCode: item.providerCode, displayName: item.displayName, channelPriority: item.channelPriority }); await load(); emit('changed') }
-  catch (cause) { error.value = cause instanceof Error ? cause.message : '渠道保存失败' } finally { busy.value = false }
-}
-async function toggle(item: Channel, action: 'enable' | 'disable') {
-  busy.value = true
-  try { await transitionAdminObject('channels', item.channelRef, action, item.version, reason.value); await load(); emit('changed') }
-  catch (cause) { error.value = cause instanceof Error ? cause.message : '渠道状态更新失败' } finally { busy.value = false }
-}
+type Channel={channelRef:string;providerCode:string;displayName:string;channelPriority:number;state:string;version:number;updatedAt:string}
+const emit=defineEmits<{changed:[]}>(),channels=ref<Channel[]>([]),error=ref(''),busy=ref(false),mode=ref<'LIST'|'CREATE'|'EDIT'>('LIST'),selected=ref<Channel|null>(null),reason=ref('渠道资料维护')
+const form=reactive({providerCode:'',displayName:'',channelPriority:0})
+async function load(){try{const response=await fetch('/admin-read/v1/pages/A130/channels',{credentials:'include',headers:{Accept:'application/json'}});if(!response.ok)throw new Error(response.status===403?'当前角色只能查看商品资料':'渠道读取失败');const body=await response.json(),items=Array.isArray(body.items)?body.items:[];if(!items.every((item:unknown)=>typeof item==='object'&&item!==null&&typeof(item as Channel).channelRef==='string'&&Number.isSafeInteger((item as Channel).version)))throw new Error('渠道数据暂时不可用');channels.value=items;error.value=''}catch(cause){channels.value=[];error.value=cause instanceof Error?cause.message:'渠道读取失败'}}
+function edit(item:Channel){selected.value=item;Object.assign(form,{providerCode:item.providerCode,displayName:item.displayName,channelPriority:item.channelPriority});mode.value='EDIT'}
+async function save(){if(!selected.value)return;busy.value=true;try{await updateAdminObject('channels',selected.value.channelRef,{expectedVersion:selected.value.version,reason:reason.value,...form});await load();emit('changed');mode.value='LIST'}catch(cause){error.value=cause instanceof Error?cause.message:'渠道保存失败'}finally{busy.value=false}}
+async function toggle(action:'enable'|'disable'){if(!selected.value)return;busy.value=true;try{await transitionAdminObject('channels',selected.value.channelRef,action,selected.value.version,reason.value);await load();emit('changed');mode.value='LIST'}catch(cause){error.value=cause instanceof Error?cause.message:'渠道状态更新失败'}finally{busy.value=false}}
 onMounted(load)
 </script>
 <template>
-  <section class="card command-card"><div class="card-head"><div><p class="eyebrow">渠道管理</p><h2>开发库渠道与优先级</h2></div><button class="secondary" @click="load">刷新</button></div>
-    <p class="scope-banner compact">不连接供应商、不触发目录同步；只维护开发库渠道记录。</p>
-    <label class="reason-field"><span>操作原因</span><input v-model="reason"></label>
-    <div v-for="item in channels" :key="item.channelRef" class="channel-editor"><b>{{ item.channelRef }}</b><input v-model="item.providerCode"><input v-model="item.displayName"><input v-model.number="item.channelPriority" type="number"><span>{{ item.state }} / v{{ item.version }}</span><button :disabled="busy" @click="save(item)">保存</button><button :disabled="busy" @click="toggle(item,'enable')">启用</button><button :disabled="busy" @click="toggle(item,'disable')">停用</button></div>
-    <p v-if="error" class="form-error">{{ error }}</p>
-  </section>
-  <AdminCreatePanel :resources="['channels']" @changed="load(); emit('changed')" />
+  <template v-if="mode==='LIST'"><div class="filter-bar"><div><p class="eyebrow">渠道配置</p><h2>渠道管理</h2></div><button class="secondary" @click="load">刷新</button><button @click="mode='CREATE'">新增渠道</button></div><p class="scope-banner compact">仅维护当前数据库中的渠道记录，不连接供应商、不触发目录同步。</p><article class="card table-card"><div class="business-table channel-table"><div class="table-row table-head"><span>渠道名称</span><span>供应商</span><span>优先级</span><span>状态</span><span>更新时间</span><span>操作</span></div><div v-for="item in channels" :key="item.channelRef" class="table-row"><span><b>{{item.displayName}}</b></span><span>{{item.providerCode}}</span><span>{{item.channelPriority}}</span><span><em class="status-strip">{{item.state}}</em></span><span>{{item.updatedAt}}</span><span><button class="text-button" @click="edit(item)">编辑</button></span></div><div v-if="channels.length===0&&!error" class="empty-panel">当前数据库中暂无渠道</div></div><p v-if="error" class="form-error">{{error}}</p></article></template>
+  <template v-else><button class="back-button" @click="mode='LIST'">← 返回渠道列表</button><AdminCreatePanel v-if="mode==='CREATE'" :resources="['channels']" title="新增渠道" @changed="load();emit('changed');mode='LIST'"/><article v-else class="card command-card"><div class="card-head"><div><p class="eyebrow">渠道维护</p><h2>{{selected?.displayName}}</h2></div><span class="status-strip">{{selected?.state}}</span></div><div class="admin-form-grid"><label><span>供应商</span><input v-model="form.providerCode"></label><label><span>渠道名称</span><input v-model="form.displayName"></label><label><span>渠道优先级</span><input v-model.number="form.channelPriority" type="number"></label></div><label class="reason-field"><span>操作说明</span><input v-model="reason"></label><div class="command-actions"><button :disabled="busy" @click="save">保存</button><button :disabled="busy" @click="toggle('enable')">启用</button><button :disabled="busy" @click="toggle('disable')">停用</button></div><p v-if="error" class="form-error">{{error}}</p></article></template>
 </template>
