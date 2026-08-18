@@ -11,6 +11,8 @@
     {"path":"pages/refund/status","style":{"navigationStyle":"custom"}},
     {"path":"pages/order/list","style":{"navigationStyle":"custom"}},
     {"path":"pages/auth/expired","style":{"navigationStyle":"custom"}},
+    {"path":"pages/legal/user-agreement","style":{"navigationStyle":"custom"}},
+    {"path":"pages/legal/privacy-policy","style":{"navigationStyle":"custom"}},
     {"path":"pages/order/recovery","style":{"navigationStyle":"custom"}},
     {"path":"pages/directory/list","style":{"navigationStyle":"custom"}},
     {"path":"pages/directory/detail","style":{"navigationStyle":"custom"}},

@@ -16,6 +16,8 @@ const orders=read('src/pages/order/list.vue')
 const recovery=read('src/pages/order/recovery.vue')
 const directory=read('src/pages/directory/list.vue')
 const detail=read('src/pages/directory/detail.vue')
+const auth=read('src/pages/auth/expired.vue')
+const profile=read('src/pages/profile/index.vue')
 
 assert.doesNotMatch(client,/\.\/mock|BuiltinSynthetic|p014BuiltinSynthetic|p021BuiltinSynthetic|PROJECT_MOCK_API|BUILTIN_MOCK/)
 for(const source of [client,projectContract,topupContract]){
@@ -79,6 +81,17 @@ for(const page of [orders,recovery]){
   assert.doesNotMatch(template,/GUEST|BUYER|authorizationSetRef|authorizationEvidenceVersion|recoveryMaterialRef|材料引用/)
 }
 assert.match(recovery,/open-type="contact"/)
+assert.match(auth,/userAgreementAccepted=ref\(false\),privacyPolicyAccepted=ref\(false\)/)
+assert.match(auth,/open-type="agreePrivacyAuthorization"/)
+assert.match(auth,/暂不登录，继续浏览/)
+assert.doesNotMatch(auth,/setStorage|acceptedAt|subjectRef|subjectId/)
+assert.match(profile,/pages\/legal\/user-agreement/)
+assert.match(profile,/pages\/legal\/privacy-policy/)
+assert.match(profile,/退出登录/)
+assert.match(profile,/注销账号/)
+assert.match(profile,/logoutBuyerSession/)
+assert.match(profile,/requestBuyerAccountClosure/)
+assert.match(profile,/仅退出当前会话，不会注销账号/)
 
 const output=resolve(root,'dist/build/mp-weixin')
 if(existsSync(output)){

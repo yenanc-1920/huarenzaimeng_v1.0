@@ -7,11 +7,17 @@ import { factStateCopy, p014FactStateCopy, p014StateCopy, projectOrderStateCopy 
 import { parseCatalogProjection } from '../src/api/topup-recovery-contract.ts'
 import { createFormalTransactionClient } from '../src/api/formal-transaction-client.ts'
 import { parsePaymentView, parseReleaseOrderView, parseReleaseQuoteView, parseTopupView } from '../src/api/formal-transaction-contract.ts'
+import { agreementsAccepted,consentAcceptances,officialPrivacyGranted,sessionConsentCommand } from '../src/domain/login-privacy-state.ts'
+import { readOrCreateBuyerGuestRef } from '../src/domain/buyer-guest-ref.ts'
+import { parseBuyerClosureView } from '../src/domain/buyer-account-lifecycle.ts'
 
 const root=process.cwd(),read=path=>readFileSync(resolve(root,path),'utf8')
 const authPage=read('src/pages/auth/expired.vue'),authContract=read('src/api/auth-entry-contract.ts')
 const paymentPage=read('src/pages/payment/status.vue'),refundPage=read('src/pages/refund/status.vue')
 const profilePage=read('src/pages/profile/index.vue'),progressPage=read('src/pages/order/progress.vue')
+const pagesManifest=read('src/pages.json'),privacyStateSource=read('src/domain/login-privacy-state.ts')
+const userAgreementPage=read('src/pages/legal/user-agreement.vue'),privacyPolicyPage=read('src/pages/legal/privacy-policy.vue')
+const lifecycleContract=read('src/api/buyer-account-lifecycle-contract.ts')
 const formalSources=[authPage,authContract,paymentPage,refundPage,profilePage,progressPage,
   read('src/api/client.ts'),read('src/api/topup-recovery-contract.ts'),read('src/api/p014-topup-contract.ts'),
   read('src/api/formal-transaction-contract.ts'),read('src/api/formal-transaction-client.ts'),
@@ -19,7 +25,30 @@ const formalSources=[authPage,authContract,paymentPage,refundPage,profilePage,pr
 
 for(const source of formalSources)assert.doesNotMatch(source,/LOCAL_MOCK_NO_REAL_OPERATOR_FACTS|legacy-price-v1|REQUEST_MOCK_PAYMENT|CREATE_LOCAL_SYNTHETIC_PAYMENT_INTENT|QUERY_LOCAL_SYNTHETIC_PAYMENT_INTENT|REQUEST_MOCK_TOPUP|CREATE_LOCAL_SYNTHETIC_TOPUP/)
 assert.doesNotMatch(read('src/api/wechat-one-time-code.ts'),/Storage|console\.|log\(/)
-assert.match(authPage,/catch\{clearBuyerSessionToken\(\)/)
+assert.match(authPage,/catch(?:\([^)]*\))?\{\s*clearBuyerSessionToken\(\)/)
+assert.match(authPage,/userAgreementAccepted=ref\(false\),privacyPolicyAccepted=ref\(false\)/)
+assert.match(authPage,/open-type="agreePrivacyAuthorization"/)
+assert.match(authPage,/@agreeprivacyauthorization="onOfficialPrivacyAuthorized"/)
+assert.match(authPage,/privacyState\.value!==\'OFFICIAL_PRIVACY_GRANTED\'/)
+assert.ok(authPage.indexOf("privacyState.value!=='OFFICIAL_PRIVACY_GRANTED'")<authPage.indexOf('requestWechatOneTimeCode(wx)'))
+assert.doesNotMatch(authPage+privacyStateSource,/setStorage|acceptedAt|subjectRef|subjectId/)
+assert.match(authPage,/暂不登录，继续浏览/)
+assert.match(profilePage,/用户协议/)
+assert.match(profilePage,/隐私政策/)
+assert.match(profilePage,/退出登录/)
+assert.match(profilePage,/注销账号/)
+assert.match(profilePage,/logoutBuyerSession/)
+assert.match(profilePage,/requestBuyerAccountClosure/)
+assert.match(profilePage,/仅退出当前会话，不会注销账号/)
+assert.match(profilePage,/受理后立即退出所有设备/)
+assert.match(lifecycleContract,/\/buyer-auth\/v1\/session\/logout/)
+assert.match(lifecycleContract,/\/buyer-auth\/v1\/account-closure-requests/)
+assert.match(lifecycleContract,/expectedVersion:1/)
+assert.match(lifecycleContract,/'Idempotency-Key':idempotencyKey/)
+assert.match(pagesManifest,/pages\/legal\/user-agreement/)
+assert.match(pagesManifest,/pages\/legal\/privacy-policy/)
+assert.match(userAgreementPage,/华人在孟小程序用户协议/)
+assert.match(privacyPolicyPage,/华人在孟小程序隐私政策/)
 assert.match(paymentPage,/:data-payment-sdk="paymentAvailable\?'available':'disabled-by-default'"/)
 assert.doesNotMatch(paymentPage,/@click="(?:pay|requestPayment|submitPayment)/)
 for(const page of [profilePage,progressPage,refundPage])assert.match(page,/open-type="contact"/)
@@ -29,6 +58,33 @@ const code=await requestWechatOneTimeCode({login({success}){success({code:' one-
 assert.equal(code,'one-time-code')
 await assert.rejects(()=>requestWechatOneTimeCode({login({fail}){fail()}}),/WX_LOGIN_FAILED/)
 await assert.rejects(()=>requestWechatOneTimeCode({login({success}){success({})}}),/WX_LOGIN_CODE_MISSING/)
+
+assert.equal(agreementsAccepted({userAgreementAccepted:false,privacyPolicyAccepted:false}),false)
+assert.equal(agreementsAccepted({userAgreementAccepted:true,privacyPolicyAccepted:false}),false)
+assert.equal(agreementsAccepted({userAgreementAccepted:false,privacyPolicyAccepted:true}),false)
+assert.equal(agreementsAccepted({userAgreementAccepted:true,privacyPolicyAccepted:true}),true)
+assert.deepEqual(consentAcceptances({userAgreementAccepted:false,privacyPolicyAccepted:true}),[])
+const acceptances=consentAcceptances({userAgreementAccepted:true,privacyPolicyAccepted:true})
+assert.deepEqual(acceptances.map(({policyType,policyVersion,accepted})=>({policyType,policyVersion,accepted})),[
+  {policyType:'USER_AGREEMENT',policyVersion:'2026-08-28-v1',accepted:true},
+  {policyType:'PRIVACY_POLICY',policyVersion:'2026-08-28-v1',accepted:true}
+])
+assert.deepEqual(sessionConsentCommand({userAgreementAccepted:true,privacyPolicyAccepted:true}),{userAgreementVersion:'2026-08-28-v1',privacyPolicyVersion:'2026-08-28-v1',userAgreementAccepted:true,privacyPolicyAccepted:true})
+assert.equal(sessionConsentCommand({userAgreementAccepted:true,privacyPolicyAccepted:false}),null)
+const guestStore={value:null,getStorageSync(){return this.value},setStorageSync(_key,value){this.value=value}}
+assert.equal(readOrCreateBuyerGuestRef(guestStore,1723000000000,.25),'GUEST-lzj9pon4-0hra0hs')
+assert.equal(readOrCreateBuyerGuestRef(guestStore,1723000001000,.75),'GUEST-lzj9pon4-0hra0hs')
+const closure=parseBuyerClosureView({schemaVersion:'BUYER_CLOSURE_V1',closureRef:'CLOSURE-1',state:'REQUESTED',blockerCount:2,version:1,requestRef:'CLOSURE-REQUEST-1',replayed:false},'CLOSURE-REQUEST-1')
+assert.equal(closure.blockerCount,2)
+for(const invalid of [
+  {...closure,state:'CLOSED'},
+  {...closure,version:2},
+  {...closure,blockerCount:-1},
+  {...closure,rawSupplierPayload:{}},
+  {...closure,requestRef:'OTHER-REQUEST'}
+])assert.throws(()=>parseBuyerClosureView(invalid,'CLOSURE-REQUEST-1'),/BUYER_CLOSURE_RESPONSE_INVALID/)
+assert.equal(officialPrivacyGranted({detail:{errMsg:'agreePrivacyAuthorization:ok'}}),true)
+for(const malformed of [undefined,null,{}, {detail:null},{detail:{}},{detail:{errMsg:'agreePrivacyAuthorization:fail'}},{detail:{errMsg:1}}])assert.equal(officialPrivacyGranted(malformed),false)
 
 const parameters=parseWechatPrepayParameters({timeStamp:'1723000000',nonceStr:'nonce',package:'prepay_id=frozen',signType:'RSA',paySign:'signature'})
 await assert.rejects(()=>invokeWechatPayment(parameters),/WECHAT_PAYMENT_CHANNEL_NOT_CONFIGURED/)
