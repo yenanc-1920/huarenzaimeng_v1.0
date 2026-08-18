@@ -117,9 +117,11 @@ function parseProgress(value:unknown,facts:P014Fact[]):P014ProgressSummary {
   const keys=['userMessageCode','confirmedItems','unknownItems','responsibilityCode','supportRef','updatedAt','nextReviewPoint']
   if(!object(value)||!exactKeys(value,keys)||!text(value.userMessageCode)||!Array.isArray(value.confirmedItems)
     ||!Array.isArray(value.unknownItems)||!value.confirmedItems.every(factCode)||!value.unknownItems.every(factCode)
-    ||!unique(value.confirmedItems)||!unique(value.unknownItems)||value.confirmedItems.some(item=>value.unknownItems.includes(item))
     ||!['SYSTEM_RECHECK','SUPPORT_REVIEW','ACCOUNTING_REVIEW','NONE'].includes(String(value.responsibilityCode))
     ||!nullableText(value.supportRef)||!instant(value.updatedAt)||!nullableInstant(value.nextReviewPoint)) throw new Error('INVALID_P014_PROGRESS_SUMMARY')
+  const confirmedItems=value.confirmedItems as P014FactCode[]
+  const unknownItems=value.unknownItems as P014FactCode[]
+  if(!unique(confirmedItems)||!unique(unknownItems)||confirmedItems.some(item=>unknownItems.includes(item)))throw new Error('INVALID_P014_PROGRESS_SUMMARY')
   const expectedConfirmed=facts.filter(f=>f.state==='CONFIRMED'||f.state==='ABSENT_CONFIRMED').map(f=>f.factCode)
   const expectedUnknown=facts.filter(f=>f.state==='UNKNOWN'||f.state==='NOT_OBSERVED').map(f=>f.factCode)
   if(value.confirmedItems.join('|')!==expectedConfirmed.join('|')||value.unknownItems.join('|')!==expectedUnknown.join('|')) throw new Error('P014_PROGRESS_FACT_MISMATCH')

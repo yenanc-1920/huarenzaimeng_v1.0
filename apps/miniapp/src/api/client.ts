@@ -141,6 +141,7 @@ export const api = {
     },baseUrl,{'Idempotency-Key':identity.idempotencyKey})))
     if(quote.requestRef!==identity.commandId||quote.operatorCode!==selection.operatorCode||quote.productRef!==selection.productRef
       ||quote.catalogVersion!==selection.catalogVersion||quote.priceVersionRef!==selection.priceVersionRef)throw new ProjectApiError('QUOTE_SELECTION_MISMATCH')
+    if(quote.currency!=='CNY')throw new ProjectApiError('QUOTE_CURRENCY_UNSUPPORTED')
     const totalMinor=Math.round(quote.finalAmountCny*100)
     return{orderRef:'',priceSnapshotRef:quote.quoteRef,maskedPhone:quote.phoneMasked,operatorCode:quote.operatorCode,operatorName:selection.operatorName,
       productRef:quote.productRef,productName:selection.displayName,denominationRef:selection.denominationRef,
