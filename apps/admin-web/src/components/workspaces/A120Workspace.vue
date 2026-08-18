@@ -10,7 +10,7 @@ const selected = computed(() => props.projection.items.find(item => item.content
 </script>
 
 <template>
-  <section class="work-grid two-column" data-page-id="UX-A120" data-readonly="true">
+  <section class="work-grid two-column" data-page-id="UX-A120" data-visual-frame-id="A120" data-readonly="true">
     <article class="card list-card">
         <div class="card-head"><div><p class="eyebrow">内容列表</p><h2>来源与展示资格</h2></div><span class="count">{{ projection.items.length }} 条记录</span></div>
       <div v-if="projection.items.length === 0" class="empty-panel">当前没有可查看的内容记录</div>

@@ -6,7 +6,7 @@ defineEmits<{ selectOrder: [orderRef: string] }>()
 </script>
 
 <template>
-  <section class="work-grid two-column" data-page-id="UX-A140" data-data-origin="LOCAL_DATABASE" data-readonly="true">
+<section class="work-grid two-column" data-page-id="UX-A140" data-visual-frame-id="A140" data-data-origin="LOCAL_DATABASE" data-readonly="true">
     <article class="card list-card">
       <div class="card-head"><div><p class="eyebrow">订单运营</p><h2>订单、支付、充值与退款</h2></div><span class="count">{{ projection.items.length }} 条</span></div>
       <div v-if="projection.items.length === 0" class="empty-panel">当前没有订单记录</div>

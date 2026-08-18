@@ -26,7 +26,7 @@ const priorityLabel=(value:string)=>({NORMAL:'普通',HIGH:'较高',URGENT:'紧�
 </script>
 
 <template>
-  <section class="work-grid two-column" data-page-id="UX-A100" data-data-origin="CURRENT_ENVIRONMENT_DATABASE">
+<section class="work-grid two-column" data-page-id="UX-A100" :data-visual-frame-id="mode==='LIST'?'A100':'A100-EDIT'" data-data-origin="CURRENT_ENVIRONMENT_DATABASE">
     <article class="card list-card">
       <div class="card-head"><div><p class="eyebrow">客服案件</p><h2>案件列表</h2></div><button class="primary" type="button" @click="mode='CREATE';error='';success=''">新增案件</button></div>
       <div v-if="projection.items.length===0" class="empty-panel">当前没有客服案件</div>

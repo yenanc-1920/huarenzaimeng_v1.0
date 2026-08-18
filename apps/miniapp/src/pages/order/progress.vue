@@ -46,7 +46,7 @@ onLoad(query=>{orderRef.value=typeof query?.orderRef==='string'?decodeURICompone
 </script>
 
 <template>
-  <view class="page" data-page-root="p014-progress" data-submit-source="trusted-paid-order-only">
+  <view class="page" data-page-id="UX-P014" data-page-root="p014-progress" data-submit-source="trusted-paid-order-only">
     <AppHeader title="充值进度" left="订单" @left="leave"/>
     <view class="content">
       <view class="heading" role="heading" aria-level="1">充值进度</view>

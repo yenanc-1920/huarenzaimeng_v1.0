@@ -15,12 +15,18 @@ watch(activeTab,()=>{mode.value='LIST';keyword.value=''})
 function edit(item:Projection['items'][number]){selectedRef.value=itemKey(item);mode.value='EDIT'}
 const catalogBatchRef=computed(()=>selected.value?.catalogBatchRef??'—')
 const minimumMarginRate=computed(()=>selected.value?.minimumMarginRate??'—')
+const visualFrameId=computed(()=>{
+  if(activeTab.value==='CHANNEL') return 'A130-CHANNEL'
+  if(activeTab.value==='TRIAL') return 'A130-PRICE-TEST'
+  if(mode.value!=='LIST') return activeTab.value==='PRODUCT'?'A130-EDIT':activeTab.value==='PRICE'?'A130-PRICE':'A130-CATALOG'
+  return activeTab.value==='PRODUCT'?'A130':activeTab.value==='CATALOG'?'A130-CATALOG':'A130-PRICE'
+})
 const productTypeLabel=(value:string|null|undefined)=>({BALANCE:'余额',DATA:'流量',BUNDLE:'套餐'}[value??'']??value??'—')
 const stateLabel=(value:string|null|undefined)=>({DRAFT:'草稿',ENABLED:'已启用',DISABLED:'已停用',MAPPED:'已映射',PENDING:'待处理',FAILED:'失败',AVAILABLE:'可用',UNAVAILABLE:'不可用'}[value??'']??value??'—')
 </script>
 <template>
   <section class="page-tabs"><button :class="{active:activeTab==='PRODUCT'}" @click="activeTab='PRODUCT'">商品列表</button><button :class="{active:activeTab==='CATALOG'}" @click="activeTab='CATALOG'">供应商目录</button><button :class="{active:activeTab==='CHANNEL'}" @click="activeTab='CHANNEL'">渠道映射</button><button :class="{active:activeTab==='PRICE'}" @click="activeTab='PRICE'">定价配置</button><button :class="{active:activeTab==='TRIAL'}" @click="activeTab='TRIAL'">价格试算</button></section>
-  <section class="management-view" data-page-id="UX-A130" data-data-origin="LOCAL_DATABASE">
+  <section class="management-view" data-page-id="UX-A130" :data-visual-frame-id="visualFrameId" data-data-origin="LOCAL_DATABASE">
     <A130ChannelPanel v-if="activeTab==='CHANNEL' && canManage" @changed="emit('changed')"/>
     <section v-else-if="activeTab==='CHANNEL'" class="state-panel"><div class="state-icon">!</div><h2>当前角色不可维护渠道</h2><p>渠道管理仅对超级管理员开放。</p></section>
     <AdminCreatePanel v-else-if="activeTab==='TRIAL' && canManage" :resources="['price-versions']" title="价格试算" trial-only/>

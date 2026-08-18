@@ -49,7 +49,7 @@ onMounted(refreshDashboard)
 </script>
 
 <template>
-  <section class="dashboard" data-page-id="UX-B002" data-data-origin="PROJECT_API_PROXY">
+  <section class="dashboard" data-page-id="UX-B002" data-visual-frame-id="B002" data-data-origin="PROJECT_API_PROXY">
     <div class="dashboard-welcome">
       <div><p class="eyebrow">运营概览</p><h1>今天也要稳稳地把服务做好</h1><p>所有数字均来自当前环境；未读取到的数据不会使用替代值。</p></div>
       <button class="secondary-action" type="button" :disabled="loading" @click="refreshDashboard">{{ loading ? '读取中' : '刷新数据' }}</button>
