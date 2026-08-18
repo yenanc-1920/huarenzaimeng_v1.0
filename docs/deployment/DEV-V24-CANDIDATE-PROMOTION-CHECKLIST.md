@@ -1,8 +1,8 @@
 # DEV V24 候选晋级清单
 
-日期：2026-08-19  
-候选分支：`codex/v1-delivery-recovery`  
-清单编制时证据提交：`38955d5`（业务代码基线包含`f7f5915`；触发CI时必须重新冻结分支最新SHA）  
+日期：2026-08-19
+候选分支：`codex/v1-delivery-recovery`
+清单编制时证据提交：`38955d5`（业务代码基线包含`f7f5915`；触发CI时必须重新冻结分支最新SHA）
 当前状态：`LOCAL_GATE_GO / GITHUB_FULL_GATE_NOT_RUN / DEV_NOT_DEPLOYED`
 
 本文只规定DEV晋级顺序，不授权数据库执行、真实支付、真实充值、合并、部署或重启。
