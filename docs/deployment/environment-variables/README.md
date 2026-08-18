@@ -61,6 +61,8 @@
 | `HZ_WECHAT_PAY_MERCHANT_PRIVATE_KEY_BASE64` | 秘密占位 | 秘密占位 | PKCS#8 DER的Base64，不得进Git/聊天/截图 |
 | `HZ_WECHAT_PAY_API_V3_KEY` | 秘密占位 | 秘密占位 | 精确32字节，每环境受控配置 |
 | `HZ_WECHAT_PAY_PLATFORM_PUBLIC_KEYS` | 占位 | 占位 | `serial:Base64(X.509公钥)`，多把逗号分隔 |
+| `HZ_WECHAT_PAY_CONNECT_TIMEOUT_MS` | `2000` | `2000` | 微信支付连接超时，单位毫秒 |
+| `HZ_WECHAT_PAY_READ_TIMEOUT_MS` | `5000` | `5000` | 微信支付读取超时，单位毫秒；四环境统一冻结 |
 | `HZ_BUYER_AUTH_IDENTITY_PEPPER` | 秘密占位 | 秘密占位 | 至少32字符、每环境独立，不得与code pepper相同 |
 | `HZ_BUYER_AUTH_CODE_PEPPER` | 秘密占位 | 秘密占位 | 至少32字符、每环境独立 |
 | `HZ_BUYER_CONSENT_USER_AGREEMENT_VERSION` | `2026-08-28` | `2026-08-28` | 当前有效用户协议版本 |
