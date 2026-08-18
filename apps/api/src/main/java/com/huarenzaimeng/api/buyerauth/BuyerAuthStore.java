@@ -14,7 +14,19 @@ interface BuyerAuthStore {
                                          String appIdRef, String subjectDigest, String subjectRef,
                                          String sessionId, String tokenDigest, Instant issuedAt,
                                          Instant absoluteExpiresAt, Instant idleExpiresAt, Audit audit);
-    Optional<BuyerPrincipal> authenticateAndAdvanceIdle(String tokenDigest, Instant now, Instant nextIdleExpiresAt);
+    default Identity establishIdentityConsentAndSession(String attemptRef, String identityEvidenceRef,
+                                         String appIdRef, String subjectDigest, String subjectRef,
+                                         String sessionId, String tokenDigest, Instant issuedAt,
+                                         Instant absoluteExpiresAt, Instant idleExpiresAt, Consent consent, Audit audit) {
+        return establishIdentityAndSession(attemptRef,identityEvidenceRef,appIdRef,subjectDigest,subjectRef,
+                sessionId,tokenDigest,issuedAt,absoluteExpiresAt,idleExpiresAt,audit);
+    }
+    default boolean accountMayLogin(String appIdRef,String subjectDigest){ return true; }
+    default boolean guestMayLogin(String guestRef){ return true; }
+    default Optional<ConsentState> consentState(String subjectRef){ return Optional.empty(); }
+    Optional<BuyerPrincipal> authenticateAndAdvanceIdle(String tokenDigest, Instant now, Instant nextIdleExpiresAt,
+                                                        String currentUserAgreementVersion,
+                                                        String currentPrivacyPolicyVersion);
     LogoutResult revokeCurrentSession(String tokenDigest, Instant now);
     record Identity(String buyerId, String subjectRef) {}
     enum Eligibility { ELIGIBLE }
@@ -22,4 +34,8 @@ interface BuyerAuthStore {
     enum LogoutResult { SUCCEEDED, UNAVAILABLE, UNKNOWN }
     record Audit(String eventCode, String resultCode, String subjectFingerprint,
                  String sessionFingerprint, String requestId, Instant occurredAt) {}
+    record Consent(String guestRef,String requestRef,String requestDigest,String userAgreementVersion,
+                   String privacyPolicyVersion,Instant acceptedAt) {}
+    record ConsentState(String subjectRef,String guestRef,String state,String userAgreementVersion,
+                        String privacyPolicyVersion,Instant acceptedAt,long version) {}
 }

@@ -2,12 +2,14 @@ package com.huarenzaimeng.api.topup;
 
 import com.huarenzaimeng.api.buyerauth.BuyerSessionFilter;
 import com.huarenzaimeng.api.buyerauth.BuyerSessionPrincipal;
+import com.huarenzaimeng.api.BuyerConsentStateGuard;
 import com.huarenzaimeng.core.ProjectEnvelope;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.context.annotation.Profile;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,11 +19,13 @@ import org.springframework.web.bind.annotation.*;
 final class BuyerTopupController {
     private final TopupCoordinator coordinator;
     private final TopupProviderPort provider;
-    BuyerTopupController(TopupCoordinator coordinator,TopupProviderPort provider){this.coordinator=coordinator;this.provider=provider;}
+    private final BuyerConsentStateGuard consent;
+    @Autowired BuyerTopupController(TopupCoordinator coordinator,TopupProviderPort provider,BuyerConsentStateGuard consent){this.coordinator=coordinator;this.provider=provider;this.consent=consent;}
+    BuyerTopupController(TopupCoordinator coordinator,TopupProviderPort provider){this(coordinator,provider,null);}
 
     @PostMapping
     ResponseEntity<?> submit(HttpServletRequest servlet,@PathVariable String orderRef,@Valid @RequestBody SubmitRequest request){
-        BuyerSessionPrincipal buyer=principal(servlet);if(!provider.available())return unavailable();
+        BuyerSessionPrincipal buyer=principal(servlet);if(consent!=null)consent.requireTransactionWrite(buyer.subjectRef());if(!provider.available())return unavailable();
         return ok(TopupView.from(coordinator.submitForBuyer(new TopupCoordinator.SubmitCommand(orderRef,request.requestRef(),request.requestDigest()),buyer.subjectRef())));
     }
     @GetMapping ResponseEntity<?> status(HttpServletRequest servlet,@PathVariable String orderRef){BuyerSessionPrincipal buyer=principal(servlet);return ok(TopupView.from(coordinator.statusForBuyer(orderRef,buyer.subjectRef())));}

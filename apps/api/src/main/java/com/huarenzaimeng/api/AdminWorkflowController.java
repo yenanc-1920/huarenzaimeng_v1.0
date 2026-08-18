@@ -95,5 +95,5 @@ class AdminWorkflowController {
         return ResponseEntity.badRequest().body(Map.of("projectCode",error.getMessage()));
     }
     private static boolean allowed(HttpServletRequest request,Set<String> roles){return roles.contains(String.valueOf(request.getAttribute(AdminSessionFilter.TRUSTED_ROLE)));}
-    private static String user(HttpServletRequest request){return String.valueOf(request.getAttribute(AdminSessionFilter.TRUSTED_USER));}
+    private static String user(HttpServletRequest request){return AdminSessionFilter.trustedUserId(request);}
 }

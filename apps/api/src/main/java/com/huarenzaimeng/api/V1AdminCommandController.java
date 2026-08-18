@@ -32,7 +32,9 @@ class V1AdminCommandController {
     private static final Set<String> ACTIONS=Set.of("submit","publish","unpublish","enable","disable");
     private final JdbcTemplate jdbc;
     private final PricingCalculator pricingCalculator=new PricingCalculator();
-    V1AdminCommandController(JdbcTemplate jdbc) { this.jdbc=jdbc; }
+    private final AdminSelfApprovalPolicy selfApproval;
+    @org.springframework.beans.factory.annotation.Autowired V1AdminCommandController(JdbcTemplate jdbc,AdminSelfApprovalPolicy selfApproval) { this.jdbc=jdbc;this.selfApproval=selfApproval; }
+    V1AdminCommandController(JdbcTemplate jdbc) { this(jdbc,null); }
 
     @PostMapping("/{resource}") @Transactional ResponseEntity<?> create(
             @PathVariable String resource,@RequestHeader("Idempotency-Key") String idempotency,
@@ -46,7 +48,7 @@ class V1AdminCommandController {
         ResponseEntity<?> prior=claim(idempotency,resource,ref,action,requestDigest);
         if(prior!=null)return prior;
         insert(resource,ref,body);
-        return complete(resource,ref,action,idempotency,requestDigest,0,1,reason,body.toString(),request);
+        return complete(resource,ref,action,idempotency,requestDigest,0,1,reason,body.toString(),request,AdminSelfApprovalPolicy.Decision.separated());
     }
 
     @PutMapping("/{resource}/{ref}") @Transactional ResponseEntity<?> update(
@@ -61,7 +63,7 @@ class V1AdminCommandController {
         ResponseEntity<?> prior=claim(idempotency,resource,ref,action,requestDigest);
         if(prior!=null)return prior;
         if(updateDraft(resource,ref,expected,body)!=1)throw new CommandConflict("VERSION_CONFLICT");
-        return complete(resource,ref,action,idempotency,requestDigest,expected,expected+1,reason,body.toString(),request);
+        return complete(resource,ref,action,idempotency,requestDigest,expected,expected+1,reason,body.toString(),request,AdminSelfApprovalPolicy.Decision.separated());
     }
 
     @PostMapping("/{resource}/{ref}/{action}") @Transactional ResponseEntity<?> transition(
@@ -77,8 +79,9 @@ class V1AdminCommandController {
         ResponseEntity<?> prior=claim(idempotency,resource,ref,actionCode,requestDigest);
         if(prior!=null)return prior;
         String state=switch(action){case"submit"->"UNDER_REVIEW";case"publish","enable"->activeState(resource);default->inactiveState(resource);};
-        if(transition(resource,ref,expected,action,state,actor(request))!=1)throw new CommandConflict("STATE_OR_VERSION_CONFLICT");
-        return complete(resource,ref,actionCode,idempotency,requestDigest,expected,expected+1,reason,body.toString(),request);
+        TransitionResult transition=transition(resource,ref,expected,action,state,actor(request));
+        if(transition.changed()!=1)throw new CommandConflict("STATE_OR_VERSION_CONFLICT");
+        return complete(resource,ref,actionCode,idempotency,requestDigest,expected,expected+1,reason,body.toString(),request,transition.approval());
     }
 
     @PostMapping("/price-versions/trial") ResponseEntity<?> trial(@RequestBody JsonNode body,HttpServletRequest request) {
@@ -129,15 +132,16 @@ class V1AdminCommandController {
                 price.result().finalAmountCny(),price.spec().supplierCost(),price.spec().settlementCurrency(),price.spec().supplierSourceRef(),price.spec().fxSource(),price.spec().fxSnapshotRef(),price.spec().fxDirection(),price.spec().fxRate(),price.spec().observedAt(),price.spec().validUntil(),price.spec().bufferRate(),price.spec().markupRate(),price.spec().wechatFeeRate(),price.spec().taxRate(),price.spec().minimumMarginRate(),price.spec().roundingRule(),required(b,"promotionBearer"),required(b,"pricingScope"),timestamp(b,"effectiveFrom"),timestamp(b,"effectiveUntil"),now,ref,version);
     }
 
-    private int transition(String r,String ref,long v,String action,String state,String actor){
+    private TransitionResult transition(String r,String ref,long v,String action,String state,String actor){
         String table=switch(r){case"cities"->"hz_city";case"directory-entries"->"hz_directory_entry";case"holidays"->"hz_holiday_rule";case"news"->"hz_news_article";case"products"->"hz_platform_product";case"channels"->"hz_provider_channel";case"price-versions"->"hz_price_version";default->throw new IllegalArgumentException("RESOURCE_INVALID");};
         String id=switch(r){case"cities"->"city_code";case"directory-entries"->"entry_ref";case"holidays"->"rule_ref";case"news"->"article_ref";case"products"->"platform_product_ref";case"channels"->"channel_ref";default->"price_version_ref";};
         String column=switch(r){case"cities"->"city_state";case"products"->"enable_state";case"channels"->"channel_state";case"price-versions"->"price_state";default->"publish_state";};
         String before=switch(action){case"submit"->"DRAFT";case"publish"->"UNDER_REVIEW";case"unpublish"->"PUBLISHED";case"enable"->"products".equals(r)?"UNDER_REVIEW":"DRAFT";case"disable"->activeState(r);default->throw new IllegalArgumentException("ACTION_INVALID");};
         if("price-versions".equals(r)&&"enable".equals(action))ensurePriceCanActivate(ref);
-        if("publish".equals(action))ensureContentApproved(r,ref,v,actor);
-        if("products".equals(r)&&"enable".equals(action))ensureContentApproved(r,ref,v,actor);
-        return jdbc.update("UPDATE "+table+" SET "+column+"=?,aggregate_version=aggregate_version+1,updated_at=? WHERE "+id+"=? AND aggregate_version=? AND "+column+"=?",state,Timestamp.from(Instant.now()),ref,v,before);
+        AdminSelfApprovalPolicy.Decision approval=AdminSelfApprovalPolicy.Decision.separated();
+        if("publish".equals(action))approval=ensureContentApproved(r,ref,v,actor);
+        if("products".equals(r)&&"enable".equals(action))approval=ensureContentApproved(r,ref,v,actor);
+        return new TransitionResult(jdbc.update("UPDATE "+table+" SET "+column+"=?,aggregate_version=aggregate_version+1,updated_at=? WHERE "+id+"=? AND aggregate_version=? AND "+column+"=?",state,Timestamp.from(Instant.now()),ref,v,before),approval);
     }
 
     private ResponseEntity<?> claim(String key,String resource,String ref,String action,String requestDigest){
@@ -156,12 +160,12 @@ class V1AdminCommandController {
         }
     }
 
-    private ResponseEntity<?> complete(String resource,String ref,String action,String key,String requestDigest,long before,long after,String reason,String snapshot,HttpServletRequest request){
+    private ResponseEntity<?> complete(String resource,String ref,String action,String key,String requestDigest,long before,long after,String reason,String snapshot,HttpServletRequest request,AdminSelfApprovalPolicy.Decision exception){
         String audit="AUD-"+UUID.randomUUID(); Instant now=Instant.now();
-        jdbc.update("INSERT INTO hz_v1_admin_audit(audit_ref,object_type,object_ref,action_type,actor_ref,reason,before_version,after_version,occurred_at) VALUES(?,?,?,?,?,?,?,?,?)",audit,resource,ref,action,String.valueOf(request.getAttribute(AdminSessionFilter.TRUSTED_USER)),reason,before,after,Timestamp.from(now));
+        jdbc.update("INSERT INTO hz_v1_admin_audit(audit_ref,object_type,object_ref,action_type,actor_ref,reason,self_approved,exception_policy_version,before_version,after_version,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",audit,resource,ref,action,actor(request),reason,exception.selfApproved()?1:0,exception.exceptionPolicyVersion(),before,after,Timestamp.from(now));
         if(Set.of("directory-entries","holidays","news","products").contains(resource))
-            jdbc.update("INSERT INTO hz_content_version_history(history_ref,object_type,object_ref,object_version,snapshot_json,action_type,actor_ref,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                    "HIS-"+UUID.randomUUID(),resource,ref,after,snapshot,action,String.valueOf(request.getAttribute(AdminSessionFilter.TRUSTED_USER)),reason,Timestamp.from(now));
+            jdbc.update("INSERT INTO hz_content_version_history(history_ref,object_type,object_ref,object_version,snapshot_json,action_type,actor_ref,reason,self_approved,exception_policy_version,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    "HIS-"+UUID.randomUUID(),resource,ref,after,snapshot,action,actor(request),reason,exception.selfApproved()?1:0,exception.exceptionPolicyVersion(),Timestamp.from(now));
         int finished=jdbc.update("UPDATE hz_v1_admin_command SET command_status='COMPLETED',resulting_version=?,audit_ref=? WHERE idempotency_key=? AND object_type=? AND object_ref=? AND action_type=? AND request_digest=? AND command_status='CLAIMED'",after,audit,key,resource,ref,action,requestDigest);
         if(finished!=1)throw new CommandConflict("IDEMPOTENCY_COMPLETION_CONFLICT");
         return ResponseEntity.ok().header("Cache-Control","no-store").body(Map.of("objectRef",ref,"version",after,"auditRef",audit,"replayed",false));
@@ -187,12 +191,14 @@ class V1AdminCommandController {
         if(evaluation.result().finalAmountCny().compareTo((BigDecimal)row.get("final_amount_cny"))!=0)throw new CommandConflict("PRICE_CALCULATION_DRIFT");
     }
 
-    private void ensureContentApproved(String resource,String ref,long version,String actor){
+    private AdminSelfApprovalPolicy.Decision ensureContentApproved(String resource,String ref,long version,String actor){
         List<Map<String,Object>> approvals=jdbc.queryForList("SELECT submitter_ref,reviewer_ref FROM hz_content_review_task WHERE object_type=? AND object_ref=? AND object_version=? AND review_state='APPROVED'",resource,ref,version);
         if(approvals.size()!=1)throw new CommandConflict("CONTENT_APPROVAL_REQUIRED");
         Map<String,Object> approval=approvals.get(0);
-        if(actor.equals(String.valueOf(approval.get("submitter_ref")))||actor.equals(String.valueOf(approval.get("reviewer_ref"))))
-            throw new CommandConflict("PUBLISH_DUTY_SEPARATION_REQUIRED");
+        boolean same=actor.equals(String.valueOf(approval.get("submitter_ref")))||actor.equals(String.valueOf(approval.get("reviewer_ref")));
+        if(!same)return AdminSelfApprovalPolicy.Decision.separated();
+        try{if(selfApproval==null)throw new AdminSelfApprovalPolicy.PolicyConflict("SELF_APPROVAL_DISABLED");return selfApproval.decide(actor,true);}
+        catch(AdminSelfApprovalPolicy.PolicyConflict denied){throw new CommandConflict("PUBLISH_DUTY_SEPARATION_REQUIRED");}
     }
 
     private PriceEvaluation evaluatePrice(String productRef,JsonNode body,Instant quotedAt){
@@ -273,7 +279,8 @@ class V1AdminCommandController {
         if(CONTENT_RESOURCES.contains(resource)&&Set.of("publish","unpublish").contains(operation))return superAdmin(request);
         return superAdmin(request);
     }
-    private static String actor(HttpServletRequest request){return String.valueOf(request.getAttribute(AdminSessionFilter.TRUSTED_USER));}
+    private static String actor(HttpServletRequest request){return AdminSessionFilter.trustedUserId(request);}
+    private record TransitionResult(int changed,AdminSelfApprovalPolicy.Decision approval){}
     private static String activeState(String r){return switch(r){case"cities"->"ACTIVE";case"products","channels"->"ENABLED";case"price-versions"->"ACTIVE";default->"PUBLISHED";};}
     private static String inactiveState(String r){return switch(r){case"cities"->"INACTIVE";case"products","channels"->"DISABLED";case"price-versions"->"INACTIVE";default->"UNPUBLISHED";};}
     private static String required(JsonNode n,String k){if(!n.path(k).isTextual()||n.path(k).textValue().isBlank())throw new IllegalArgumentException(k+" required");return n.path(k).textValue();}

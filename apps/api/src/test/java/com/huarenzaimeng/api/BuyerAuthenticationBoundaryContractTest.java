@@ -12,7 +12,7 @@ class BuyerAuthenticationBoundaryContractTest {
         String client=Files.readString(root.resolve("WechatCode2SessionClient.java"));
         assertThat(release).contains("enabled: ${HZ_BUYER_AUTH_ENABLED:false}","provider-mode: disabled","code-pepper: ${HZ_BUYER_AUTH_CODE_PEPPER:}")
                 .doesNotContain("trusted-ingress","ingress-hmac-secret","expected-appid-digest");
-        assertThat(controller).contains("Set.of(\"code\",\"requestRef\")","/wechat/session")
+        assertThat(controller).contains("Set.of(\"code\",\"requestRef\",\"guestRef\",\"consent\")","CONSENT_FIELDS","/wechat/session")
                 .doesNotContain("X-WX-APPID","X-WX-OPENID","openid","session_key","idleExpiresAt");
         String store=Files.readString(root.resolve("BuyerAuthStore.java"));
         assertThat(store).contains("enum Eligibility { ELIGIBLE }","record BuyerPrincipal(Eligibility eligibility, String subjectRef, String sessionRef)")

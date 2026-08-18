@@ -27,20 +27,22 @@ public final class ReleaseBuyerFlowController {
     private final WeChatPayCoordinator payments;
     private final WeChatPayPort paymentProvider;
     private final ReleaseQuoteOrderService quoteOrders;
+    private final BuyerConsentStateGuard consent;
     @Autowired
-    ReleaseBuyerFlowController(FlowStore store,WeChatPayCoordinator payments,WeChatPayPort paymentProvider,ReleaseQuoteOrderService quoteOrders) { this.store = store;this.payments=payments;this.paymentProvider=paymentProvider;this.quoteOrders=quoteOrders; }
-    ReleaseBuyerFlowController(FlowStore store,WeChatPayCoordinator payments,WeChatPayPort paymentProvider) { this(store,payments,paymentProvider,null); }
+    ReleaseBuyerFlowController(FlowStore store,WeChatPayCoordinator payments,WeChatPayPort paymentProvider,ReleaseQuoteOrderService quoteOrders,BuyerConsentStateGuard consent) { this.store = store;this.payments=payments;this.paymentProvider=paymentProvider;this.quoteOrders=quoteOrders;this.consent=consent; }
+    ReleaseBuyerFlowController(FlowStore store,WeChatPayCoordinator payments,WeChatPayPort paymentProvider,ReleaseQuoteOrderService quoteOrders) { this(store,payments,paymentProvider,quoteOrders,null); }
+    ReleaseBuyerFlowController(FlowStore store,WeChatPayCoordinator payments,WeChatPayPort paymentProvider) { this(store,payments,paymentProvider,null,null); }
 
     @PostMapping("/quotes")
     ResponseEntity<?> quote(HttpServletRequest servlet, @RequestHeader("Idempotency-Key") @NotBlank String idempotencyKey,
                             @Valid @RequestBody QuoteRequest r) {
-        return ok(requireQuoteOrders().createQuote(principal(servlet).subjectRef(),idempotencyKey,r.requestRef(),r.phone(),r.productRef()));
+        BuyerSessionPrincipal buyer=principal(servlet);requireConsent(buyer);return ok(requireQuoteOrders().createQuote(buyer.subjectRef(),idempotencyKey,r.requestRef(),r.phone(),r.productRef()));
     }
 
     @PostMapping("/orders")
     ResponseEntity<?> order(HttpServletRequest servlet, @RequestHeader("Idempotency-Key") @NotBlank String idempotencyKey,
                             @Valid @RequestBody OrderRequest r) {
-        return ok(requireQuoteOrders().createOrder(principal(servlet).subjectRef(),idempotencyKey,r.requestRef(),r.quoteRef()));
+        BuyerSessionPrincipal buyer=principal(servlet);requireConsent(buyer);return ok(requireQuoteOrders().createOrder(buyer.subjectRef(),idempotencyKey,r.requestRef(),r.quoteRef()));
     }
 
     @GetMapping("/orders")
@@ -62,6 +64,7 @@ public final class ReleaseBuyerFlowController {
     ResponseEntity<?> payment(HttpServletRequest servlet, @PathVariable String orderRef,
                                                    @Valid @RequestBody PaymentRequest r) {
         BuyerSessionPrincipal buyer=principal(servlet);
+        requireConsent(buyer);
         if(!paymentProvider.available())return providerUnavailable("WECHAT_PAY_ADAPTER_DISABLED");
         return ok(PaymentView.from(payments.createForBuyer(new WeChatPayCoordinator.CreateCommand(orderRef,r.requestDigest()),buyer.subjectRef())));
     }
@@ -82,6 +85,7 @@ public final class ReleaseBuyerFlowController {
     @PostMapping("/orders/{orderRef}/refunds")
     ResponseEntity<?> refund(HttpServletRequest servlet,@PathVariable String orderRef,@Valid @RequestBody RefundRequest r){
         BuyerSessionPrincipal buyer=principal(servlet);
+        requireConsent(buyer);
         payments.statusForBuyer(orderRef,buyer.subjectRef());
         if(!paymentProvider.available())return providerUnavailable("WECHAT_PAY_ADAPTER_DISABLED");
         return ok(PaymentView.from(payments.refundForBuyer(new WeChatPayPort.Refund(orderRef,r.refundRef(),r.amountMinor(),r.requestDigest()),buyer.subjectRef())));
@@ -108,6 +112,7 @@ public final class ReleaseBuyerFlowController {
     }
     private static ResponseEntity<?> providerUnavailable(String code){return ResponseEntity.status(503).header("Cache-Control","no-store").body(ProjectEnvelope.rejected(code));}
     private ReleaseQuoteOrderService requireQuoteOrders(){if(quoteOrders==null)throw new IllegalStateException("RELEASE_QUOTE_ORDER_SERVICE_REQUIRED");return quoteOrders;}
+    private void requireConsent(BuyerSessionPrincipal buyer){if(consent!=null)consent.requireTransactionWrite(buyer.subjectRef());}
 
     @ExceptionHandler(WeChatPayCoordinator.Conflict.class)
     ResponseEntity<?> paymentConflict(WeChatPayCoordinator.Conflict conflict){return ResponseEntity.status(409).header("Cache-Control","no-store").body(ProjectEnvelope.rejected(conflict.getMessage()));}

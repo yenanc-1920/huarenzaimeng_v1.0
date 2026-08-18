@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import com.huarenzaimeng.core.BusinessEventLinker;
 
@@ -24,7 +25,9 @@ class AdminWorkflowService {
     private static final Set<String> RECON_ACTIONS=Set.of("CLAIM","QUERY_WECHAT","QUERY_PROVIDER","NOTE","TRANSFER_CS","TRANSFER_REVIEW","RESOLVE","CLOSE");
     private final JdbcTemplate jdbc;
     private final BusinessEventStore events;
-    AdminWorkflowService(JdbcTemplate jdbc,BusinessEventStore events){this.jdbc=jdbc;this.events=events;}
+    private final AdminSelfApprovalPolicy selfApproval;
+    @Autowired AdminWorkflowService(JdbcTemplate jdbc,BusinessEventStore events,AdminSelfApprovalPolicy selfApproval){this.jdbc=jdbc;this.events=events;this.selfApproval=selfApproval;}
+    AdminWorkflowService(JdbcTemplate jdbc,BusinessEventStore events){this(jdbc,events,null);}
 
     @Transactional
     Map<String,Object> createCase(String key,JsonNode body,String actor){
@@ -103,16 +106,21 @@ class AdminWorkflowService {
         String reason=required(body,"reason");max(reason,500,"REASON_TOO_LONG");
         String requestDigest=digest(body);
         Map<String,Object> prior=replayReviewDecisionIfPresent(ref,key,requestDigest);if(prior!=null)return prior;
+        List<Map<String,Object>> pending=jdbc.queryForList("SELECT submitter_ref,review_state FROM hz_content_review_task WHERE review_ref=? FOR UPDATE",ref);
+        if(pending.size()!=1)throw new WorkflowConflict("REVIEW_STATE_CONFLICT");boolean same=actor.equals(String.valueOf(pending.get(0).get("submitter_ref")));
+        AdminSelfApprovalPolicy.Decision exception;
+        try{exception=same?(selfApproval==null?AdminSelfApprovalPolicy.Decision.separated():selfApproval.decide(actor,true)):AdminSelfApprovalPolicy.Decision.separated();}
+        catch(AdminSelfApprovalPolicy.PolicyConflict denied){throw new WorkflowConflict(denied.getMessage());}
+        if(same&&!exception.selfApproved())throw new WorkflowConflict("REVIEW_DUTY_SEPARATION_REQUIRED");
         int changed;
-        try{changed=jdbc.update("UPDATE hz_content_review_task SET review_state=?,reviewer_ref=?,decision_idempotency_key=?,decision_request_digest=?,decision_reason=?,decided_at=? WHERE review_ref=? AND review_state='PENDING' AND submitter_ref<>?",decision,actor,key,requestDigest,reason,now(),ref,actor);}
+        try{changed=jdbc.update("UPDATE hz_content_review_task SET review_state=?,reviewer_ref=?,decision_idempotency_key=?,decision_request_digest=?,decision_reason=?,self_approved=?,exception_policy_version=?,decided_at=? WHERE review_ref=? AND review_state='PENDING'",decision,actor,key,requestDigest,reason,exception.selfApproved()?1:0,exception.exceptionPolicyVersion(),now(),ref);}
         catch(DuplicateKeyException duplicate){return replayReviewDecision(ref,key,requestDigest);}
         if(changed!=1){
             List<Map<String,Object>> replay=jdbc.queryForList("SELECT review_state,submitter_ref,decision_idempotency_key,decision_request_digest FROM hz_content_review_task WHERE review_ref=?",ref);
-            if(replay.size()==1&&actor.equals(String.valueOf(replay.get(0).get("submitter_ref"))))throw new WorkflowConflict("REVIEW_DUTY_SEPARATION_REQUIRED");
             if(replay.size()==1&&key.equals(replay.get(0).get("decision_idempotency_key"))){requireDecisionDigest(replay.get(0),requestDigest);return Map.of("reviewRef",ref,"state",text(replay.get(0),"review_state"),"decisionKey",key,"replayed",true);}
             throw new WorkflowConflict("REVIEW_STATE_CONFLICT");
         }
-        return Map.of("reviewRef",ref,"state",decision,"decisionKey",key,"replayed",false);
+        Map<String,Object> result=new LinkedHashMap<>();result.put("reviewRef",ref);result.put("state",decision);result.put("decisionKey",key);result.put("replayed",false);result.put("selfApproved",exception.selfApproved());result.put("exceptionPolicyVersion",exception.exceptionPolicyVersion());return result;
     }
 
     WorkflowDetail<CustomerCaseView,CustomerCaseEventView> caseDetail(String ref){

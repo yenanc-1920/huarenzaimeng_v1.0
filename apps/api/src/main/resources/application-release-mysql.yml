@@ -30,11 +30,25 @@ hz:
     bootstrap-enabled: ${HZ_ADMIN_BOOTSTRAP_ENABLED:false}
     bootstrap-token: ${HZ_ADMIN_BOOTSTRAP_TOKEN:}
     session-hours: ${HZ_ADMIN_SESSION_HOURS:8}
+  admin:
+    self-approval:
+      enabled: ${HZ_ADMIN_SELF_APPROVAL_ENABLED:false}
+      policy-version: ${HZ_ADMIN_SELF_APPROVAL_POLICY_VERSION:}
   buyer-auth:
     enabled: ${HZ_BUYER_AUTH_ENABLED:false}
     provider-mode: disabled
+    expected-app-id-ref: ${HZ_BUYER_AUTH_EXPECTED_APP_ID_REF:}
     identity-pepper: ${HZ_BUYER_AUTH_IDENTITY_PEPPER:}
     code-pepper: ${HZ_BUYER_AUTH_CODE_PEPPER:}
+  buyer-consent:
+    user-agreement-version: ${HZ_BUYER_CONSENT_USER_AGREEMENT_VERSION:}
+    privacy-policy-version: ${HZ_BUYER_CONSENT_PRIVACY_POLICY_VERSION:}
+  buyer-closure:
+    cleanup:
+      scheduler-enabled: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_ENABLED:false}
+      scheduler-delay-ms: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_DELAY_MS:30000}
+      lease-seconds: ${HZ_BUYER_CLOSURE_CLEANUP_LEASE_SECONDS:30}
+      retry-seconds: ${HZ_BUYER_CLOSURE_CLEANUP_RETRY_SECONDS:30}
   # Test-only credentials are forbidden in the production release profile.
   test-access-token: ${HZ_TEST_ACCESS_TOKEN:}
   project-auth:

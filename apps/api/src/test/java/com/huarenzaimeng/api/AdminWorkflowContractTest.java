@@ -40,7 +40,9 @@ class AdminWorkflowContractTest {
         String service=Files.readString(Path.of("src/main/java/com/huarenzaimeng/api/AdminWorkflowService.java"));
         String commands=Files.readString(Path.of("src/main/java/com/huarenzaimeng/api/V1AdminCommandController.java"));
         assertTrue(service.contains("requireReviewObjectUnderReview(objectType,objectRef,version)"));
-        assertTrue(service.contains("review_state='PENDING' AND submitter_ref<>?"));
+        assertTrue(service.contains("SELECT submitter_ref,review_state FROM hz_content_review_task WHERE review_ref=? FOR UPDATE"));
+        assertTrue(service.contains("self_approved=?"));
+        assertTrue(service.contains("selfApproval.decide(actor,true)"));
         assertTrue(service.contains("REVIEW_DUTY_SEPARATION_REQUIRED"));
         assertTrue(service.contains("requireSameDigest"));
         assertTrue(commands.contains("CONTENT_APPROVAL_REQUIRED"));
