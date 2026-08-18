@@ -30,6 +30,7 @@ class JdbcWeChatPayStoreOutboxTest {
         jdbc=new JdbcTemplate(ds);
         tx=new TransactionTemplate(new DataSourceTransactionManager(ds));
         jdbc.execute("CREATE TABLE hz_payment_coordination(merchant_order_ref VARCHAR(64) PRIMARY KEY,request_digest VARCHAR(64),buyer_subject_ref VARCHAR(128),quote_ref VARCHAR(64),price_snapshot_digest VARCHAR(64),amount_minor BIGINT,currency VARCHAR(3),provider_ref VARCHAR(128),state_code VARCHAR(32),evidence_ref VARCHAR(128),query_budget_remaining INT,query_deadline TIMESTAMP,refunded_minor BIGINT,aggregate_version BIGINT,updated_at TIMESTAMP)");
+        for(String column:java.util.List.of("prepay_timestamp VARCHAR(32)","prepay_nonce VARCHAR(32)","prepay_package VARCHAR(128)","prepay_sign_type VARCHAR(8)","prepay_pay_sign VARCHAR(1024)","prepay_expires_at TIMESTAMP"))jdbc.execute("ALTER TABLE hz_payment_coordination ADD "+column);
         jdbc.execute("CREATE TABLE hz_payment_refund(refund_ref VARCHAR(64) PRIMARY KEY,merchant_order_ref VARCHAR(64),request_digest VARCHAR(64),amount_minor BIGINT,state_code VARCHAR(32),original_payment_state VARCHAR(32),refund_query_budget_remaining INT,refund_query_deadline TIMESTAMP,created_at TIMESTAMP,updated_at TIMESTAMP)");
         jdbc.execute("CREATE TABLE event_probe(event_ref VARCHAR(64) PRIMARY KEY,order_ref VARCHAR(64),event_type VARCHAR(40),event_digest VARCHAR(64))");
     }
@@ -82,7 +83,7 @@ class JdbcWeChatPayStoreOutboxTest {
         doThrow(new IllegalStateException("INJECTED_REFUND_RECOVERY_FAILURE")).when(recovery).schedule(anyString(),anyString(),anyLong(),anyInt(),any(),any());
         JdbcWeChatPayStore store=new JdbcWeChatPayStore(jdbc,new ProbeEvents(jdbc,false),recovery);
         Instant now=Instant.now();
-        jdbc.update("INSERT INTO hz_payment_coordination VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)","PAY-REFUND-UNKNOWN","f".repeat(64),"BUYER","QUOTE","d".repeat(64),1000,"CNY","WX","PAID",null,2,Timestamp.from(now.plusSeconds(60)),0,1,Timestamp.from(now));
+        jdbc.update("INSERT INTO hz_payment_coordination VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,NULL,NULL)","PAY-REFUND-UNKNOWN","f".repeat(64),"BUYER","QUOTE","d".repeat(64),1000,"CNY","WX","PAID",null,2,Timestamp.from(now.plusSeconds(60)),0,1,Timestamp.from(now));
         WeChatPayCoordinator.Begin begun=tx.execute(ignored->store.beginRefund("PAY-REFUND-UNKNOWN","REFUND-UNKNOWN","a".repeat(64),400,2,now.plusSeconds(60)));
         assertThat(begun).isEqualTo(WeChatPayCoordinator.Begin.CREATED);
 
@@ -95,7 +96,7 @@ class JdbcWeChatPayStoreOutboxTest {
     }
 
     private void insert(String ref,String digest){
-        jdbc.update("INSERT INTO hz_payment_coordination VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",ref,digest,"BUYER","QUOTE","d".repeat(64),1000,"CNY",null,"PREPAY_CREATED",null,2, Timestamp.from(Instant.now().plusSeconds(60)),0,1,Timestamp.from(Instant.now()));
+        jdbc.update("INSERT INTO hz_payment_coordination VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,NULL,NULL)",ref,digest,"BUYER","QUOTE","d".repeat(64),1000,"CNY",null,"PREPAY_CREATED",null,2, Timestamp.from(Instant.now().plusSeconds(60)),0,1,Timestamp.from(Instant.now()));
     }
 
     private record ProbeEvents(JdbcTemplate jdbc,boolean fail) implements BusinessEventStore {

@@ -1,4 +1,4 @@
-import type { WechatPrepayParameters } from './wechat-payment-port.ts'
+import { parseWechatPrepayParameters, type WechatPrepayParameters } from './wechat-payment-port.ts'
 
 export type PaymentState='NEW'|'PREPAY_CREATED'|'PROCESSING'|'PAID'|'CLOSED'|'REFUND_PROCESSING'|'REFUNDED'|'REJECTED'|'UNKNOWN'
 export type RefundState='PENDING'|'SUCCEEDED'|'REJECTED'|'UNKNOWN'
@@ -51,12 +51,15 @@ export function parseReleaseOrderView(value:unknown):ReleaseOrderView{
 }
 
 export function parsePaymentView(value:unknown):PaymentView{
-  const base=['orderRef','state','providerRef','amountMinor','currency','refundedMinor','version'] as const
+  const base=['orderRef','state','providerRef','amountMinor','currency','refundedMinor','version','prepayParameters'] as const
   if(!object(value)||!exact(value,base)||!text(value.orderRef)
     ||!PAYMENT_STATES.includes(value.state as PaymentState)||!nullableText(value.providerRef)||!positive(value.amountMinor)
-    ||!currency(value.currency)||!nonNegative(value.refundedMinor)||!positive(value.version))throw new Error('INVALID_PAYMENT_VIEW_DTO')
+    ||!currency(value.currency)||!nonNegative(value.refundedMinor)||!positive(value.version)
+    ||!(value.prepayParameters===null||object(value.prepayParameters)))throw new Error('INVALID_PAYMENT_VIEW_DTO')
+  let prepay:WechatPrepayParameters|null=null
+  try{prepay=value.prepayParameters===null?null:parseWechatPrepayParameters(value.prepayParameters)}catch{throw new Error('INVALID_PAYMENT_VIEW_DTO')}
   return{orderRef:value.orderRef,state:value.state as PaymentState,providerRef:value.providerRef as string|null,
-    amountMinor:value.amountMinor,currency:value.currency,refundedMinor:value.refundedMinor,version:value.version,prepayParameters:null}
+    amountMinor:value.amountMinor,currency:value.currency,refundedMinor:value.refundedMinor,version:value.version,prepayParameters:prepay}
 }
 
 export function parseRefundView(value:unknown):RefundView{

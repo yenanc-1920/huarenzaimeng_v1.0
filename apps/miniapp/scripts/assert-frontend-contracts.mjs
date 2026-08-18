@@ -28,7 +28,7 @@ assert.match(payment, /当前暂不可支付[\s\S]*未扣款[\s\S]*没有向运�
 assert.match(payment, /paymentReadState=ref<'IDLE'\|'LOADING'\|'READY'\|'READ_ERROR'>[\s\S]*payment\.value=null[\s\S]*paymentReadState\.value='READ_ERROR'/, 'P013 must revoke stale payment state when status read fails')
 assert.match(payment, /支付状态暂时无法读取，已撤销旧结果/, 'P013 must expose an explicit payment read failure')
 assert.match(payment, /data-payment-read-state="paymentReadState"/, 'P013 must project READ_ERROR for deterministic UI verification')
-assert.match(payment, /paymentReadState==='READ_ERROR'[\s\S]*旧支付结果已撤销，不会重新发起支付[\s\S]*v-else-if="unpaid"/, 'P013 must not present a normal order hero after payment read failure')
+assert.match(payment, /paymentReadState==='READ_ERROR'[\s\S]*旧支付结果已撤销，不会重新发起支付[\s\S]*v-else-if="unpaid&&!paymentAvailable"/, 'P013 must not present a normal order hero after payment read failure')
 assert.doesNotMatch(payment, /REQUEST_MOCK_PAYMENT|LOCAL_SYNTHETIC|confirmPayment/, 'P013 must not expose retired payment actions')
 
 assert.match(progress, /api\.getPaymentStatus\(orderRef\.value\)[\s\S]*api\.getTopupStatus\(orderRef\.value\)/, 'P014 must bind topup eligibility to the formal payment and topup status endpoints')

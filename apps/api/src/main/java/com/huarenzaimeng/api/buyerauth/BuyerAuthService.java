@@ -85,7 +85,7 @@ final class BuyerAuthService {
             BuyerAuthStore.Identity identity;
             if(command==null) identity=store.establishIdentityAndSession(attemptRef,success.evidenceRef(),success.appIdRef(),subjectDigest,"BUYER-"+UUID.randomUUID(),UUID.randomUUID().toString(),tokenDigest,sessionIssuedAt,absolute,idle,
                     new BuyerAuthStore.Audit("WECHAT_SESSION_ESTABLISHED","SUCCEEDED",subjectDigest,tokenDigest,requestRef,sessionIssuedAt));
-            else identity=store.establishIdentityConsentAndSession(attemptRef,success.evidenceRef(),success.appIdRef(),subjectDigest,"BUYER-"+UUID.randomUUID(),UUID.randomUUID().toString(),tokenDigest,sessionIssuedAt,absolute,idle,
+            else identity=store.establishIdentityConsentAndSession(attemptRef,success.evidenceRef(),success.appIdRef(),subjectDigest,success.providerSubject(),"BUYER-"+UUID.randomUUID(),UUID.randomUUID().toString(),tokenDigest,sessionIssuedAt,absolute,idle,
                     new BuyerAuthStore.Consent(command.guestRef(),requestRef,consentDigest(command),command.userAgreementVersion(),command.privacyPolicyVersion(),sessionIssuedAt),
                     new BuyerAuthStore.Audit("WECHAT_CONSENT_SESSION_ESTABLISHED","SUCCEEDED",subjectDigest,tokenDigest,requestRef,sessionIssuedAt));
             store.recordLoginWindowOutcome(windowKeyDigest,true,sessionIssuedAt);

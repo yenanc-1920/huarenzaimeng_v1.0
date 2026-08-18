@@ -1,6 +1,6 @@
 # 四环境变量清单（CloudBase 可粘贴 JSON）
 
-本目录以 `apps/api/src/main`、四个 profile YAML、五个 Dockerfile 和容器 entrypoint 的实际读取点为准。四份 JSON 是当前 V23 候选所需的**全量受控配置基线**，不是增量补丁；应用时应与云端现有键合并核对，不能直接删除模板未列出的平台保留键。模板不含真实秘密，可粘贴到 CloudBase 的 JSON 环境变量编辑器后逐项替换 `[REPLACE_...]`。
+本目录以 `apps/api/src/main`、四个 profile YAML、五个 Dockerfile 和容器 entrypoint 的实际读取点为准。四份 JSON 是当前 V24 候选所需的**全量受控配置基线**，不是增量补丁；应用时应与云端现有键合并核对，不能直接删除模板未列出的平台保留键。模板不含真实秘密，可粘贴到 CloudBase 的 JSON 环境变量编辑器后逐项替换 `[REPLACE_...]`。
 
 ## 1. 模板
 
@@ -54,6 +54,13 @@
 | `HZ_WINLA_ENABLED` | `false` | `false` | 与provider mode双开关，单独打开会启动失败 |
 | `HZ_WINLA_UID` | 秘密占位 | 秘密占位 | 赢啦账号；平台环境变量维护，不在聊天或Git填写真实值 |
 | `HZ_WINLA_API_KEY` | 秘密占位 | 秘密占位 | 赢啦API Key；每个环境按实际隔离能力配置 |
+| `HZ_WECHAT_PAY_MODE` | `disabled` | `disabled` | 本地候选支持`api-v3`，真实小额验收前保持关闭 |
+| `HZ_WECHAT_PAY_ENABLED` | `false` | `false` | 与mode双开关；单独开启会启动失败 |
+| `HZ_WECHAT_PAY_MERCHANT_ID/SERIAL` | 占位 | 占位 | 商户号与商户API证书序列号 |
+| `HZ_WECHAT_PAY_NOTIFY_URL` | DEV域名 | 对应环境域名 | 固定到真实微信支付通知入口 |
+| `HZ_WECHAT_PAY_MERCHANT_PRIVATE_KEY_BASE64` | 秘密占位 | 秘密占位 | PKCS#8 DER的Base64，不得进Git/聊天/截图 |
+| `HZ_WECHAT_PAY_API_V3_KEY` | 秘密占位 | 秘密占位 | 精确32字节，每环境受控配置 |
+| `HZ_WECHAT_PAY_PLATFORM_PUBLIC_KEYS` | 占位 | 占位 | `serial:Base64(X.509公钥)`，多把逗号分隔 |
 | `HZ_BUYER_AUTH_IDENTITY_PEPPER` | 秘密占位 | 秘密占位 | 至少32字符、每环境独立，不得与code pepper相同 |
 | `HZ_BUYER_AUTH_CODE_PEPPER` | 秘密占位 | 秘密占位 | 至少32字符、每环境独立 |
 | `HZ_BUYER_CONSENT_USER_AGREEMENT_VERSION` | `2026-08-28` | `2026-08-28` | 当前有效用户协议版本 |
@@ -152,7 +159,7 @@ AppID/AppSecret已由平台侧单独维护，因此不重复出现在JSON；候�
 | 能力 | 安全默认 | 启用前置 |
 |---|---|---|
 | 微信登录 | `HZ_BUYER_AUTH_ENABLED=false`、provider disabled、identity disabled | 平台秘密、预期AppID绑定、真机验收；三开关按受控步骤切换 |
-| 微信支付 | Disabled port | 商户/证书/回调配置、验签解密与小额支付退款授权 |
+| 微信支付 | `HZ_WECHAT_PAY_MODE=disabled`、`HZ_WECHAT_PAY_ENABLED=false` | 商户号/API证书私钥/APIv3密钥/平台公钥、回调配置、真机小额支付退款授权 |
 | WINLA充值 | `HZ_TOPUP_PROVIDER_MODE=disabled`、`HZ_WINLA_ENABLED=false` | 账号/API Key、余额、出口IP白名单、回调地址、签名/金额/状态小额验收；两开关最后切换 |
 | P021测试只读 | `HZ_P021_MODE=disabled` | 只能在独立证据服务使用，不进入四环境正式服务 |
 | 管理员bootstrap | `false` 且token必须为空 | 使用受控初始化流程，不在普通发布中打开 |

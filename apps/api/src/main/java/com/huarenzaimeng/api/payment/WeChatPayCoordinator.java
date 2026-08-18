@@ -29,13 +29,13 @@ public final class WeChatPayCoordinator {
         PaymentOrderSnapshotPort.Snapshot trusted=orders.requirePayable(requested.merchantOrderRef(),buyerSubjectRef);
         if(buyerSubjectRef!=null&&!buyerSubjectRef.equals(trusted.buyerSubjectRef()))throw new Conflict("PAYMENT_ORDER_OWNERSHIP_CONFLICT");
         requireOrder(trusted.merchantOrderRef(),trusted.amountMinor(),trusted.currency(),requested.requestDigest());
-        WeChatPayPort.UnifiedOrder command=new WeChatPayPort.UnifiedOrder(trusted.merchantOrderRef(),trusted.amountMinor(),trusted.currency(),trusted.buyerSubjectRef(),requested.requestDigest());
+        WeChatPayPort.UnifiedOrder command=new WeChatPayPort.UnifiedOrder(trusted.merchantOrderRef(),trusted.amountMinor(),trusted.currency(),trusted.payerOpenId(),requested.requestDigest());
         Begin begin = store.begin(trusted,requested.requestDigest(),queryBudget,Instant.now().plusSeconds(300));
         if (begin == Begin.REPLAY) return store.require(trusted.merchantOrderRef());
         if (begin == Begin.CONFLICT) throw new Conflict("PAYMENT_IDEMPOTENCY_CONFLICT");
         WeChatPayPort.Result result = safe(() -> provider.unifiedOrder(command));
         if (result instanceof WeChatPayPort.Accepted accepted)
-            store.providerResult(command.merchantOrderRef(), accepted.providerRef(), normalize(accepted.state()), accepted.evidenceRef());
+            store.providerResultWithPrepay(command.merchantOrderRef(),accepted,normalize(accepted.state()));
         else if (result instanceof WeChatPayPort.Rejected rejected)
             store.providerResult(command.merchantOrderRef(), null, State.REJECTED, rejected.reasonCode());
         else store.providerResult(command.merchantOrderRef(), null, State.UNKNOWN, ((WeChatPayPort.Unknown) result).reasonCode());
@@ -70,10 +70,12 @@ public final class WeChatPayCoordinator {
         return observe(orderRef, safe(() -> provider.close(orderRef)));
     }
     public View refund(WeChatPayPort.Refund command) {
+        View payment=store.require(command.merchantOrderRef());
+        WeChatPayPort.Refund trusted=new WeChatPayPort.Refund(command.merchantOrderRef(),command.refundRef(),command.amountMinor(),command.requestDigest(),payment.amountMinor(),payment.currency());
         Begin begin=store.beginRefund(command.merchantOrderRef(),command.refundRef(),command.requestDigest(),command.amountMinor(),queryBudget,Instant.now().plusSeconds(300));
         if(begin==Begin.CONFLICT)throw new Conflict("PAYMENT_REFUND_NOT_ALLOWED");
         if(begin==Begin.REPLAY)return store.require(command.merchantOrderRef());
-        WeChatPayPort.Result result=safe(()->provider.refund(command));store.refundResult(command.merchantOrderRef(),command.refundRef(),result);return store.require(command.merchantOrderRef());
+        WeChatPayPort.Result result=safe(()->provider.refund(trusted));store.refundResult(command.merchantOrderRef(),command.refundRef(),result);return store.require(command.merchantOrderRef());
     }
     public View refundForBuyer(WeChatPayPort.Refund command,String buyerSubjectRef){requireBuyer(store.require(command.merchantOrderRef()),buyerSubjectRef);return refund(command);}
     public RefundView refundStatus(String refundRef){if(blank(refundRef))throw new Conflict("PAYMENT_REFUND_REF_INVALID");return store.requireRefund(refundRef);}
@@ -117,7 +119,12 @@ public final class WeChatPayCoordinator {
     public record CreateCommand(String merchantOrderRef,String requestDigest) {}
     public record View(String merchantOrderRef,String requestDigest,String buyerSubjectRef,String quoteRef,String priceSnapshotDigest,
                        long amountMinor,String currency,String providerRef,State state,String evidenceRef,
-                       int queryBudgetRemaining,Instant queryDeadline,long refundedMinor,long version,Instant updatedAt) {}
+                       int queryBudgetRemaining,Instant queryDeadline,long refundedMinor,long version,Instant updatedAt,
+                       WeChatPayPort.PrepayParameters prepayParameters) {
+        public View(String merchantOrderRef,String requestDigest,String buyerSubjectRef,String quoteRef,String priceSnapshotDigest,long amountMinor,String currency,String providerRef,State state,String evidenceRef,int queryBudgetRemaining,Instant queryDeadline,long refundedMinor,long version,Instant updatedAt){
+            this(merchantOrderRef,requestDigest,buyerSubjectRef,quoteRef,priceSnapshotDigest,amountMinor,currency,providerRef,state,evidenceRef,queryBudgetRemaining,queryDeadline,refundedMinor,version,updatedAt,null);
+        }
+    }
     public record NotificationAuthority(String expectedAppId,String merchantId,Set<String> allowedCertificateSerials){public NotificationAuthority{allowedCertificateSerials=allowedCertificateSerials==null?Set.of():Set.copyOf(allowedCertificateSerials);}boolean configured(){return !blank(expectedAppId)&&!blank(merchantId)&&!allowedCertificateSerials.isEmpty();}}
     public enum RefundState{PENDING,SUCCEEDED,REJECTED,UNKNOWN}
     public record RefundView(String refundRef,String merchantOrderRef,String requestDigest,long amountMinor,RefundState state,State originalPaymentState,
@@ -127,6 +134,7 @@ public final class WeChatPayCoordinator {
         Begin begin(PaymentOrderSnapshotPort.Snapshot snapshot,String requestDigest,int queryBudget,Instant queryDeadline);
         View require(String orderRef);
         void providerResult(String orderRef,String providerRef,State state,String evidenceRef);
+        default void providerResultWithPrepay(String orderRef,WeChatPayPort.Accepted accepted,State state){providerResult(orderRef,accepted.providerRef(),state,accepted.evidenceRef());}
         void observation(String orderRef,State state,String evidenceRef);
         NotificationDisposition receiveNotification(WeChatPayPort.VerifiedNotification notification,State state);
         void consumeQueryBudget(String orderRef);

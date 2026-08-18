@@ -57,6 +57,18 @@ hz:
     # Real WINLA transport remains unreachable until both switches and credentials are explicit.
     mode: ${HZ_TOPUP_PROVIDER_MODE:disabled}
     winla-enabled: ${HZ_WINLA_ENABLED:false}
+  wechat-pay:
+    mode: ${HZ_WECHAT_PAY_MODE:disabled}
+    enabled: ${HZ_WECHAT_PAY_ENABLED:false}
+    expected-app-id: ${HZ_WECHAT_APP_ID:}
+    merchant-id: ${HZ_WECHAT_PAY_MERCHANT_ID:}
+    merchant-serial: ${HZ_WECHAT_PAY_MERCHANT_SERIAL:}
+    notify-url: ${HZ_WECHAT_PAY_NOTIFY_URL:}
+    merchant-private-key-base64: ${HZ_WECHAT_PAY_MERCHANT_PRIVATE_KEY_BASE64:}
+    api-v3-key: ${HZ_WECHAT_PAY_API_V3_KEY:}
+    platform-public-keys: ${HZ_WECHAT_PAY_PLATFORM_PUBLIC_KEYS:}
+    connect-timeout-ms: ${HZ_WECHAT_PAY_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${HZ_WECHAT_PAY_READ_TIMEOUT_MS:3000}
   buyer-closure:
     cleanup:
       scheduler-enabled: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_ENABLED:false}

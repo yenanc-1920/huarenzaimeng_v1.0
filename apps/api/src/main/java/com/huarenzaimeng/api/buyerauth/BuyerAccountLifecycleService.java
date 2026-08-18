@@ -75,6 +75,7 @@ class BuyerAccountLifecycleService {
                 "CLEANUP-"+UUID.randomUUID(),closureRef,buyerId,"PII-"+closureRef,ts(now),ts(now),ts(now));
         String tombstone="CLOSED-"+closureRef;
         jdbc.update("DELETE FROM buyer_session WHERE buyer_id=?",buyerId);
+        jdbc.update("DELETE FROM buyer_wechat_payment_identity WHERE buyer_id=?",buyerId);
         jdbc.update("UPDATE buyer_consent_state SET guest_ref=?,consent_state='CLOSURE_REQUESTED',aggregate_version=aggregate_version+1,updated_at=? WHERE buyer_id=?",tombstone,ts(now),buyerId);
         jdbc.update("UPDATE buyer_consent_acceptance SET guest_ref=? WHERE buyer_id=?",tombstone,buyerId);
         int task=leaseOwner==null

@@ -71,6 +71,16 @@ class JdbcBuyerAuthStore implements BuyerAuthStore {
                 sessionId,tokenDigest,identity.buyerId(),ts(issuedAt),ts(expiresAt),ts(idleExpiresAt));
         appendAudit(audit);finishLoginAttempt(attemptRef,"SUCCEEDED",identityEvidenceRef,issuedAt);return identity;
     }
+    @Override @Transactional
+    public Identity establishIdentityConsentAndSession(String attemptRef,String identityEvidenceRef,String appidDigest,String subjectDigest,String providerSubject,String subjectRef,
+                                                        String sessionId,String tokenDigest,Instant issuedAt,Instant expiresAt,Instant idleExpiresAt,
+                                                        Consent consent,Audit audit){
+        Identity identity=establishIdentityConsentAndSession(attemptRef,identityEvidenceRef,appidDigest,subjectDigest,subjectRef,
+                sessionId,tokenDigest,issuedAt,expiresAt,idleExpiresAt,consent,audit);
+        jdbc.update("INSERT INTO buyer_wechat_payment_identity(buyer_id,app_id_ref,openid_ref,created_at,updated_at) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE app_id_ref=VALUES(app_id_ref),openid_ref=VALUES(openid_ref),updated_at=VALUES(updated_at)",
+                identity.buyerId(),appidDigest,providerSubject,ts(issuedAt),ts(issuedAt));
+        return identity;
+    }
 
     @Override public boolean accountMayLogin(String appIdRef,String subjectDigest){
         return jdbc.query("SELECT status_code FROM buyer_identity WHERE provider_code='WECHAT' AND provider_appid_digest=? AND provider_subject_digest=?",

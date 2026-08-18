@@ -14,11 +14,18 @@ public interface WeChatPayPort {
 
     record UnifiedOrder(String merchantOrderRef, long amountMinor, String currency,
                         String payerSubjectRef, String requestDigest) {}
-    record Refund(String merchantOrderRef, String refundRef, long amountMinor, String requestDigest) {}
-    record NotificationEnvelope(String notificationId, String timestamp, String nonce,
-                                String signature, String encryptedBody) {}
+    record Refund(String merchantOrderRef,String refundRef,long amountMinor,String requestDigest,long totalAmountMinor,String currency) {
+        public Refund(String merchantOrderRef,String refundRef,long amountMinor,String requestDigest){this(merchantOrderRef,refundRef,amountMinor,requestDigest,0,null);}
+    }
+    record NotificationEnvelope(String notificationId,String timestamp,String nonce,String signature,
+                                String certificateSerial,String rawBody) {
+        public NotificationEnvelope(String notificationId,String timestamp,String nonce,String signature,String rawBody){this(notificationId,timestamp,nonce,signature,"",rawBody);}
+    }
     sealed interface Result permits Accepted, Rejected, Unknown {}
-    record Accepted(String providerRef, String state, String evidenceRef) implements Result {}
+    record Accepted(String providerRef,String state,String evidenceRef,PrepayParameters prepayParameters) implements Result {
+        public Accepted(String providerRef,String state,String evidenceRef){this(providerRef,state,evidenceRef,null);}
+    }
+    record PrepayParameters(String timeStamp,String nonceStr,String packageValue,String signType,String paySign) {}
     record Rejected(String reasonCode) implements Result {}
     record Unknown(String reasonCode) implements Result {}
     sealed interface RefundQueryResult permits RefundObservation, RefundQueryUnknown {}

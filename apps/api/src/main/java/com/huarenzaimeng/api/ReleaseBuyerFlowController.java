@@ -9,6 +9,7 @@ import com.huarenzaimeng.core.ProjectProjection;
 import com.huarenzaimeng.core.Quote;
 import com.huarenzaimeng.api.payment.WeChatPayCoordinator;
 import com.huarenzaimeng.api.payment.WeChatPayPort;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -126,6 +127,9 @@ public final class ReleaseBuyerFlowController {
                           @NotBlank String authorizationSetRef, @Min(1) long expectedProjectionVersion,
                           @Min(1) long expectedAggregateVersion,@Pattern(regexp="[a-f0-9]{64}") String requestDigest) {}
     record RefundRequest(@NotBlank String refundRef,@Min(1) long amountMinor,@Pattern(regexp="[a-f0-9]{64}") String requestDigest) {}
-    record PaymentView(String orderRef,String state,String providerRef,long amountMinor,String currency,long refundedMinor,long version){static PaymentView from(WeChatPayCoordinator.View v){return new PaymentView(v.merchantOrderRef(),v.state().name(),v.providerRef(),v.amountMinor(),v.currency(),v.refundedMinor(),v.version());}}
+    record PaymentView(String orderRef,String state,String providerRef,long amountMinor,String currency,long refundedMinor,long version,PrepayParameters prepayParameters){
+        static PaymentView from(WeChatPayCoordinator.View v){var p=v.prepayParameters();return new PaymentView(v.merchantOrderRef(),v.state().name(),v.providerRef(),v.amountMinor(),v.currency(),v.refundedMinor(),v.version(),p==null?null:new PrepayParameters(p.timeStamp(),p.nonceStr(),p.packageValue(),p.signType(),p.paySign()));}
+    }
+    record PrepayParameters(String timeStamp,String nonceStr,@JsonProperty("package") String packageValue,String signType,String paySign) {}
     record RefundView(String orderRef,String refundRef,String state,long amountMinor){static RefundView from(WeChatPayCoordinator.RefundView v){return new RefundView(v.merchantOrderRef(),v.refundRef(),v.state().name(),v.amountMinor());}}
 }

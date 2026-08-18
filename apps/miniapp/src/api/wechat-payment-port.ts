@@ -17,6 +17,12 @@ export function parseWechatPrepayParameters(value: unknown): WechatPrepayParamet
 export const unavailableWechatPaymentSdk: WechatPaymentSdkPort = Object.freeze({
   async requestPayment(): Promise<void> { throw new Error('WECHAT_PAYMENT_CHANNEL_NOT_CONFIGURED') },
 })
+export const miniProgramWechatPaymentSdk: WechatPaymentSdkPort = Object.freeze({
+  async requestPayment(input:WechatPrepayParameters): Promise<void> {
+    const p=parseWechatPrepayParameters(input)
+    await new Promise<void>((resolve,reject)=>uni.requestPayment({provider:'wxpay',...p,success:()=>resolve(),fail:()=>reject(new Error('WECHAT_PAYMENT_NOT_COMPLETED'))}))
+  },
+})
 /** UI boundary only. The caller must supply frozen backend parameters and an explicit SDK port. */
 export async function invokeWechatPayment(parameters: WechatPrepayParameters, port: WechatPaymentSdkPort = unavailableWechatPaymentSdk): Promise<'PAYMENT_SDK_COMPLETED'> {
   await port.requestPayment(parseWechatPrepayParameters(parameters))

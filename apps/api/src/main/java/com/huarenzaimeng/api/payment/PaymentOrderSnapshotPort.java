@@ -10,5 +10,9 @@ public interface PaymentOrderSnapshotPort {
         return snapshot;
     }
     record Snapshot(String merchantOrderRef,String buyerSubjectRef,String quoteRef,String priceSnapshotDigest,
-                    long amountMinor,String currency) {}
+                    long amountMinor,String currency,String payerOpenId) {
+        public Snapshot(String merchantOrderRef,String buyerSubjectRef,String quoteRef,String priceSnapshotDigest,long amountMinor,String currency){
+            this(merchantOrderRef,buyerSubjectRef,quoteRef,priceSnapshotDigest,amountMinor,currency,buyerSubjectRef);
+        }
+    }
 }

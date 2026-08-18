@@ -21,6 +21,13 @@ interface BuyerAuthStore {
         return establishIdentityAndSession(attemptRef,identityEvidenceRef,appIdRef,subjectDigest,subjectRef,
                 sessionId,tokenDigest,issuedAt,absoluteExpiresAt,idleExpiresAt,audit);
     }
+    default Identity establishIdentityConsentAndSession(String attemptRef,String identityEvidenceRef,
+                                         String appIdRef,String subjectDigest,String providerSubject,String subjectRef,
+                                         String sessionId,String tokenDigest,Instant issuedAt,Instant absoluteExpiresAt,
+                                         Instant idleExpiresAt,Consent consent,Audit audit) {
+        return establishIdentityConsentAndSession(attemptRef,identityEvidenceRef,appIdRef,subjectDigest,subjectRef,
+                sessionId,tokenDigest,issuedAt,absoluteExpiresAt,idleExpiresAt,consent,audit);
+    }
     default boolean accountMayLogin(String appIdRef,String subjectDigest){ return true; }
     default boolean guestMayLogin(String guestRef){ return true; }
     default Optional<ConsentState> consentState(String subjectRef){ return Optional.empty(); }
