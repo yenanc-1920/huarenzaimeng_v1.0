@@ -6,7 +6,7 @@
 
 1. Pull Request 或人工检查执行快速门禁：启动阻断测试、后台契约与构建、小程序契约与构建。
 2. 合入 `dev` 前执行本地完整门禁：后端完整测试、release/dev 制品打包、本地 MySQL 5.7 一次性数据库迁移、JAR 启动和健康检查。
-3. 完整门禁必须满足：V1-V14 全部成功、失败迁移为 0、最高版本为 14、`/actuator/health` 为 `UP`。
+3. 完整门禁必须满足：V1-V24 全部成功、失败迁移为 0、最高版本为 24、`/actuator/health` 为 `UP`。
 4. GitHub Actions 对固定提交重复完整代码门禁并构建 `Dockerfile.dev`。
 5. 只有 GitHub 门禁成功后才推进 `deploy/dev`；微信云托管开发服务只监听 `deploy/dev`。
 6. 云端失败不自动反复重发。记录首个根因，回到本地修复并重新完整验证。
@@ -65,7 +65,7 @@ powershell -ExecutionPolicy Bypass -File tools\Invoke-DevReleaseGate.ps1 -SkipCo
 # 统一环境启动链（2026-08-18）
 
 DEV、TEST、STAGE、PROD 统一使用同一个环境 Flyway bootstrap：应用端口先启动，业务 API 保持
-`SERVICE_STARTING`，后台线程只执行一次 Flyway，数据库身份、V1-V14 成功记录和开发种子边界全部
+`SERVICE_STARTING`，后台线程只执行一次 Flyway，数据库身份、V1-V24 成功记录和开发种子边界全部
 核验通过后才开放业务。迁移失败不重试，状态保持 FAILED。
 
 环境仅通过以下配置区分：
