@@ -58,7 +58,7 @@
 
 已确认事项（微信AppID策略、WINLA契约、A130预填值、V1手机号明文边界和初期单SUPER_ADMIN例外）
 统一归档在外部集成与经营决策基线中。单SUPER_ADMIN窄例外已在V22实现并完成本地定向测试；履约
-手机号专用存储、保留期与出口脱敏仍需实现与验收。需求确认不得被解读为真实平台已经通过。
+手机号专用存储、终态三年保留和出口脱敏已由V23完成本地实现与门禁；真实MySQL执行、数据库账号最小权限和真实供应商联调仍未验收。需求确认不得被解读为真实平台已经通过。
 
 ## 6. 完成标准
 
@@ -74,14 +74,14 @@
 |---|---|---|---|
 | T0 | 已完成 | 分支、需求、视觉、禁止事项与角色边界已冻结；双工作树已收敛为唯一根工作区并建立仓库外恢复材料 | 当前候选尚未推送或部署 |
 | T1 | 本地完成 | 后台按21屏信息架构重构导航、B002、A100/A110正式工作流、A121/A122/A130独立列表与编辑/目录/渠道/定价/试算，以及A140正式只读详情；contracts、state、typecheck、build通过 | A121既有城市因读投影无版本号保持安全只读；21帧仍缺真实运行截图与像素对比证据 |
-| T2 | 本地完成 | V15与V22完成A100/A110事件、A120审核、内容版本历史、目录批次、FX快照、职责分离、唯一SUPER_ADMIN例外、幂等与审计；价格成本只取持久供应商快照 | V15-V22仍需真实MySQL 5.7空库、升级、重复执行及中断恢复证据 |
+| T2 | 本地完成 | V15与V22完成A100/A110事件、A120审核、内容版本历史、目录批次、FX快照、职责分离、唯一SUPER_ADMIN例外、幂等与审计；价格成本只取持久供应商快照 | V15-V23仍需真实MySQL 5.7空库、升级、重复执行及中断恢复证据 |
 | T3 | 本地完成 | 小程序既定页面、高保真主体、四栏导航、余额/流量/套餐、严格正式DTO、无业务图片和客服直达已收口；development/legacy/formal、mp-weixin及AppService门禁通过 | 后端尚无微信五项预支付参数，P013保持禁用；正式资格当前UNKNOWN时不伪造可售 |
-| T4 | 本地完成 | V17不可变报价/订单快照、可信目录/价格/运营商集合与版本漂移关闭；手机号摘要改为独立HMAC；小程序报价/订单已接正式接口 | 可逆履约号码与生产密钥托管尚未实现；真实经营参数待用户录入 |
+| T4 | 本地完成 | V17不可变报价/订单快照、可信目录/价格/运营商集合与版本漂移关闭；V23以专用表受控保存履约号码、对外保持掩码/HMAC并从实际终态起保留三个日历年；小程序报价/订单已接正式接口 | V23尚未在真实MySQL执行；数据库最小权限与真实供应商出口仍待验收 |
 | T5-T8/C1 | 本地完成 | V16支付/退款/充值协调；V18事务outbox；状态、余额、闩锁、事件同事务；小D结论 `GO` | 真实微信身份/支付与WINLA网络适配器默认不可达；本地产物已形成，但不证明云部署、探针或长期稳定性 |
 | C2 | 本地完成 | V19 UNKNOWN持久任务、预算/截止/租约、三域正式Handler、旧版本零外调、DEAD幂等进入A110；小D结论 `GO` | 调度默认关闭；生产频率和真实provider查询能力待外部输入 |
 | C3 | 本地完成 | V20 provider/channel/operator/currency跨实例限额、锁行持久counter、完整scope闩锁、余额exact运算；小D结论 `GO_FOR_LOCAL_BASELINE` | 真实MySQL 5.7双实例锁等待、死锁和counter一致性尚未实证 |
 | C4 | 本地完成并暂停 | V21不可变原始金额/币种/协议事实与canonical结果；适配器独占规范化，错配统一UNKNOWN；小D结论 `GO_FOR_LOCAL_BASELINE` | WINLA真实金额字段、币种、scale、签名canonical串及回调字段仍为 `NO-GO_REAL_PROVIDER_CONTRACT` |
-| T9 | 本地自动化GO，视觉实证待补 | 可执行候选`a8877b4`：后端879项零失败、四环境Smoke 4/4、迁移118项全绿、Boot repackage成功；后台和小程序合同、状态、类型检查、构建、AppService load全部通过；正式产物禁Mock/synthetic/sandbox命中0 | P021 host-only 5项因固定manifest缺失为NOT_RUN；真实MySQL未执行；21+16帧截图/像素对比未执行 |
+| T9 | 本地自动化GO，视觉实证待补 | 当前代码候选`a702f86`：后端889项零失败、四环境Smoke 4/4；V1-V23连续唯一；后台和小程序合同、状态、类型检查、构建、AppService load此前均通过；正式产物禁Mock/synthetic/sandbox命中0 | 当前候选未重新执行package；真实MySQL未执行；21+16帧截图/像素对比未执行 |
 | T10 | 禁止执行 | 本轮没有云部署、推送、真实DB或外部调用 | 仅T9通过且取得用户统一授权后进入 |
 
 ## 8. 当前固定候选与证据边界
@@ -90,7 +90,7 @@
 - 分支：`codex/v1-delivery-recovery`
 - 起始提交：`335bffb`
 - 工作区收敛提交：`934fbe7`
-- 本地门禁代码候选：`a8877b4c494b15ced5e1ab4b228c3d09a308270e`
+- 本地门禁代码候选：`a702f86dcf2a9dda5392724dc1cae52b6ffe2fdf`
 - V15 SHA256：`D7F533A9063D6F7904EF56FB015119693FB053718115570A27C2437981D0E964`
 - V16 SHA256：`8AD1651E4C10081A4DB04FFCDD237EF3303D98ADE3F3F35FCBB5EE752BA916EC`
 - V17 SHA256：`0E0C1775AD1C42191855C355F03780B933AA1E8CD6A3D889FB08071741508077`
@@ -99,7 +99,8 @@
 - V20 SHA256：`A9B3B46543C3B333D2F016EFA1E220FC129EE15A663D43BF65B4358D54DBE6BA`
 - V21 SHA256：`0EB0F9B07C61F72E09C00A928CC397B906E0B7FC55172FC223109385CA149494`
 - V22 SHA256：`EDD56C76C1AEABD5D24D7749C408C2C90A971034A480A12B123AD391264D5658`
-- 后端：完整879 tests，0 failure，0 error，65 skipped；P021 host-only 5项NOT_RUN；DEV/TEST/STAGE/PROD Smoke 4/4；离线package与Boot repackage成功。
+- V23 SHA256：`E47332BF7359B0FE8FB38FC0BB67C7E0BD7B4E68EC14FC07D73954059795F012`
+- 后端：完整889 tests，0 failure，0 error，65 skipped；DEV/TEST/STAGE/PROD Smoke 4/4。V23后未重跑package，最近一次Boot repackage成功证据仅属于早期`a8877b4`候选。
 - 后台：real-data contracts、纯DTO/状态契约、`vue-tsc`、Vite build全部通过。
 - 小程序：development API contracts、formal runtime contracts、legacy compatibility gate、`tsc --noEmit`、mp-weixin build和AppService load全部通过。
 - 安全：已完成的C1-C4冻结项本地P0清零；A100/A110不改交易终态，A140仅返回掩码和白名单权益字段；正式产物不含已禁Mock/synthetic/sandbox动作；未声称未审范围全部清零。

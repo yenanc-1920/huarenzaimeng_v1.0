@@ -1,6 +1,6 @@
 # 四环境变量清单（CloudBase 可粘贴 JSON）
 
-本目录以 `apps/api/src/main`、四个 profile YAML、五个 Dockerfile 和容器 entrypoint 的实际读取点为准。模板不含真实秘密，可直接粘贴到 CloudBase 的 JSON 环境变量编辑器后逐项替换 `[REPLACE_...]`。
+本目录以 `apps/api/src/main`、四个 profile YAML、五个 Dockerfile 和容器 entrypoint 的实际读取点为准。四份 JSON 是当前 V23 候选所需的**全量受控配置基线**，不是增量补丁；应用时应与云端现有键合并核对，不能直接删除模板未列出的平台保留键。模板不含真实秘密，可粘贴到 CloudBase 的 JSON 环境变量编辑器后逐项替换 `[REPLACE_...]`。
 
 ## 1. 模板
 
@@ -10,6 +10,8 @@
 - `cloudbase-prod.env.json`
 
 四个文件均刻意不包含微信 AppID 和 AppSecret。四环境共用获批 AppID，但 AppID/AppSecret 由平台侧受控配置维护；AppSecret 不进 Git、不进截图、不进本次汇总。
+
+四份 JSON 也不包含数据库真实密码或任何已配置秘密。`[REPLACE_...]` 是待配置标记，不是可部署默认值；看到任一该标记都必须停止发布。
 
 ### 兼容性规则
 
@@ -32,7 +34,18 @@
 | `HZ_PHONE_DIGEST_HMAC_SECRET` | 必填 | 必填 | 至少32字符、每环境独立；不得复用数据库密码 |
 | `HZ_ADMIN_BOOTSTRAP_ENABLED` | `false` | `false` | release 校验强制关闭 |
 | `HZ_ADMIN_SESSION_HOURS` | `8` | `8` | 管理员会话时长 |
+| `HZ_ADMIN_SELF_APPROVAL_ENABLED` | `true` | `true` | 仅唯一有效SUPER_ADMIN同人提交/审核/发布窄例外 |
+| `HZ_ADMIN_SELF_APPROVAL_POLICY_VERSION` | 固定版本 | 固定版本 | 当前为`V1_SINGLE_SUPER_ADMIN_20260818`，写入审计 |
 | `HZ_BUYER_AUTH_ENABLED` | `false` | `false` | 真实微信身份验收前保持关闭 |
+| `HZ_BUYER_AUTH_PROVIDER_MODE` | `disabled` | `disabled` | 启用真实登录时才切换为`wechat-code2session` |
+| `HZ_WECHAT_IDENTITY_ENABLED` | `false` | `false` | 与provider mode双开关，真实验收前关闭 |
+| `HZ_BUYER_AUTH_IDENTITY_PEPPER` | 秘密占位 | 秘密占位 | 至少32字符、每环境独立，不得与code pepper相同 |
+| `HZ_BUYER_AUTH_CODE_PEPPER` | 秘密占位 | 秘密占位 | 至少32字符、每环境独立 |
+| `HZ_BUYER_CONSENT_USER_AGREEMENT_VERSION` | `2026-08-28` | `2026-08-28` | 当前有效用户协议版本 |
+| `HZ_BUYER_CONSENT_PRIVACY_POLICY_VERSION` | `2026-08-28` | `2026-08-28` | 当前有效隐私政策版本 |
+| `HZ_RECIPIENT_RETENTION_SCHEDULER_ENABLED` | `true` | `true` | V23履约号码终态三年保留与到期匿名化 |
+| `HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_ENABLED` | `true` | `true` | 注销请求的PII清理与CLOSED收敛 |
+| `HZ_RECOVERY_SCHEDULER_ENABLED` | `false` | `false` | 真实provider查询未验收前关闭 |
 | `HZ_P021_MODE` | `disabled` | `disabled` | 正式服务禁止测试只读旁路 |
 
 JSON 中数据库 URL、账号和密码均为占位符；不替换就不应部署。用户名虽不一定是秘密，也使用占位符以防四环境误共用账号。
@@ -44,14 +57,14 @@ JSON 中数据库 URL、账号和密码均为占位符；不替换就不应部�
 | Spring 属性 / canonical env | 当前规则 |
 |---|---|
 | `hz.buyer-auth.expected-app-id-ref` / `HZ_BUYER_AUTH_EXPECTED_APP_ID_REF` | AppID相关引用，按用户要求不进本次JSON |
-| `hz.buyer-auth.provider-mode` / `HZ_BUYER_AUTH_PROVIDER_MODE` | YAML 当前固定 `disabled`；真实 adapter 验收前不得改 |
+| `hz.buyer-auth.provider-mode` / `HZ_BUYER_AUTH_PROVIDER_MODE` | JSON显式为`disabled`；真实adapter验收时才改`wechat-code2session` |
 | `hz.buyer-auth.identity-pepper` / `HZ_BUYER_AUTH_IDENTITY_PEPPER` | 仅身份启用时必填；独立秘密 |
 | `hz.buyer-auth.code-pepper` / `HZ_BUYER_AUTH_CODE_PEPPER` | 仅身份启用时必填；独立秘密 |
 | `hz.wechat-pay.expected-app-id` / `HZ_WECHAT_PAY_EXPECTED_APP_ID` | AppID，按用户要求不进本次JSON |
 | `hz.wechat-pay.merchant-id` / `HZ_WECHAT_PAY_MERCHANT_ID` | 支付启用时必填，按环境受控配置 |
 | `hz.wechat-pay.allowed-certificate-serials` / `HZ_WECHAT_PAY_ALLOWED_CERTIFICATE_SERIALS` | 支付通知允许序列号集合；未配置时通知失败关闭 |
 
-AppSecret 当前没有被候选代码直接读取；后续真实 WeChat adapter 应通过秘密装载边界读取，不能新增明文 YAML。WINLA 当前正式 Bean 固定为 Disabled，代码没有可安全启用的 WINLA 环境变量；不得自行添加猜测的 URL/token/signing key。
+AppID/AppSecret已由平台侧单独维护，因此不重复出现在JSON；V23候选会通过`HZ_WECHAT_APP_ID/HZ_WECHAT_APP_SECRET`读取它们。WINLA 当前正式 Bean 固定为 Disabled，代码没有可安全启用的 WINLA 环境变量；不得自行添加猜测的 URL/token/signing key。
 
 ### 3.2 release 中禁止或只用于隔离测试
 
@@ -102,6 +115,12 @@ AppSecret 当前没有被候选代码直接读取；后续真实 WeChat adapter 
 | `HZ_ADMIN_COMMAND_ENABLED` | 当前代码 `matchIfMissing=true`；后台命令仍受会话角色、版本、幂等和状态机约束 |
 | `HZ_RECOVERY_SCHEDULER_ENABLED` | 缺省关闭；真实 provider 查询未验收前不得打开 |
 | `HZ_RECOVERY_SCHEDULER_DELAY_MS` | 缺省 `30000`；仅 scheduler 获准后使用 |
+| `HZ_RECIPIENT_RETENTION_SCHEDULER_ENABLED` | JSON显式开启；只处理V23专用表，终态三年后清除明文 |
+| `HZ_RECIPIENT_RETENTION_SCHEDULER_DELAY_MS` | `86400000`，每日检查一次 |
+| `HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_ENABLED` | JSON显式开启；注销任务失败可重试，完成后才CLOSED |
+| `HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_DELAY_MS` | `30000` |
+| `HZ_BUYER_CLOSURE_CLEANUP_LEASE_SECONDS` | `30` |
+| `HZ_BUYER_CLOSURE_CLEANUP_RETRY_SECONDS` | `30` |
 | `HZ_RELOADLY_SANDBOX_TOPUP_ENABLED` | 缺省关闭，四环境禁止启用 |
 | `HZ_DATA_INTEGRATION_READINESS_ENABLED` | 缺省关闭；只读数据库就绪探针 |
 | `HZ_DATA_INTEGRATION_EXPECTED_SERVER_UUID` | 只读就绪探针启用时必填；用于数据库身份绑定 |
@@ -117,7 +136,7 @@ AppSecret 当前没有被候选代码直接读取；后续真实 WeChat adapter 
 
 | 能力 | 安全默认 | 启用前置 |
 |---|---|---|
-| 微信登录 | `HZ_BUYER_AUTH_ENABLED=false`、provider disabled | 平台秘密、预期AppID绑定、正式adapter、真机验收 |
+| 微信登录 | `HZ_BUYER_AUTH_ENABLED=false`、provider disabled、identity disabled | 平台秘密、预期AppID绑定、真机验收；三开关按受控步骤切换 |
 | 微信支付 | Disabled port | 商户/证书/回调配置、验签解密与小额支付退款授权 |
 | WINLA充值 | Disabled port，且无启用变量 | 书面协议、真实adapter、余额/IP/签名/金额/回调验收 |
 | P021测试只读 | `HZ_P021_MODE=disabled` | 只能在独立证据服务使用，不进入四环境正式服务 |
@@ -132,3 +151,5 @@ AppSecret 当前没有被候选代码直接读取；后续真实 WeChat adapter 
 4. `SPRING_PROFILES_ACTIVE` 与所选 Dockerfile/服务名一致。
 5. TEST/STAGE/PROD 不含任何 `HZ_IT_*`、测试token、bootstrap token或开发种子变量。
 6. 真实微信/WINLA未单独验收前，看到503/UNKNOWN是预期失败关闭，不得改成Fake成功。
+7. AppID/AppSecret虽不在JSON中，启用微信登录前必须确认平台侧两键已存在且AppID与预期值完全一致。
+8. `HZ_BUYER_AUTH_IDENTITY_PEPPER`、`HZ_BUYER_AUTH_CODE_PEPPER`和`HZ_PHONE_DIGEST_HMAC_SECRET`必须三者不同且四环境不复用。

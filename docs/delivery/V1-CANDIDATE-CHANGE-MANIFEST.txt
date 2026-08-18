@@ -1,50 +1,45 @@
 V1 LOCAL RELEASE CANDIDATE MANIFEST
-schemaVersion=V1_CANDIDATE_MANIFEST_2
-generatedAt=2026-08-18
+schemaVersion=V1_CANDIDATE_MANIFEST_3
+generatedAt=2026-08-19
 branch=codex/v1-delivery-recovery
-codeCandidateCommit=a8877b4c494b15ced5e1ab4b228c3d09a308270e
-codeCandidateTree=f23eab36bd7dd5b8ca30cf65cef93483562b3f2e
-parentCommit=934fbe764af1bdd13e8fae408cd17b40a3f1c553
-migrationRange=V1-V22
-V22_SHA256=EDD56C76C1AEABD5D24D7749C408C2C90A971034A480A12B123AD391264D5658
+codeCandidateCommit=a702f86dcf2a9dda5392724dc1cae52b6ffe2fdf
+codeCandidateTree=821615f606f99595082d8cde9432d2c4ffd0d973
+parentCommit=cc96b99a476798974836ddef873e3995e584c637
+migrationRange=V1-V23
+V23_SHA256=E47332BF7359B0FE8FB38FC0BB67C7E0BD7B4E68EC14FC07D73954059795F012
 
 RESULTS
-backendAffected=48/48 PASS
-backendFull=879 tests; 0 failures; 0 errors; 65 skipped
-p021HostOnly=5 NOT_RUN; fixed offline manifest absent from clean checkout
+v23Focused=11 tests; 0 failures; 0 errors
+v23RetentionCalendarYear=2 tests; 0 failures; 0 errors
+backendFull=889 tests; 0 failures; 0 errors; 65 skipped
 environmentSmoke=DEV/TEST/STAGE/PROD 4/4 PASS
-migrationContracts=118 tests; 0 failures; 0 errors; 0 skipped
-flywayHistory=V1-V22 continuous and unique; V1-V21 unchanged after V22 introduction
-package=PASS
-coreJar=28350 bytes; SHA256=EDFA5A2DA0DE170ADDB40A2D7094482474986B881D827DC70E7993F26C39BC7D
-apiBootJar=32648669 bytes; SHA256=13BC949A2B35E1C189EE4F8D20650DAD6031B85A98A47B090D4E33EE707CE64E
-adminContracts=PASS
-adminStateContracts=PASS
-adminTypecheck=PASS
-adminBuild=PASS
-miniDevelopmentContracts=PASS
-miniLegacyContracts=PASS
-miniFormalContracts=PASS
-miniTypecheck=PASS
-miniMpWeixinBuild=PASS
-miniAppServiceLoad=PASS; 106 relative static requires
-formalArtifactForbiddenScan=PASS; 0 hits
+flywayHistory=V1-V23 continuous and unique; V1-V22 unchanged; V23 append-only
+package=NOT_RUN_AFTER_V23
+previousPackageEvidence=a8877b4 only; not current artifact evidence
+adminContracts=PASS at cc96b99 visual-traceability batch
+adminStateContracts=PASS at cc96b99 visual-traceability batch
+adminTypecheck=PASS at cc96b99 visual-traceability batch
+adminBuild=PASS at cc96b99 visual-traceability batch
+miniDevelopmentContracts=PASS at cc96b99 visual-traceability batch
+miniLegacyContracts=PASS at cc96b99 visual-traceability batch
+miniFormalContracts=PASS at cc96b99 visual-traceability batch
+miniMpWeixinBuild=PASS at cc96b99 visual-traceability batch
+miniAppServiceLoad=PASS at cc96b99; 106 relative static requires
+visualTraceability=16 mini pages and 21 admin frames mapped; NOT_EVIDENCED
 diffCheck=PASS
 
 CODE CANDIDATE DELTA FROM PARENT
-M apps/api/src/test/java/com/huarenzaimeng/api/P021HostPreflightOuterWrapperContractTest.java
-M apps/api/src/test/java/com/huarenzaimeng/api/TemporalOverviewBuildSelectionContractTest.java
-M apps/miniapp/src/api/client.ts
-D apps/miniapp/src/api/content-contract.ts
-D apps/miniapp/src/api/mock.ts
-M apps/miniapp/src/api/order-detail-contract.ts
-M apps/miniapp/src/api/p014-topup-contract.ts
-D apps/miniapp/src/api/payment-intent-client.ts
-D apps/miniapp/src/api/payment-intent-contract.ts
-M apps/miniapp/src/api/topup-recovery-contract.ts
-D apps/miniapp/src/domain/payment-intent-flow.ts
-M apps/miniapp/src/domain/temporal-overview-flow.ts
-M apps/miniapp/tsconfig.json
+M apps/api/src/main/java/com/huarenzaimeng/api/ReleaseQuoteOrderService.java
+M apps/api/src/main/java/com/huarenzaimeng/api/topup/JdbcTopupEligibilityPort.java
+A apps/api/src/main/java/com/huarenzaimeng/api/topup/OrderRecipientRetentionScheduler.java
+A apps/api/src/main/java/com/huarenzaimeng/api/topup/OrderRecipientRetentionSchedulingConfiguration.java
+A apps/api/src/main/java/com/huarenzaimeng/api/topup/OrderRecipientRetentionStore.java
+M apps/api/src/main/resources/application-release-mysql.yml
+A apps/api/src/main/resources/db/migration/V23__add_order_recipient_fulfillment.sql
+M apps/api/src/test/java/com/huarenzaimeng/api/ReleaseQuoteOrderServiceTest.java
+M apps/api/src/test/java/com/huarenzaimeng/api/V15MigrationGateTest.java
+A apps/api/src/test/java/com/huarenzaimeng/api/V23OrderRecipientMigrationContractTest.java
+A apps/api/src/test/java/com/huarenzaimeng/api/topup/OrderRecipientRetentionStoreTest.java
 
 EVIDENCE BOUNDARY
 LOCAL_RELEASE_CANDIDATE_GO
@@ -55,4 +50,4 @@ REAL_WINLA_NO_GO
 VISUAL_NOT_EVIDENCED
 NO_PUSH_NO_RESTART_NO_DEPLOYMENT_NO_EXTERNAL_CONNECTION
 
-This manifest replaces the former dirty-worktree porcelain snapshot. Historical fixed-SHA and PRECHECKED_NOT_RUN records remain historical inputs and are not current runtime evidence.
+This manifest binds the V23 code candidate only. Documentation and environment-template commits made after a702f86 do not change this code identity. Fake, H2, build, smoke and local preview evidence are not real provider, real database, cloud deployment or production evidence.
