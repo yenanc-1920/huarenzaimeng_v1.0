@@ -38,8 +38,38 @@ final class JdkWechatCode2SessionTransport implements WechatCode2SessionTranspor
             if (current instanceof java.net.http.HttpTimeoutException) return FailureKind.TIMEOUT;
             if (current instanceof java.net.UnknownHostException
                     || current instanceof java.nio.channels.UnresolvedAddressException) return FailureKind.DNS;
+            if (current instanceof java.security.cert.CertificateExpiredException) {
+                return FailureKind.TLS_CERTIFICATE_EXPIRED;
+            }
+            if (current instanceof java.security.cert.CertificateNotYetValidException) {
+                return FailureKind.TLS_CERTIFICATE_NOT_YET_VALID;
+            }
+            if (current instanceof java.security.cert.CertPathValidatorException validatorFailure) {
+                java.security.cert.CertPathValidatorException.Reason reason = validatorFailure.getReason();
+                if (reason == java.security.cert.CertPathValidatorException.BasicReason.EXPIRED) {
+                    return FailureKind.TLS_CERTIFICATE_EXPIRED;
+                }
+                if (reason == java.security.cert.CertPathValidatorException.BasicReason.NOT_YET_VALID) {
+                    return FailureKind.TLS_CERTIFICATE_NOT_YET_VALID;
+                }
+                if (reason == java.security.cert.CertPathValidatorException.BasicReason.REVOKED) {
+                    return FailureKind.TLS_CERTIFICATE_REVOKED;
+                }
+                if (reason == java.security.cert.CertPathValidatorException.BasicReason.UNDETERMINED_REVOCATION_STATUS) {
+                    return FailureKind.TLS_CERTIFICATE_REVOCATION_UNDETERMINED;
+                }
+                if (reason == java.security.cert.CertPathValidatorException.BasicReason.ALGORITHM_CONSTRAINED) {
+                    return FailureKind.TLS_CERTIFICATE_ALGORITHM_CONSTRAINED;
+                }
+                return FailureKind.TLS_CERTIFICATE;
+            }
+            // The JDK's PKIX builder type is internal and cannot be imported. Its stable
+            // simple name is sufficient for a non-sensitive diagnostic classification.
+            if ("SunCertPathBuilderException".equals(current.getClass().getSimpleName())) {
+                return FailureKind.TLS_CERTIFICATE_PATH_BUILD;
+            }
             if (current instanceof java.security.cert.CertificateException
-                    || current instanceof java.security.cert.CertPathValidatorException) return FailureKind.TLS_CERTIFICATE;
+                    || current instanceof javax.net.ssl.SSLPeerUnverifiedException) return FailureKind.TLS_CERTIFICATE;
             if (current instanceof javax.net.ssl.SSLException) tlsFailure = true;
             if (current instanceof java.net.ConnectException) return FailureKind.CONNECTION;
         }
