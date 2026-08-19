@@ -68,6 +68,8 @@ class WechatCode2SessionClientTest {
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_CERTIFICATE_FAILURE"));
         assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE_PATH_BUILD)),true,APP,SECRET,2000,3000).exchange(command()))
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_CERTIFICATE_PATH_BUILD_FAILURE"));
+        assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.TLS_HOSTNAME_MISMATCH)),true,APP,SECRET,2000,3000).exchange(command()))
+                .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_HOSTNAME_MISMATCH"));
         assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.TLS_HANDSHAKE)),true,APP,SECRET,2000,3000).exchange(command()))
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_HANDSHAKE_FAILURE"));
         assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.CONNECTION)),true,APP,SECRET,2000,3000).exchange(command()))
@@ -90,6 +92,12 @@ class WechatCode2SessionClientTest {
                 .isEqualTo(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE_ALGORITHM_CONSTRAINED);
         assertThat(JdkWechatCode2SessionTransport.classify(new SunCertPathBuilderException()))
                 .isEqualTo(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE_PATH_BUILD);
+        javax.net.ssl.SSLHandshakeException hostnameMismatch =
+                new javax.net.ssl.SSLHandshakeException("certificate validation failed");
+        hostnameMismatch.initCause(new java.security.cert.CertificateException(
+                "No subject alternative DNS name matching api.weixin.qq.com found."));
+        assertThat(JdkWechatCode2SessionTransport.classify(hostnameMismatch))
+                .isEqualTo(WechatCode2SessionTransport.FailureKind.TLS_HOSTNAME_MISMATCH);
     }
 
     @Test void invalidJsonMissingIdentityAndOversizedBodyFailClosed() {

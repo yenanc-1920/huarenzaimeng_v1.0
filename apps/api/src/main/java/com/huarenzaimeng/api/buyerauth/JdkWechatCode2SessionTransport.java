@@ -69,11 +69,24 @@ final class JdkWechatCode2SessionTransport implements WechatCode2SessionTranspor
                 return FailureKind.TLS_CERTIFICATE_PATH_BUILD;
             }
             if (current instanceof java.security.cert.CertificateException
+                    && isHostnameMismatch(current.getMessage())) {
+                return FailureKind.TLS_HOSTNAME_MISMATCH;
+            }
+            if (current instanceof java.security.cert.CertificateException
                     || current instanceof javax.net.ssl.SSLPeerUnverifiedException) return FailureKind.TLS_CERTIFICATE;
             if (current instanceof javax.net.ssl.SSLException) tlsFailure = true;
             if (current instanceof java.net.ConnectException) return FailureKind.CONNECTION;
         }
         return tlsFailure ? FailureKind.TLS_HANDSHAKE : FailureKind.UNAVAILABLE;
+    }
+
+    private static boolean isHostnameMismatch(String message) {
+        if (message == null) return false;
+        String normalized = message.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("subject alternative")
+                || normalized.contains("no name matching")
+                || normalized.contains("doesn't match")
+                || normalized.contains("does not match");
     }
 
     static URI requestUri(Request request) {
