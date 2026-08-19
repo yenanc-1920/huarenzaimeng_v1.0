@@ -16,7 +16,7 @@ const selected = computed(() => props.projection.items.find(item => itemRef(item
   <section class="work-grid two-column" :data-page-id="projection.pageId === 'A121' ? 'UX-A121' : 'UX-A122'" data-data-origin="LOCAL_DATABASE">
     <article class="card list-card">
       <div class="card-head"><div><p class="eyebrow">{{ projection.pageId === 'A121' ? '黄页与城市' : '节假日、周休与资讯' }}</p><h2>版本化内容</h2></div><span class="count">{{ projection.items.length }} 条</span></div>
-      <div v-if="projection.items.length === 0" class="empty-panel">开发库中暂无记录</div>
+      <div v-if="projection.items.length === 0" class="empty-panel">当前没有可查看记录</div>
       <div v-else class="record-list" role="list">
         <button v-for="item in projection.items" :key="itemRef(item as never)" class="record-row" :class="{ selected: selectedRef === itemRef(item as never) }" @click="selectedRef = itemRef(item as never)">
           <span v-if="'entryRef' in item"><b>{{ item.name }}</b><small>{{ item.cityName }} · {{ item.category }}</small></span>

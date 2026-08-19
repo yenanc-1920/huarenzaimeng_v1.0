@@ -1,0 +1,60 @@
+name: test-predeploy-gate
+
+on:
+  pull_request:
+    branches: [test]
+  push:
+    branches: [test]
+  workflow_dispatch:
+
+concurrency:
+  group: test-predeploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-test-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require the exact DEV deployment commit
+        if: github.event_name != 'pull_request'
+        run: |
+          git fetch --no-tags origin deploy/dev:refs/remotes/origin/deploy/dev
+          node tools/verify-environment-promotion.mjs --environment TEST --upstream-ref refs/remotes/origin/deploy/dev
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            apps/admin-web/package-lock.json
+            apps/miniapp/package-lock.json
+      - run: npm ci
+        working-directory: apps/admin-web
+      - run: npm ci
+        working-directory: apps/miniapp
+      - name: Full deterministic TEST gate
+        run: node tools/run-test-deployment-gate.mjs
+      - name: Build exact TEST image without repeating tests
+        run: docker build --file Dockerfile --tag huaren-api-test:${{ github.sha }} .
+
+  promote-deploy-branch:
+    if: github.event_name == 'push'
+    needs: full-test-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Advance deployment branch only after the full gate
+        run: git push origin HEAD:refs/heads/deploy/test

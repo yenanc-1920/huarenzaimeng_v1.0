@@ -1,0 +1,53 @@
+V1 LOCAL RELEASE CANDIDATE MANIFEST
+schemaVersion=V1_CANDIDATE_MANIFEST_3
+generatedAt=2026-08-19
+branch=codex/v1-delivery-recovery
+codeCandidateCommit=a702f86dcf2a9dda5392724dc1cae52b6ffe2fdf
+codeCandidateTree=821615f606f99595082d8cde9432d2c4ffd0d973
+parentCommit=cc96b99a476798974836ddef873e3995e584c637
+migrationRange=V1-V23
+V23_SHA256=E47332BF7359B0FE8FB38FC0BB67C7E0BD7B4E68EC14FC07D73954059795F012
+
+RESULTS
+v23Focused=11 tests; 0 failures; 0 errors
+v23RetentionCalendarYear=2 tests; 0 failures; 0 errors
+backendFull=889 tests; 0 failures; 0 errors; 65 skipped
+environmentSmoke=DEV/TEST/STAGE/PROD 4/4 PASS
+flywayHistory=V1-V23 continuous and unique; V1-V22 unchanged; V23 append-only
+package=NOT_RUN_AFTER_V23
+previousPackageEvidence=a8877b4 only; not current artifact evidence
+adminContracts=PASS at cc96b99 visual-traceability batch
+adminStateContracts=PASS at cc96b99 visual-traceability batch
+adminTypecheck=PASS at cc96b99 visual-traceability batch
+adminBuild=PASS at cc96b99 visual-traceability batch
+miniDevelopmentContracts=PASS at cc96b99 visual-traceability batch
+miniLegacyContracts=PASS at cc96b99 visual-traceability batch
+miniFormalContracts=PASS at cc96b99 visual-traceability batch
+miniMpWeixinBuild=PASS at cc96b99 visual-traceability batch
+miniAppServiceLoad=PASS at cc96b99; 106 relative static requires
+visualTraceability=16 mini pages and 21 admin frames mapped; NOT_EVIDENCED
+diffCheck=PASS
+
+CODE CANDIDATE DELTA FROM PARENT
+M apps/api/src/main/java/com/huarenzaimeng/api/ReleaseQuoteOrderService.java
+M apps/api/src/main/java/com/huarenzaimeng/api/topup/JdbcTopupEligibilityPort.java
+A apps/api/src/main/java/com/huarenzaimeng/api/topup/OrderRecipientRetentionScheduler.java
+A apps/api/src/main/java/com/huarenzaimeng/api/topup/OrderRecipientRetentionSchedulingConfiguration.java
+A apps/api/src/main/java/com/huarenzaimeng/api/topup/OrderRecipientRetentionStore.java
+M apps/api/src/main/resources/application-release-mysql.yml
+A apps/api/src/main/resources/db/migration/V23__add_order_recipient_fulfillment.sql
+M apps/api/src/test/java/com/huarenzaimeng/api/ReleaseQuoteOrderServiceTest.java
+M apps/api/src/test/java/com/huarenzaimeng/api/V15MigrationGateTest.java
+A apps/api/src/test/java/com/huarenzaimeng/api/V23OrderRecipientMigrationContractTest.java
+A apps/api/src/test/java/com/huarenzaimeng/api/topup/OrderRecipientRetentionStoreTest.java
+
+EVIDENCE BOUNDARY
+LOCAL_RELEASE_CANDIDATE_GO
+REAL_MYSQL_NO_GO
+REAL_WECHAT_NO_GO
+REAL_PAYMENT_NO_GO
+REAL_WINLA_NO_GO
+VISUAL_NOT_EVIDENCED
+NO_PUSH_NO_RESTART_NO_DEPLOYMENT_NO_EXTERNAL_CONNECTION
+
+This manifest binds the V23 code candidate only. Documentation and environment-template commits made after a702f86 do not change this code identity. Fake, H2, build, smoke and local preview evidence are not real provider, real database, cloud deployment or production evidence.

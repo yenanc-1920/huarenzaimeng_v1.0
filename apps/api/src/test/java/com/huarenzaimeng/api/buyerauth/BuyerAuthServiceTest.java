@@ -119,7 +119,7 @@ class BuyerAuthServiceTest {
 
     @Test void providerDelayUsesPostValidationSessionIssuedAtForAllSessionTimes(){
         MemoryStore store=new MemoryStore();MutableClock clock=new MutableClock(NOW);WechatCode2SessionPort delayed=command->{clock.now=clock.now.plus(Duration.ofMinutes(5));return new WechatCode2SessionPort.Success("APP_PRIMARY","provider_subject_synthetic","EVIDENCE-SYNTHETIC");};
-        BuyerAuthService service=new BuyerAuthService(store,delayed,true,ID,CODE,clock,new SecureRandom(new byte[]{4,5,6}));var result=service.establish("one-time-code-delayed","REQUEST-004");
+        BuyerAuthService service=new BuyerAuthService(store,delayed,true,"APP_PRIMARY",ID,CODE,clock,new SecureRandom(new byte[]{4,5,6}));var result=service.establish("one-time-code-delayed","REQUEST-004");
         assertThat(store.issuedAt).isEqualTo(NOW.plus(Duration.ofMinutes(5)));assertThat(result.absoluteExpiresAt()).isEqualTo(store.issuedAt.plus(Duration.ofHours(24)));assertThat(store.active.idleExpiresAt).isEqualTo(store.issuedAt.plus(Duration.ofHours(2)));assertThat(store.audit.occurredAt()).isEqualTo(store.issuedAt);
     }
 
@@ -135,16 +135,49 @@ class BuyerAuthServiceTest {
                 .noneMatch(component->component.contains("boolean")||component.contains("UNKNOWN")||component.contains("Instant")||component.contains("Time"));
     }
 
-    private static BuyerAuthService service(MemoryStore store,WechatCode2SessionPort port,boolean enabled){return new BuyerAuthService(store,port,enabled,ID,CODE,Clock.fixed(NOW,ZoneOffset.UTC),new SecureRandom(new byte[]{1,2,3}));}
+    @Test void appIdMismatchFailsClosedAndWindowCanRateLimit(){MemoryStore store=new MemoryStore();assertCode(service(store,new FakePort(new WechatCode2SessionPort.Success("APP_OTHER","provider_subject_synthetic","EVIDENCE-SYNTHETIC")),true),"appid-mismatch-code","WECHAT_LOGIN_APPID_MISMATCH");store.admitted=false;assertCode(service(store,new FakePort(new WechatCode2SessionPort.Unknown("UNUSED")),true),"rate-limited-code","LOGIN_RATE_LIMITED");}
+    @Test void currentDualConsentIsPersistedWithTheSessionAndOutdatedConsentCallsNoProvider(){
+        MemoryStore store=new MemoryStore();FakePort provider=new FakePort(new WechatCode2SessionPort.Success("APP_PRIMARY","provider_subject_synthetic","EVIDENCE-SYNTHETIC"));
+        BuyerAuthService service=service(store,provider,true);
+        assertThatThrownBy(()->service.establish(new BuyerAuthService.LoginCommand("one-time-code-old-policy","REQUEST-C01","GUEST-000001","UA-OLD","PP-V1",true,true)))
+                .isInstanceOfSatisfying(BuyerAuthService.Rejected.class,r->assertThat(r.projectCode).isEqualTo("BUYER_CONSENT_REQUIRED"));
+        assertThat(provider.calls).isZero();
+        var result=service.establish(new BuyerAuthService.LoginCommand("one-time-code-consented","REQUEST-C02","GUEST-000001","UA-V1","PP-V1",true,true));
+        assertThat(result.subjectRef()).isNotBlank();assertThat(store.consentWrites).isOne();
+        assertThat(store.consent).extracting(BuyerAuthStore.Consent::guestRef,BuyerAuthStore.Consent::userAgreementVersion,BuyerAuthStore.Consent::privacyPolicyVersion)
+                .containsExactly("GUEST-000001","UA-V1","PP-V1");
+    }
+
+    @Test void closureRequestedGuestIsRejectedBeforeProviderCall(){
+        MemoryStore store=new MemoryStore();store.guestAllowed=false;FakePort provider=new FakePort(new WechatCode2SessionPort.Unknown("MUST_NOT_CALL"));
+        BuyerAuthService service=service(store,provider,true);
+        assertThatThrownBy(()->service.establish(new BuyerAuthService.LoginCommand("one-time-code-closure","REQUEST-C03","GUEST-000001","UA-V1","PP-V1",true,true)))
+                .isInstanceOfSatisfying(BuyerAuthService.Rejected.class,r->assertThat(r.projectCode).isEqualTo("BUYER_ACCOUNT_CLOSURE_PENDING"));
+        assertThat(provider.calls).isZero();assertThat(store.attemptWrites).isZero();
+    }
+    @Test void policyRotationInvalidatesExistingSessionWithoutIdleWrite(){
+        MemoryStore store=new MemoryStore();store.active=new SessionState("BUYER-SYN","SESSION-SYN",NOW.plusSeconds(3600),NOW.plusSeconds(1800));
+        store.acceptedUserAgreementVersion="UA-V0";
+        BuyerAuthService service=service(store,new FakePort(new WechatCode2SessionPort.Unknown("UNUSED")),true);
+        assertThat(service.authenticate("synthetic-existing-token")).isEmpty();
+        assertThat(store.authReads).isOne();assertThat(store.idleAdvances).isZero();
+    }
+    private static BuyerAuthService service(MemoryStore store,WechatCode2SessionPort port,boolean enabled){return new BuyerAuthService(store,port,enabled,"APP_PRIMARY",ID,CODE,Clock.fixed(NOW,ZoneOffset.UTC),new SecureRandom(new byte[]{1,2,3}));}
     private static void assertCode(BuyerAuthService service,String code,String expected){assertThatThrownBy(()->service.establish(code,"REQUEST-VALID")).isInstanceOfSatisfying(BuyerAuthService.Rejected.class,r->assertThat(r.projectCode).isEqualTo(expected));}
     private static final class FakePort implements WechatCode2SessionPort {final Result result;int calls;FakePort(Result r){result=r;}public Result exchange(Command c){calls++;return result;}}
     private static final class MemoryStore implements BuyerAuthStore {
-        final Set<String> codes=ConcurrentHashMap.newKeySet();int attemptWrites,sessionWrites,authReads,idleAdvances,revokes,lastSeenWrites;SessionState active;boolean logoutUnknown;Instant issuedAt;Audit audit;
+        final Set<String> codes=ConcurrentHashMap.newKeySet();int attemptWrites,sessionWrites,consentWrites,authReads,idleAdvances,revokes,lastSeenWrites;SessionState active;boolean logoutUnknown,admitted=true,guestAllowed=true,accountAllowed=true;Instant issuedAt;Audit audit;Consent consent;
         String codeDigest,subjectDigest,tokenDigest;
+        public boolean admitLoginWindow(String key,Instant now,Instant end,int attempts,int failures){return admitted;}
+        public void recordLoginWindowOutcome(String key,boolean succeeded,Instant occurredAt){}
         public synchronized boolean beginLoginAttempt(String e,String a,String d,String ref,String req,Instant at){if(!codes.add(d))return false;attemptWrites++;codeDigest=d;return true;}
         public void finishLoginAttempt(String a,String r,String e,Instant at){}
         public synchronized Identity establishIdentityAndSession(String attempt,String evidence,String app,String sub,String ref,String sid,String token,Instant issued,Instant absolute,Instant idle,Audit audit){sessionWrites++;subjectDigest=sub;tokenDigest=token;issuedAt=issued;this.audit=audit;active=new SessionState(ref,sid,absolute,idle);return new Identity("buyer",ref);}
-        public synchronized Optional<BuyerPrincipal> authenticateAndAdvanceIdle(String token,Instant now,Instant requested){authReads++;if(active==null||now.compareTo(active.absoluteExpiresAt)>=0||now.compareTo(active.idleExpiresAt)>=0)return Optional.empty();Instant next=requested.isBefore(active.absoluteExpiresAt)?requested:active.absoluteExpiresAt;active=new SessionState(active.subjectRef,active.sessionRef,active.absoluteExpiresAt,next);idleAdvances++;return Optional.of(new BuyerPrincipal(Eligibility.ELIGIBLE,active.subjectRef,active.sessionRef));}
+        public synchronized Identity establishIdentityConsentAndSession(String attempt,String evidence,String app,String sub,String ref,String sid,String token,Instant issued,Instant absolute,Instant idle,Consent consent,Audit audit){this.consent=consent;consentWrites++;return establishIdentityAndSession(attempt,evidence,app,sub,ref,sid,token,issued,absolute,idle,audit);}
+        public boolean guestMayLogin(String guestRef){return guestAllowed;}
+        public boolean accountMayLogin(String appIdRef,String subjectDigest){return accountAllowed;}
+        String acceptedUserAgreementVersion="UA-V1",acceptedPrivacyPolicyVersion="PP-V1";
+        public synchronized Optional<BuyerPrincipal> authenticateAndAdvanceIdle(String token,Instant now,Instant requested,String userAgreementVersion,String privacyPolicyVersion){authReads++;if(active==null||!acceptedUserAgreementVersion.equals(userAgreementVersion)||!acceptedPrivacyPolicyVersion.equals(privacyPolicyVersion)||now.compareTo(active.absoluteExpiresAt)>=0||now.compareTo(active.idleExpiresAt)>=0)return Optional.empty();Instant next=requested.isBefore(active.absoluteExpiresAt)?requested:active.absoluteExpiresAt;active=new SessionState(active.subjectRef,active.sessionRef,active.absoluteExpiresAt,next);idleAdvances++;return Optional.of(new BuyerPrincipal(Eligibility.ELIGIBLE,active.subjectRef,active.sessionRef));}
         public synchronized LogoutResult revokeCurrentSession(String token,Instant now){if(logoutUnknown)throw new IllegalStateException("synthetic storage failure");if(active==null)return LogoutResult.UNAVAILABLE;active=null;revokes++;return LogoutResult.SUCCEEDED;}
         String persistedText(){return String.valueOf(codeDigest)+subjectDigest+tokenDigest;}
     }

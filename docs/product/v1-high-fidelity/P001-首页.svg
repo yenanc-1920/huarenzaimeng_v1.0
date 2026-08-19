@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <defs>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1557B0"/><stop offset="1" stop-color="#2D72D6"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#17345F" flood-opacity=".10"/></filter>
+  </defs>
+  <rect width="390" height="844" rx="32" fill="#F4F7FB"/>
+  <rect x="0" y="0" width="390" height="94" rx="32" fill="#FFFFFF"/>
+  <rect x="0" y="62" width="390" height="32" fill="#FFFFFF"/>
+  <circle cx="34" cy="58" r="17" fill="#EAF2FF"/><text x="34" y="64" text-anchor="middle" font-size="17">🛖</text>
+  <text x="60" y="55" font-family="Arial,'Microsoft YaHei'" font-size="18" font-weight="700" fill="#163158">华人在孟</text>
+  <text x="24" y="126" font-family="Arial,'Microsoft YaHei'" font-size="14" fill="#75839A">你好，欢迎回来</text>
+  <text x="24" y="158" font-family="Arial,'Microsoft YaHei'" font-size="28" font-weight="700" fill="#10213D">在孟生活，一站办妥</text>
+  <rect x="20" y="184" width="350" height="188" rx="26" fill="url(#hero)" filter="url(#shadow)"/>
+  <rect x="42" y="208" width="78" height="28" rx="14" fill="#FFFFFF" fill-opacity=".16"/><text x="81" y="227" text-anchor="middle" font-family="Arial,'Microsoft YaHei'" font-size="13" fill="#FFFFFF">手机充值</text>
+  <text x="42" y="272" font-family="Arial,'Microsoft YaHei'" font-size="25" font-weight="700" fill="#FFFFFF">给孟加拉手机号充值</text>
+  <text x="42" y="300" font-family="Arial,'Microsoft YaHei'" font-size="14" fill="#DCEAFF">输入号码，选择商品，微信付款</text>
+  <rect x="42" y="322" width="112" height="40" rx="14" fill="#FFFFFF"/><text x="98" y="348" text-anchor="middle" font-family="Arial,'Microsoft YaHei'" font-size="15" font-weight="700" fill="#195BB8">开始充值</text>
+  <circle cx="324" cy="228" r="26" fill="#FFFFFF" fill-opacity=".12"/><circle cx="326" cy="238" r="34" fill="#FFFFFF" fill-opacity=".08"/><text x="326" y="245" text-anchor="middle" font-size="31">📱</text>
+  <rect x="20" y="390" width="350" height="224" rx="22" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="40" y="420" font-family="Arial,'Microsoft YaHei'" font-size="12" font-weight="700" fill="#C88318">今日信息</text>
+  <text x="40" y="447" font-family="Arial,'Microsoft YaHei'" font-size="20" font-weight="700" fill="#152642">达卡与北京</text>
+  <rect x="40" y="464" width="140" height="66" rx="16" fill="#F2F6FC"/><text x="54" y="485" font-family="Arial,'Microsoft YaHei'" font-size="12" fill="#738098">达卡</text><text x="54" y="516" font-family="Arial" font-size="25" font-weight="700" fill="#152642">12:00</text>
+  <rect x="190" y="464" width="140" height="66" rx="16" fill="#F2F6FC"/><text x="204" y="485" font-family="Arial,'Microsoft YaHei'" font-size="12" fill="#738098">北京</text><text x="204" y="516" font-family="Arial" font-size="25" font-weight="700" fill="#152642">14:00</text>
+  <line x1="40" y1="548" x2="330" y2="548" stroke="#E8EDF5"/>
+  <circle cx="49" cy="570" r="5" fill="#26A269"/><text x="62" y="575" font-family="Arial,'Microsoft YaHei'" font-size="14" font-weight="700" fill="#243653">中国 · 工作日</text>
+  <circle cx="49" cy="595" r="5" fill="#E7A62B"/><text x="62" y="600" font-family="Arial,'Microsoft YaHei'" font-size="14" font-weight="700" fill="#243653">孟加拉 · 休息日</text>
+  <rect x="20" y="630" width="168" height="88" rx="20" fill="#FFF8E8"/><circle cx="50" cy="658" r="17" fill="#FFE5A7"/><text x="50" y="664" text-anchor="middle" font-size="16">📍</text><text x="76" y="655" font-family="Arial,'Microsoft YaHei'" font-size="15" font-weight="700" fill="#302713">孟加拉黄页</text><text x="76" y="678" font-family="Arial,'Microsoft YaHei'" font-size="12" fill="#7C7158">找机构与服务</text>
+  <rect x="202" y="630" width="168" height="88" rx="20" fill="#EAF6F2"/><circle cx="232" cy="658" r="17" fill="#CFEADF"/><text x="232" y="664" text-anchor="middle" font-size="16">📰</text><text x="258" y="655" font-family="Arial,'Microsoft YaHei'" font-size="15" font-weight="700" fill="#183C32">生活资讯</text><text x="258" y="678" font-family="Arial,'Microsoft YaHei'" font-size="12" fill="#57776F">实用提醒与节日</text>
+  <rect x="0" y="744" width="390" height="100" fill="#FFFFFF"/><line x1="0" y1="744" x2="390" y2="744" stroke="#E8EDF5"/>
+  <text x="49" y="779" text-anchor="middle" font-size="20">⌂</text><text x="49" y="805" text-anchor="middle" font-family="Arial,'Microsoft YaHei'" font-size="12" font-weight="700" fill="#195BB8">首页</text>
+  <text x="147" y="779" text-anchor="middle" font-size="18">▤</text><text x="147" y="805" text-anchor="middle" font-family="Arial,'Microsoft YaHei'" font-size="12" fill="#7C8799">资讯</text>
+  <text x="244" y="779" text-anchor="middle" font-size="18">⌖</text><text x="244" y="805" text-anchor="middle" font-family="Arial,'Microsoft YaHei'" font-size="12" fill="#7C8799">黄页</text>
+  <text x="341" y="779" text-anchor="middle" font-size="18">◉</text><text x="341" y="805" text-anchor="middle" font-family="Arial,'Microsoft YaHei'" font-size="12" fill="#7C8799">我的</text>
+</svg>

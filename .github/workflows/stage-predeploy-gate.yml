@@ -1,0 +1,69 @@
+name: stage-predeploy-gate
+
+on:
+  pull_request:
+    branches: [stage]
+  push:
+    branches: [stage]
+  workflow_dispatch:
+
+concurrency:
+  group: stage-predeploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-stage-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require the exact TEST deployment commit
+        if: github.event_name != 'pull_request'
+        run: |
+          git fetch --no-tags origin deploy/test:refs/remotes/origin/deploy/test
+          node tools/verify-environment-promotion.mjs --environment STAGE --upstream-ref refs/remotes/origin/deploy/test
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            apps/admin-web/package-lock.json
+            apps/miniapp/package-lock.json
+      - run: npm ci
+        working-directory: apps/admin-web
+      - run: npm ci
+        working-directory: apps/miniapp
+      - name: Full deterministic STAGE gate
+        run: node tools/run-stage-deployment-gate.mjs
+      - name: Verify exact CloudBase container contract without a duplicate cold build
+        shell: bash
+        run: |
+          test "$(grep -Fxc 'ENTRYPOINT ["java", "-jar", "/app/app.jar"]' Dockerfile)" -eq 1
+          test -f apps/api/target/api-0.1.0-SNAPSHOT.jar
+          jar tf apps/api/target/api-0.1.0-SNAPSHOT.jar | grep -qx 'BOOT-INF/classes/application-stage-mysql.yml'
+          jar tf apps/api/target/api-0.1.0-SNAPSHOT.jar | grep -qx 'BOOT-INF/classes/db/migration/V14__add_v1_business_read_models.sql'
+          if jar tf apps/api/target/api-0.1.0-SNAPSHOT.jar | grep -q 'BOOT-INF/classes/db/devdata/'; then
+            exit 1
+          fi
+          sha256sum apps/api/target/api-0.1.0-SNAPSHOT.jar
+
+  promote-deploy-branch:
+    if: github.event_name == 'push'
+    needs: full-stage-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Advance deployment branch only after the full gate
+        run: git push origin HEAD:refs/heads/deploy/stage

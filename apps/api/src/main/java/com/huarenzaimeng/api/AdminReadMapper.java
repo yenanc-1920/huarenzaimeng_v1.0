@@ -10,11 +10,14 @@ import java.util.Map;
 interface AdminReadMapper {
     @Select("SELECT city_code AS cityRef,country_code AS countryCode,display_name AS displayName,local_name AS localName,timezone_id AS timezoneId,city_state AS state,sort_order AS sortOrder,aggregate_version AS version,updated_at AS updatedAt FROM hz_city ORDER BY sort_order,city_code")
     List<Map<String,Object>> selectCities();
-    @Select("SELECT case_ref AS caseRef,source_type AS sourceType,issue_type AS issueType,related_order_ref AS relatedOrderRef,priority_code AS priorityCode,owner_ref AS ownerRef,case_state AS state,updated_at AS updatedAt FROM hz_customer_case ORDER BY updated_at DESC,case_ref LIMIT 200")
+    @Select("SELECT c.case_ref AS caseRef,c.source_type AS sourceType,c.issue_type AS issueType,c.related_order_ref AS relatedOrderRef,c.priority_code AS priorityCode,c.owner_ref AS ownerRef,c.case_state AS state,c.aggregate_version AS version,(SELECT COUNT(*) FROM hz_customer_case_event e WHERE e.case_ref=c.case_ref) AS historyCount,c.updated_at AS updatedAt FROM hz_customer_case c ORDER BY c.updated_at DESC,c.case_ref LIMIT 200")
     List<Map<String,Object>> selectCustomerCases();
 
-    @Select("SELECT reconciliation_ref AS reconciliationRef,order_ref AS orderRef,difference_type AS differenceType,amount,currency,case_state AS state,owner_ref AS ownerRef,discovered_at AS discoveredAt,updated_at AS updatedAt FROM hz_reconciliation_case ORDER BY updated_at DESC,reconciliation_ref LIMIT 200")
+    @Select("SELECT c.reconciliation_ref AS reconciliationRef,c.order_ref AS orderRef,c.difference_type AS differenceType,c.amount,c.currency,c.case_state AS state,c.owner_ref AS ownerRef,c.aggregate_version AS version,(SELECT COUNT(*) FROM hz_reconciliation_event e WHERE e.reconciliation_ref=c.reconciliation_ref) AS historyCount,c.discovered_at AS discoveredAt,c.updated_at AS updatedAt FROM hz_reconciliation_case c ORDER BY c.updated_at DESC,c.reconciliation_ref LIMIT 200")
     List<Map<String,Object>> selectReconciliationCases();
+
+    @Select("SELECT review_ref AS reviewRef,object_type AS objectType,object_ref AS objectRef,object_version AS objectVersion,priority_code AS priorityCode,review_state AS state,submitter_ref AS submitterRef,reviewer_ref AS reviewerRef,decision_reason AS decisionReason,created_at AS createdAt,decided_at AS decidedAt FROM hz_content_review_task ORDER BY created_at DESC,review_ref LIMIT 200")
+    List<Map<String,Object>> selectContentReviewTasks();
 
     @Select("SELECT report_ref AS reportRef,entry_ref AS entryRef,reason_code AS reasonCode,description,report_state AS state,created_at AS createdAt FROM hz_directory_report ORDER BY created_at DESC,report_ref LIMIT 200")
     List<Map<String,Object>> selectDirectoryReports();

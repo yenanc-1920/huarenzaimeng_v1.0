@@ -6,7 +6,7 @@
 
 1. Pull Request 或人工检查执行快速门禁：启动阻断测试、后台契约与构建、小程序契约与构建。
 2. 合入 `dev` 前执行本地完整门禁：后端完整测试、release/dev 制品打包、本地 MySQL 5.7 一次性数据库迁移、JAR 启动和健康检查。
-3. 完整门禁必须满足：V1-V14 全部成功、失败迁移为 0、最高版本为 14、`/actuator/health` 为 `UP`。
+3. 完整门禁必须满足：V1-V24 全部成功、失败迁移为 0、最高版本为 24、`/actuator/health` 为 `UP`。
 4. GitHub Actions 对固定提交重复完整代码门禁并构建 `Dockerfile.dev`。
 5. 只有 GitHub 门禁成功后才推进 `deploy/dev`；微信云托管开发服务只监听 `deploy/dev`。
 6. 云端失败不自动反复重发。记录首个根因，回到本地修复并重新完整验证。
@@ -38,6 +38,14 @@ powershell -ExecutionPolicy Bypass -File tools\Invoke-DevReleaseGate.ps1 -SkipCo
 | DEV-ENV-007 | 本地 JDBC 报参数串是“过长标识符” | PowerShell 将 `$database?` 误解析为变量名的一部分，库名被吃掉 | JDBC 字符串使用 `${database}?` 显式变量边界 | 一次性真实 MySQL 启动门禁 |
 | DEV-ENV-008 | 健康接口先 UP，但 Flyway 历史仍为 0 | Tomcat 已监听时异步迁移尚未完成，过早读取历史表 | 健康 UP 后继续轮询 Flyway：版本迁移 14、失败 0、最高版本 14 | `Invoke-DevReleaseGate.ps1` 双阶段等待 |
 | DEV-ENV-009 | 历史表尚未创建时轮询直接终止 | 用“查询不存在表”的异常作为等待条件 | 先查 `information_schema.tables`，存在后再读历史 | 同上 |
+| DEV-ENV-010 | 云托管显示镜像发布成功，但容器持续 502/503；日志为 `Access denied for user 'huaren_app'` | 服务环境变量中的应用账号密码与云 MySQL 当前密码不一致；镜像发布成功不等于应用启动成功 | 在云 MySQL 重置 `huaren_app` 密码，并将同一个值更新到对应服务的 `SPRING_DATASOURCE_PASSWORD`；不得把密码写入仓库或日志 | 发布后必须同时通过容器健康检查和真实数据库读接口；四环境密码分别维护，不复制旧环境密文 |
+| TEST-ENV-001 | 本地真实 MySQL 门禁先看到健康 UP，但迁移历史尚未到 V14 | Web 端口就绪早于一次性迁移完成 | TEST 门禁分别等待迁移历史达到 14/0/14，再检查健康；不得把首次健康响应当成迁移完成 | `Invoke-TestReleaseGate.ps1` 固定双阶段等待，且断言开发预置数据为 0 |
+| TEST-ENV-002 | 完整测试出现大量 JUnit/Mockito `AccessDeniedException`，或仓库根目录负例在项目内临时目录误判 | Windows 系统 Temp 权限污染；临时目录放在仓库内部又会改变“无仓库祖先”负例的前提 | Surefire 子 JVM 通过 `argLine` 使用仓库同级的专用临时目录；本地沙箱验证可用 `TEST_JUNIT_TMP` 指向仓库外可写目录 | TEST 工作流与本地门禁统一隔离临时目录；业务失败与执行环境失败分开统计 |
+| PROD-ENV-001 | 空库首次迁移执行到 V10 后出现 `Communications link failure / Connection reset` | 云 MySQL 连接在迁移过程中被基础设施重置；Flyway 无失败记录，但库已不再为空 | 只允许从 20 张表、V1-V10 连续成功、失败 0、installed_rank 与版本一致且 `flyway.validate()` checksum 通过的固定 PRE_V10 恢复；其他非空状态失败关闭 | `ProdFlywayBootstrapRunnerTest` 锁定空库、精确 PRE_V10、错误库、未知非空状态和开发种子拒绝 |
+| PROD-ENV-002 | 镜像构建成功，Spring Context 已初始化但云托管报 8080 `connection refused`，且没有应用 `Caused by` | PROD 在应用启动主线程同步执行数据库迁移，云托管 TCP 探针在端口完成监听前终止实例 | 应用先完成 8080 监听；`ApplicationReadyEvent` 后由唯一 daemon worker 执行受控迁移；迁移期间业务 Gate 保持关闭，精确 POST_V14 后才开放 | 启动器定向测试锁定单次事件、重复事件不重跑、失败关闭；完整 PROD gate 后才允许推进 `deploy/prod` |
+| PROD-ENV-003 | `ProdFlywayBootstrapRunner: No default constructor found` | 启动器为测试保留了第二个注入执行器的构造器，Spring 面对多个未标注构造器无法选择生产构造器 | 生产构造器显式标记 `@Autowired`，测试构造器继续只供同包测试注入同步执行器 | PROD profile smoke test 不再 mock 启动器，必须实例化真实 Bean |
+| PROD-ENV-004 | 已改为 `ApplicationReadyEvent` 异步迁移，但应用仍可能在 `Started ApiApplication` 前阻塞 | 旧 `ReleaseMigrationReadyVerifier` 仍是同步 `ApplicationRunner`，会在 PROD 启动主线程读取旧授权材料并连接数据库 | `prod-mysql` 物理不装配旧 verifier；PROD 只由 `ProdFlywayBootstrapRunner` 管理迁移和 Gate 状态 | PROD profile smoke test 断言启动器存在且旧 verifier Bean 为 0 |
+| PROD-ENV-005 | 关闭 PROD 功能旁路后启动报 `RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES` | release Profile 校验器错误地要求 PROD 的 `function-release-enabled=true`，与迁移完成前必须关闭业务 Gate 的安全边界相反 | PROD 固定只接受 `function-release-enabled=false`；为 true 时明确失败关闭 | `ReleaseSecretBoundaryValidatorTest` 同时锁定 false 正例和 true 拒绝负例 |
 
 ## 四环境边界
 
@@ -47,3 +55,29 @@ powershell -ExecutionPolicy Bypass -File tools\Invoke-DevReleaseGate.ps1 -SkipCo
 - `prod`：不得启用 `local-mysql`、开发预置数据或测试 profile；真实支付/充值上线门禁另行执行。
 
 任何环境都不得共享数据库名、业务账号密码、Flyway 密码或第三方 Secret。模板文件只保留键名和占位符，不提交真实凭据。
+# STAGE 环境发布约定
+
+- GitHub 源分支固定为 `stage`，完整门禁通过后才推进 `deploy/stage`。
+- 微信云托管服务固定为 `huaren-api-stage`，数据库固定为 `huarenzaimeng_stage`。
+- 激活 Profile 固定为 `release-mysql,stage-mysql`；普通 `Dockerfile`、端口 `8080`。
+- STAGE 不加载 `db/devdata`，不启用微信支付和充值供应商。
+- 应用启动前先核对 `SELECT DATABASE()`，只有精确命中配置库才执行 Flyway；迁移失败不重试。
+# 统一环境启动链（2026-08-18）
+
+DEV、TEST、STAGE、PROD 统一使用同一个环境 Flyway bootstrap：应用端口先启动，业务 API 保持
+`SERVICE_STARTING`，后台线程只执行一次 Flyway，数据库身份、V1-V24 成功记录和开发种子边界全部
+核验通过后才开放业务。迁移失败不重试，状态保持 FAILED。
+
+环境仅通过以下配置区分：
+
+- `SPRING_PROFILES_ACTIVE=release-mysql,<dev/test/stage/prod>-mysql`（DEV 仍使用 `local-mysql`）
+- `HZ_ENV_DATABASE_NAME`（DEV 兼容 `HZ_DEV_DATABASE_NAME`）
+- `HZ_ENV_MIGRATION_ENABLED=true`
+- 只有 DEV 的 `hz.v1-dev-data.enabled=true`；TEST/STAGE/PROD 必须为 false
+
+`HZ_ENV_FUNCTION_RELEASE_ENABLED` 和 `HZ_DEV_FUNCTION_RELEASE_ENABLED` 不再参与 profile 合法性，
+也不能绕过迁移门禁；云平台可删除这两个旧变量。PROD 不加载 `db/devdata`，且 seed registry
+必须物理不存在。
+
+部署前分别运行 `Invoke-DevReleaseGate.ps1`、`Invoke-TestReleaseGate.ps1`、
+`Invoke-StageReleaseGate.ps1`、`Invoke-ProdReleaseGate.ps1`。任何一项失败都不得推送对应部署分支。

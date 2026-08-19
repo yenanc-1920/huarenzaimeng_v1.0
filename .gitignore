@@ -36,7 +36,17 @@ tmp/
 .tmp/
 .tmp-*/
 **/.tmp-*/
+**/__pycache__/
+*.pyc
 .cache/
+/.runtime/
+/.migration-output/
+/.worktrees/
+/.gate-temp/
+/.codex-tmp/
+/stage-gate.log
+/stage-mysql-gate.log
+/target-readiness.log
 
 # Local databases and runtime data
 *.db
@@ -52,3 +62,4 @@ data/
 /华人在孟 V1.0 产品设计规范.md
 /sprint-plan-v3.md
 /reloadly_api.yaml
+/椤圭洰绠＄悊/

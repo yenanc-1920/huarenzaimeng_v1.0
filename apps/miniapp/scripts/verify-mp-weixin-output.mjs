@@ -8,6 +8,8 @@ const requiredArtifacts = [
   'app.js',
   'app.json',
   'api/client.js',
+  'api/formal-transaction-client.js',
+  'api/formal-transaction-contract.js',
   'api/p014-topup-contract.js',
   'pages/index/index.js',
   'pages/index/index.wxml',
@@ -23,6 +25,12 @@ const requiredArtifacts = [
   'pages/life-content/list.wxml',
   'pages/order/progress.js',
   'pages/order/progress.wxml',
+  'pages/payment/status.js',
+  'pages/payment/status.wxml',
+  'pages/refund/status.js',
+  'pages/refund/status.wxml',
+  'pages/auth/expired.js',
+  'pages/profile/index.wxml',
 ]
 
 for (const artifact of requiredArtifacts) {
@@ -44,8 +52,12 @@ function collectJavaScript(directory) {
 }
 
 let staticRequireCount = 0
+const forbiddenRuntimeSemantics = /LOCAL_MOCK_NO_REAL_OPERATOR_FACTS|legacy-price-v1|REQUEST_MOCK_PAYMENT|CREATE_LOCAL_SYNTHETIC_PAYMENT_INTENT|QUERY_LOCAL_SYNTHETIC_PAYMENT_INTENT|REQUEST_MOCK_TOPUP|CREATE_LOCAL_SYNTHETIC_TOPUP|MOCK_PROJECTION_ONLY_NO_EXTERNAL_FACTS/
 for (const file of collectJavaScript(outputRoot)) {
   const source = readFileSync(file, 'utf8')
+  if (forbiddenRuntimeSemantics.test(source)) {
+    throw new Error(`MP_WEIXIN_SYNTHETIC_SEMANTIC_PRESENT:${relative(outputRoot,file).replaceAll('\\','/')}`)
+  }
   for (const forbidden of ['P021-V01','P021-V16','visualScenario','p021-visual-fixtures','P021-VISUAL-SUBJECT','P021-VISUAL-AUTH']) {
     if (source.includes(forbidden)) throw new Error(`MP_WEIXIN_P021_DEV_FIXTURE_LEAK:${forbidden}:${relative(outputRoot,file).replaceAll('\\','/')}`)
   }

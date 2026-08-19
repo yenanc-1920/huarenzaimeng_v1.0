@@ -10,4 +10,5 @@ interface ImportMetaEnv {
   readonly VITE_ADMIN_REENTRY_PATH?: string
   readonly VITE_ICP_FILING?: string
   readonly VITE_PUBLIC_SECURITY_FILING?: string
+  readonly VITE_ENVIRONMENT_LABEL?: string
 }

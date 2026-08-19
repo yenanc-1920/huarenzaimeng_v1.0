@@ -1,7 +1,7 @@
 <script setup lang="ts">
-const goHome=()=>uni.reLaunch({url:'/pages/index/index'})
 import { computed, onMounted, ref } from 'vue'
 import AppHeader from '../../components/AppHeader.vue'
+import BottomNav from '../../components/BottomNav.vue'
 import { api } from '../../api/client'
 import type { LifeContentCategory, LifeContentReadState, LifeContentSummary } from '../../domain/types'
 import { executeLifeContentListRead, navigateToLifeContentDetail, type LifeContentListPageState, type LifeContentReadTrigger } from '../../domain/life-content-page-executor'
@@ -21,7 +21,7 @@ const pageState:LifeContentListPageState={
 const categoryLabel=(category:LifeContentCategory)=>category==='LIFE_REMINDER'?'生活提醒':'节假日说明'
 const updatedLabel=(instant:string)=>{
   const date=new Date(instant)
-  return `${date.getUTCMonth()+1}月${date.getUTCDate()}日更新`
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}`
 }
 
 async function loadList(trigger:LifeContentReadTrigger='FIRST_ENTRY'){
@@ -37,7 +37,7 @@ onMounted(()=>loadList('FIRST_ENTRY'))
 
 <template>
   <view class="page life-page" data-page-id="UX-P042" data-page-root="life-content-list" :data-visible-state="state">
-<AppHeader touch-safe left="首页" @left="goHome" />
+<AppHeader />
     <view class="content life-content">
       <view class="intro">
         <text class="eyebrow">生活资讯</text>
@@ -47,8 +47,8 @@ onMounted(()=>loadList('FIRST_ENTRY'))
 
       <view v-if="state==='READY'" class="topic-tabs" role="tablist" aria-label="资讯类别">
         <button :class="{active:topic==='ALL'}" role="tab" :aria-selected="topic==='ALL'" @click="topic='ALL'">全部</button>
-        <button :class="{active:topic==='LIFE_REMINDER'}" role="tab" :aria-selected="topic==='LIFE_REMINDER'" @click="topic='LIFE_REMINDER'">生活提醒</button>
         <button :class="{active:topic==='HOLIDAY_EXPLANATION'}" role="tab" :aria-selected="topic==='HOLIDAY_EXPLANATION'" @click="topic='HOLIDAY_EXPLANATION'">节假日说明</button>
+        <button :class="{active:topic==='LIFE_REMINDER'}" role="tab" :aria-selected="topic==='LIFE_REMINDER'" @click="topic='LIFE_REMINDER'">生活提醒</button>
       </view>
 
       <view v-if="state==='LOADING'" class="state-card loading" role="status" data-state="LOADING" data-retry-visible="false">
@@ -65,7 +65,7 @@ onMounted(()=>loadList('FIRST_ENTRY'))
         <text class="state-symbol">⌛</text><view><text class="state-title">内容已过期</text><text class="state-copy">不继续展示旧内容。</text></view>
       </view>
       <view v-else-if="state==='REMOVED'" class="state-card" role="status" data-state="UNPUBLISHED" data-retry-visible="false">
-        <text class="state-symbol">—</text><view><text class="state-title">内容已撤回</text><text class="state-copy">请返回查看其他资讯。</text></view>
+        <text class="state-symbol">—</text><view><text class="state-title">内容已下架</text><text class="state-copy">请返回查看其他资讯。</text></view>
       </view>
       <view v-else-if="state==='UNKNOWN'" class="state-card unknown" role="status" data-state="UNKNOWN" data-retry-visible="true">
         <text class="state-symbol">?</text><view><text class="state-title">暂时无法确认内容状态</text><text class="state-copy">不会猜测内容是否仍可查看。</text><button class="readonly-retry" @click="loadList('USER_RETRY')">重新读取</button></view>
@@ -80,12 +80,13 @@ onMounted(()=>loadList('FIRST_ENTRY'))
           <text class="state-copy">可以查看其他类别。</text>
         </view>
         <button v-for="item in visibleItems" :key="`${item.contentRef}:${item.contentVersion}`" class="story-card" :aria-label="`查看${categoryLabel(item.category)}：${item.title}`" @click="openDetail(item)">
-          <view class="story-copy"><text class="story-kind">{{categoryLabel(item.category)}}</text><text class="story-title">{{item.title}}</text><text class="story-summary">{{item.summary}}</text><text class="story-meta">适用：{{item.applicableAudience}} · {{updatedLabel(item.updatedAt)}}</text></view>
+          <view class="story-copy"><text class="story-kind">{{categoryLabel(item.category)}}</text><text class="story-title">{{item.title}}</text><text class="story-summary">{{item.summary}}</text><text class="story-meta">适用：{{item.applicableAudience||'适用对象暂未提供'}} · {{updatedLabel(item.updatedAt)}}</text></view>
           <text class="chevron" aria-hidden="true">›</text>
         </button>
         <text class="source-note">打开详情后会再次确认内容是否仍可查看。</text>
       </view>
     </view>
+    <BottomNav active="news"/>
   </view>
 </template>
 

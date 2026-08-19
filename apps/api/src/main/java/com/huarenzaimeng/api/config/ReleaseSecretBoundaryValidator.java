@@ -49,9 +49,25 @@ final class ReleaseSecretBoundaryValidator {
         boolean releaseOnly = profiles.size() == 1 && profileSet.equals(Set.of("release-mysql"));
         boolean isolatedDevelopment = profiles.size() == 2
                 && profileSet.equals(Set.of("release-mysql", "local-mysql"))
-                && environment.getProperty("hz.dev-function-release.enabled", Boolean.class, false)
+                && "dev".equals(environment.getProperty("hz.environment.name"))
+                && environment.getProperty("hz.environment.migration-enabled", Boolean.class, false)
                 && environment.getProperty("hz.v1-dev-data.enabled", Boolean.class, false);
-        if (!releaseOnly && !isolatedDevelopment) {
+        boolean isolatedTest = profiles.size() == 2
+                && profileSet.equals(Set.of("release-mysql", "test-mysql"))
+                && "test".equals(environment.getProperty("hz.environment.name"))
+                && environment.getProperty("hz.environment.migration-enabled", Boolean.class, false)
+                && !environment.getProperty("hz.v1-dev-data.enabled", Boolean.class, false);
+        boolean isolatedStage = profiles.size() == 2
+                && profileSet.equals(Set.of("release-mysql", "stage-mysql"))
+                && "stage".equals(environment.getProperty("hz.environment.name"))
+                && environment.getProperty("hz.environment.migration-enabled", Boolean.class, false)
+                && !environment.getProperty("hz.v1-dev-data.enabled", Boolean.class, false);
+        boolean isolatedProd = profiles.size() == 2
+                && profileSet.equals(Set.of("release-mysql", "prod-mysql"))
+                && "prod".equals(environment.getProperty("hz.environment.name"))
+                && environment.getProperty("hz.environment.migration-enabled", Boolean.class, false)
+                && !environment.getProperty("hz.v1-dev-data.enabled", Boolean.class, false);
+        if (!releaseOnly && !isolatedDevelopment && !isolatedTest && !isolatedStage && !isolatedProd) {
             throw invalid("spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");
         }
     }

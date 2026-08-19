@@ -30,11 +30,51 @@ hz:
     bootstrap-enabled: ${HZ_ADMIN_BOOTSTRAP_ENABLED:false}
     bootstrap-token: ${HZ_ADMIN_BOOTSTRAP_TOKEN:}
     session-hours: ${HZ_ADMIN_SESSION_HOURS:8}
+  admin:
+    self-approval:
+      enabled: ${HZ_ADMIN_SELF_APPROVAL_ENABLED:false}
+      policy-version: ${HZ_ADMIN_SELF_APPROVAL_POLICY_VERSION:}
   buyer-auth:
     enabled: ${HZ_BUYER_AUTH_ENABLED:false}
-    provider-mode: disabled
+    provider-mode: ${HZ_BUYER_AUTH_PROVIDER_MODE:disabled}
+    expected-app-id-ref: ${HZ_BUYER_AUTH_EXPECTED_APP_ID_REF:}
     identity-pepper: ${HZ_BUYER_AUTH_IDENTITY_PEPPER:}
     code-pepper: ${HZ_BUYER_AUTH_CODE_PEPPER:}
+    wechat:
+      enabled: ${HZ_WECHAT_IDENTITY_ENABLED:false}
+      endpoint: https://api.weixin.qq.com/sns/jscode2session
+      app-id: ${HZ_WECHAT_APP_ID:}
+      app-secret: ${HZ_WECHAT_APP_SECRET:}
+      connect-timeout-ms: ${HZ_WECHAT_CONNECT_TIMEOUT_MS:2000}
+      read-timeout-ms: ${HZ_WECHAT_READ_TIMEOUT_MS:3000}
+  buyer-consent:
+    user-agreement-version: ${HZ_BUYER_CONSENT_USER_AGREEMENT_VERSION:}
+    privacy-policy-version: ${HZ_BUYER_CONSENT_PRIVACY_POLICY_VERSION:}
+  recipient-retention:
+    scheduler-enabled: ${HZ_RECIPIENT_RETENTION_SCHEDULER_ENABLED:false}
+    scheduler-delay-ms: ${HZ_RECIPIENT_RETENTION_SCHEDULER_DELAY_MS:86400000}
+  topup-provider:
+    # Real WINLA transport remains unreachable until both switches and credentials are explicit.
+    mode: ${HZ_TOPUP_PROVIDER_MODE:disabled}
+    winla-enabled: ${HZ_WINLA_ENABLED:false}
+  wechat-pay:
+    mode: ${HZ_WECHAT_PAY_MODE:disabled}
+    enabled: ${HZ_WECHAT_PAY_ENABLED:false}
+    expected-app-id: ${HZ_WECHAT_APP_ID:}
+    merchant-id: ${HZ_WECHAT_PAY_MERCHANT_ID:}
+    merchant-serial: ${HZ_WECHAT_PAY_MERCHANT_SERIAL:}
+    notify-url: ${HZ_WECHAT_PAY_NOTIFY_URL:}
+    merchant-private-key-base64: ${HZ_WECHAT_PAY_MERCHANT_PRIVATE_KEY_BASE64:}
+    api-v3-key: ${HZ_WECHAT_PAY_API_V3_KEY:}
+    platform-public-keys: ${HZ_WECHAT_PAY_PLATFORM_PUBLIC_KEYS:}
+    connect-timeout-ms: ${HZ_WECHAT_PAY_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${HZ_WECHAT_PAY_READ_TIMEOUT_MS:3000}
+  buyer-closure:
+    cleanup:
+      scheduler-enabled: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_ENABLED:false}
+      scheduler-delay-ms: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_DELAY_MS:30000}
+      lease-seconds: ${HZ_BUYER_CLOSURE_CLEANUP_LEASE_SECONDS:30}
+      retry-seconds: ${HZ_BUYER_CLOSURE_CLEANUP_RETRY_SECONDS:30}
   # Test-only credentials are forbidden in the production release profile.
   test-access-token: ${HZ_TEST_ACCESS_TOKEN:}
   project-auth:

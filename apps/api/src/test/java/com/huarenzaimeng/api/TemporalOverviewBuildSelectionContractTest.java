@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TemporalOverviewBuildSelectionContractTest {
     private static final Map<String, String> FROZEN_INPUTS = Map.of(
             "项目管理/正式交付/D3-技术实现基线/D3-04-数据账务与外部适配方案.md",
-            "B12E780F19AB333458018C908324EADA6F84E1ECD35349FB739A7DC5AE22E4DB");
+            "EED0FD0B2890FC1C3D830EC8A13EE7C7FB10B14F2B0E5AA9C0384B2A723532FF");
 
     @Test
     void fixed_contract_inputs_match_authorized_sha256() throws Exception {

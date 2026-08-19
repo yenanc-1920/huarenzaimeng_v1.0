@@ -6,10 +6,10 @@ defineEmits<{ selectOrder: [orderRef: string] }>()
 </script>
 
 <template>
-  <section class="work-grid two-column" data-page-id="UX-A140" data-data-origin="LOCAL_DATABASE" data-readonly="true">
+<section class="work-grid two-column" data-page-id="UX-A140" data-visual-frame-id="A140" data-data-origin="LOCAL_DATABASE" data-readonly="true">
     <article class="card list-card">
       <div class="card-head"><div><p class="eyebrow">订单运营</p><h2>订单、支付、充值与退款</h2></div><span class="count">{{ projection.items.length }} 条</span></div>
-      <div v-if="projection.items.length === 0" class="empty-panel">开发库中暂无订单记录</div>
+      <div v-if="projection.items.length === 0" class="empty-panel">当前没有订单记录</div>
       <div v-else class="table-scroll" tabindex="0"><div class="data-table order-table" role="table">
         <div class="table-header" role="row"><span role="columnheader">订单</span><span role="columnheader">综合展示状态</span><span role="columnheader">下单金额</span><span role="columnheader">操作</span></div>
         <div v-for="item in projection.items" :key="item.orderRef" class="table-row" role="row">

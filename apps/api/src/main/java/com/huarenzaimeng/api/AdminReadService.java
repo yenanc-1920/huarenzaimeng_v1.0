@@ -25,14 +25,15 @@ class AdminReadService {
         this.content = content; this.mapper = mapper; this.clock = clock;
     }
 
-    AdminProjection read(String pageId) {
+    AdminProjection read(String pageId) { return read(pageId,"SUPER_ADMIN"); }
+    AdminProjection read(String pageId,String role) {
         return switch (pageId) {
             case "A100" -> customerCaseProjection();
             case "A110" -> reconciliationProjection();
             case "A120" -> contentProjection();
             case "A121" -> directoryProjection();
             case "A122" -> holidayNewsProjection();
-            case "A130" -> productProjection();
+            case "A130" -> productProjection(role);
             case "A140" -> orderProjection();
             default -> null;
         };
@@ -70,9 +71,16 @@ class AdminReadService {
         return new AdminProjection("ADMIN_READ_V1", version("CONTENT",rows), "A122", "SUPER_ADMIN", rows);
     }
 
-    private AdminProjection productProjection() {
+    private AdminProjection productProjection(String role) {
         List<Map<String,Object>> rows=mapper.selectPlatformProducts();
         if (rows == null) rows=List.of();
+        if (!"SUPER_ADMIN".equals(role)) {
+            List<A130ContentItem> contentRows=rows.stream().map(row->new A130ContentItem(
+                    text(row,"productRef"),text(row,"operatorCode"),text(row,"productType"),
+                    text(row,"displayName"),text(row,"benefitText"),displayText(row,"validityText"),
+                    text(row,"state"),number(row,"version"))).toList();
+            return new AdminProjection("ADMIN_READ_V1",version("PRODUCTS-CONTENT",rows),"A130",role,contentRows);
+        }
         return new AdminProjection("ADMIN_READ_V1", version("PRODUCTS",rows), "A130", "SUPER_ADMIN", rows);
     }
 
@@ -108,8 +116,16 @@ class AdminReadService {
                 optionalText(report, "description", "未补充说明"),
                 "不直接修改公开内容", "待内容运营核验",
                 timestamp(report, "createdAt").toString(), "核验后处理")).forEach(items::add);
+        List<Map<String,Object>> reviews=mapper.selectContentReviewTasks();
+        if(reviews!=null) reviews.stream().map(review -> new A120Item(
+                text(review,"reviewRef"),
+                text(review,"objectType")+" / "+text(review,"objectRef")+" / V"+number(review,"objectVersion"),
+                "正式审核任务",text(review,"state"),"提交人："+text(review,"submitterRef"),
+                "APPROVED".equals(text(review,"state"))?"允许同版本发布":"不可发布",
+                review.get("reviewerRef")==null?"待独立审核人":"审核人："+review.get("reviewerRef"),
+                "版本绑定且不可追溯改写",optionalText(review,"decisionReason","尚无审核结论"))).forEach(items::add);
         long version = source.stream().mapToLong(DirectoryContent::version).max().orElse(0);
-        return new AdminProjection("ADMIN_READ_V1", "CONTENT-V" + version + "-R" + (reports==null?0:reports.size()), "A120", "SUPER_ADMIN", items);
+        return new AdminProjection("ADMIN_READ_V1", "CONTENT-V" + version + "-R" + (reports==null?0:reports.size())+"-W"+(reviews==null?0:reviews.size()), "A120", "SUPER_ADMIN", items);
     }
 
     private AdminProjection catalogProjection() {
@@ -191,6 +207,7 @@ class AdminReadService {
         Object value = row.get(key); if (value == null || value.toString().isBlank()) throw new IllegalStateException("ADMIN_READ_FIELD_MISSING:" + key);
         return value.toString();
     }
+    private static String displayText(Map<String,Object> row,String key){Object value=row.get(key);return value==null?"":value.toString();}
     private static long number(Map<String, Object> row, String key) {
         Object value = row.get(key); if (!(value instanceof Number number)) throw new IllegalStateException("ADMIN_READ_NUMBER_MISSING:" + key);
         return number.longValue();
@@ -216,6 +233,8 @@ class AdminReadService {
     record A130FinanceItem(String catalogRef, String displayName, String denominationLabel, String currencyLabel,
                            String priceCostCandidateLabel, String validityLabel, String supportBatchLabel,
                            String financeReviewLabel) {}
+    record A130ContentItem(String productRef,String operatorCode,String productType,String displayName,
+                           String benefitText,String validityText,String state,long version) {}
     record A140SupportItem(String orderRef, String maskedPhone, String userStatusLabel, String totalLabel,
                            String updatedLabel) {}
 }

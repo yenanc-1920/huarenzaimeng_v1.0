@@ -88,9 +88,12 @@ function parseProjection(value:unknown):P021Projection{
   const keys=['orderRef','aggregateVersion','projectionVersion','stateCode','priceSnapshotSummary','confirmedItems','unknownItems','responsibilityCode','updatedAt','nextReviewPoint','timeline','allowedActions','supportRef']
   if(!object(value)||!exactKeys(value,keys)||!opaque(value.orderRef)||!positiveInteger(value.aggregateVersion)||!positiveInteger(value.projectionVersion)
     ||!stateCode(value.stateCode)||!Array.isArray(value.confirmedItems)||!Array.isArray(value.unknownItems)
-    ||!value.confirmedItems.every(itemCode)||!value.unknownItems.every(itemCode)||new Set(value.confirmedItems).size!==value.confirmedItems.length
-    ||new Set(value.unknownItems).size!==value.unknownItems.length||value.confirmedItems.some(item=>value.unknownItems.includes(item))
+    ||!value.confirmedItems.every(itemCode)||!value.unknownItems.every(itemCode)
     ||!responsibilityCode(value.responsibilityCode)||!isP021Instant(value.updatedAt)||!nullableInstant(value.nextReviewPoint)||!nullableText(value.supportRef))throw new Error('INVALID_P021_PROJECTION')
+  const confirmedItems=value.confirmedItems as P021UserItemCode[]
+  const unknownItems=value.unknownItems as P021UserItemCode[]
+  if(new Set(confirmedItems).size!==confirmedItems.length||new Set(unknownItems).size!==unknownItems.length
+    ||confirmedItems.some(item=>unknownItems.includes(item)))throw new Error('INVALID_P021_PROJECTION')
   const priceSnapshotSummary=parsePrice(value.priceSnapshotSummary)
   const timeline=parseTimeline(value.timeline,value.projectionVersion,value.stateCode)
   const allowedActions=parseActions(value.allowedActions,value.projectionVersion,value.stateCode,value.supportRef)

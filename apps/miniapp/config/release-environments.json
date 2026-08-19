@@ -1,0 +1,9 @@
+{
+  "cloudEnvironmentId": "prod-d3g9ntdmsdf9d7877",
+  "environments": {
+    "dev": { "releaseEnv": "DEV", "service": "huaren-api-dev", "apiOrigin": "https://dev.guiye.xyz" },
+    "test": { "releaseEnv": "TEST", "service": "huaren-api-test", "apiOrigin": "https://test.guiye.xyz" },
+    "stage": { "releaseEnv": "STAGE", "service": "huaren-api-stage", "apiOrigin": "https://stage.guiye.xyz" },
+    "prod": { "releaseEnv": "PROD", "service": "huaren-api-prod", "apiOrigin": "https://api.guiye.xyz" }
+  }
+}

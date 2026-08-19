@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppHeader from '../../components/AppHeader.vue'
+import BottomNav from '../../components/BottomNav.vue'
 import { api } from '../../api/client'
 import type { ClockAuthorityState, ClockViewState, HolidayState, TemporalClock, TemporalHoliday, TemporalOverview, TemporalOverviewReadResponse } from '../../api/temporal-overview-contract'
 
@@ -64,11 +65,11 @@ function parseHoliday(value:unknown,countryCode:TemporalHoliday['countryCode'],r
 }
 
 function parseTemporalOverview(value:unknown):TemporalOverview {
-  if(!isRecord(value)||!exactKeys(value,ROOT_KEYS)||!nonEmpty(value.requestRef)||!nonEmpty(value.projectCode)
+  if(!isRecord(value)||!exactKeys(value,ROOT_KEYS)||!nullableString(value.requestRef)||!nonEmpty(value.projectCode)
     ||value.schemaVersion!=='TEMPORAL_OVERVIEW_V1'||!isRfc3339(value.referenceInstant)||!isRfc3339(value.generatedAt)
-    ||Date.parse(value.generatedAt)<Date.parse(value.referenceInstant)||!nonEmpty(value.timeZoneRuleVersion)
+    ||Date.parse(value.generatedAt)<Date.parse(value.referenceInstant)||!nullableString(value.timeZoneRuleVersion)
     ||!Number.isSafeInteger(value.clockStaleAfterSeconds)||Number(value.clockStaleAfterSeconds)<=0
-    ||!CLOCK_STATES.includes(value.clockState as ClockAuthorityState)||!nonEmpty(value.holidayRuleVersion)
+    ||!CLOCK_STATES.includes(value.clockState as ClockAuthorityState)||!nullableString(value.holidayRuleVersion)
     ||!RETRY_CLASSES.includes(value.retryClass as typeof RETRY_CLASSES[number]))throw new Error('INVALID_TEMPORAL_OVERVIEW_DTO')
   if(!isRecord(value.clocks)||!exactKeys(value.clocks,['dhaka','beijing'])||!isRecord(value.holidays)||!exactKeys(value.holidays,['china','bangladesh']))throw new Error('INVALID_TEMPORAL_OVERVIEW_COLLECTION_DTO')
   const referenceInstant=value.referenceInstant as string
@@ -141,7 +142,7 @@ async function executeTemporalOverviewRead(state:TemporalOverviewPageState,reade
   }
 }
 
-const HOME_ROUTES = new Set(['/pages/recharge/select', '/pages/order/list', '/pages/directory/list', '/pages/life-content/list'])
+const HOME_ROUTES = new Set(['/pages/recharge/select', '/pages/directory/list', '/pages/life-content/list'])
 const temporalState=ref<ClockViewState>('LOADING')
 const temporalOverview=ref<TemporalOverview|null>(null)
 let temporalReadGeneration=0
@@ -227,11 +228,11 @@ onShow(()=>{
     <AppHeader/>
     <view class="content">
       <view class="welcome"><text>你好，欢迎回来</text><view class="heading" role="heading" aria-level="1">在孟生活，一站办妥</view></view>
-      <button class="hero" @click="go('/pages/recharge/select')"><text class="eyebrow">手机充值</text><view class="hero-title" role="heading" aria-level="2">给孟加拉手机号充值</view><text class="hero-copy">输入号码，选择金额，核对后付款</text><text class="hero-action">开始充值</text></button>
+      <button class="hero" @click="go('/pages/recharge/select')"><text class="eyebrow">手机充值</text><view class="hero-title" role="heading" aria-level="2">给孟加拉手机号充值</view><text class="hero-copy">输入号码，选择商品，微信付款</text><text class="hero-action">开始充值</text></button>
 
       <view class="temporal-card" role="region" aria-label="今日时间与节假日">
         <view class="temporal-heading"><view><text class="temporal-eyebrow">今日信息</text><text class="temporal-title">达卡与北京</text></view><button class="temporal-refresh" :disabled="temporalState==='LOADING'" @click="loadTemporal('USER_REFRESH')">刷新</button></view>
-        <text class="temporal-status" role="status">{{clockStatusCopy[temporalState]}} · 同一基准，不使用设备时区</text>
+        <text class="temporal-status" role="status">{{clockStatusCopy[temporalState]}}</text>
         <view class="clock-grid">
           <view class="clock-cell"><text class="clock-city">达卡</text><text class="clock-time">{{temporalOverview?.clocks.dhaka.localTime||'--:--'}}</text><text v-if="temporalState==='STALE'" class="not-current">非当前时间</text><text v-else-if="temporalOverview?.clocks.dhaka.availabilityState==='UNAVAILABLE'" class="not-current">暂不可用</text></view>
           <view class="clock-cell"><text class="clock-city">北京</text><text class="clock-time">{{temporalOverview?.clocks.beijing.localTime||'--:--'}}</text><text v-if="temporalState==='STALE'" class="not-current">非当前时间</text><text v-else-if="temporalOverview?.clocks.beijing.availabilityState==='UNAVAILABLE'" class="not-current">暂不可用</text></view>
@@ -241,11 +242,12 @@ onShow(()=>{
           <view class="holiday-row"><text class="holiday-copy">{{temporalState==='LOADING'?'中国：正在读取今日节假日':holidayTitle('中国',temporalOverview?.holidays.china||null)}}</text><text v-if="holidayMeta(temporalOverview?.holidays.china||null)" class="holiday-meta">{{holidayMeta(temporalOverview?.holidays.china||null)}}</text></view>
           <view class="holiday-row"><text class="holiday-copy">{{temporalState==='LOADING'?'孟加拉：正在读取今日节假日':holidayTitle('孟加拉',temporalOverview?.holidays.bangladesh||null)}}</text><text v-if="holidayMeta(temporalOverview?.holidays.bangladesh||null)" class="holiday-meta">{{holidayMeta(temporalOverview?.holidays.bangladesh||null)}}</text></view>
         </view>
-        <text class="temporal-note">本页只读展示；时间与节假日异常不影响充值。</text>
+        <text class="temporal-note">时间与今日状态异常不影响充值。</text>
       </view>
 
       <view class="entries"><button class="card nav" @click="go('/pages/directory/list')"><text class="entry-icon orange">页</text><view><text class="card-title">孟加拉黄页</text><text class="copy">按城市查找电话与生活服务</text></view><text class="arrow">›</text></button><button class="card nav" @click="go('/pages/life-content/list')"><text class="entry-icon warm">阅</text><view><text class="card-title">生活资讯</text><text class="copy">查看生活提醒与节假日说明</text></view><text class="arrow">›</text></button></view>
     </view>
+    <BottomNav active="home"/>
   </view>
 </template>
 

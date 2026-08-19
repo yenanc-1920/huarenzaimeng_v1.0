@@ -26,16 +26,16 @@ export interface TemporalHoliday {
 }
 
 export interface TemporalOverview {
-  requestRef: string
+  requestRef: string | null
   projectCode: string
   schemaVersion: 'TEMPORAL_OVERVIEW_V1'
   referenceInstant: string
   generatedAt: string
-  timeZoneRuleVersion: string
+  timeZoneRuleVersion: string | null
   clockStaleAfterSeconds: number
   clockState: ClockAuthorityState
   clocks: { dhaka: TemporalClock; beijing: TemporalClock }
-  holidayRuleVersion: string
+  holidayRuleVersion: string | null
   holidays: { china: TemporalHoliday; bangladesh: TemporalHoliday }
   retryClass: 'NONE' | 'USER_INITIATED_READ_ONLY'
 }

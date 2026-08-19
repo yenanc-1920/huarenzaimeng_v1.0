@@ -74,7 +74,7 @@ class V1PersistentDevelopmentDataContractTest {
         assertTrue(command.contains("hz_v1_admin_audit"));
         assertTrue(command.contains("command_status='CLAIMED'"));
         assertTrue(command.contains("IDEMPOTENCY_CONFLICT"));
-        assertTrue(command.contains("@ConditionalOnProperty(name=\"hz.v1-dev-data.enabled\",havingValue=\"true\")"));
+        assertTrue(command.contains("@ConditionalOnProperty(name=\"hz.admin-command.enabled\",havingValue=\"true\",matchIfMissing=true)"));
         assertFalse(command.contains("@Profile({\"mock\""));
         String data=Files.readString(MAIN.resolve("java/com/huarenzaimeng/api/V1DevelopmentDataService.java"));
         assertFalse(data.contains("AS sourceLabel"));

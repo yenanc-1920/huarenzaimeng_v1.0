@@ -15,12 +15,14 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.context.annotation.Profile;
 
 import java.time.Instant;
 
 @RestController
 @RequestMapping("/project-api/v1")
 @Validated
+@Profile({"mock","test","local-synthetic"})
 class ContentController {
     private static final String MOCK_HEADER = "X-HZM-Mock-Only";
     private final ContentService service;

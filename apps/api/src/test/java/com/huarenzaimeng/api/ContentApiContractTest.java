@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -27,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "hz.project-auth.authorization-ref=AUTH-CONTENT-TEST"
 })
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class ContentApiContractTest {
     @Autowired MockMvc mvc;
     @Autowired ContentService service;

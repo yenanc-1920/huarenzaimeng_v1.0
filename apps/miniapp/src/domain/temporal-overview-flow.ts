@@ -101,7 +101,7 @@ function hasRequiredNoStore(value:string):boolean {
   for(const name of ['max-age','s-maxage']){
     if(!directives.has(name))continue
     const directiveValue=directives.get(name)
-    if(directiveValue===null||!/^\d+$/.test(directiveValue)||Number(directiveValue)>0)return false
+    if(directiveValue===null||directiveValue===undefined||!/^\d+$/.test(directiveValue)||Number(directiveValue)>0)return false
   }
   return true
 }

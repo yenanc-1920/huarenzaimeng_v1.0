@@ -23,7 +23,7 @@ async function submit() {
 </script>
 
 <template>
-  <section class="login-required" data-read-state="UNAUTHENTICATED" role="alert" aria-live="assertive">
+  <section class="login-required" data-visual-frame-id="B001" data-read-state="UNAUTHENTICATED" role="alert" aria-live="assertive">
     <div class="login-card">
       <img src="/src/assets/login-lock.svg" alt="">
       <p class="eyebrow">运营后台</p>

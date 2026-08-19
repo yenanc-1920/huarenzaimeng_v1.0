@@ -1,12 +1,19 @@
-export const WECHAT_DEVELOPMENT_ENV = 'prod-d3g9ntdmsdf9d7877' as const
-export const WECHAT_DEVELOPMENT_SERVICE = 'huaren-api-it' as const
+type ReleaseEnvironment = 'DEV' | 'TEST' | 'STAGE' | 'PROD'
+const build = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {}
+export const WECHAT_DEVELOPMENT_ENV = build.VITE_CLOUD_ENV_ID || 'prod-d3g9ntdmsdf9d7877'
+export const RELEASE_ENVIRONMENT = (build.VITE_RELEASE_ENV || 'PROD') as ReleaseEnvironment
+const expectedService = `huaren-api-${RELEASE_ENVIRONMENT.toLowerCase()}`
+export const WECHAT_DEVELOPMENT_SERVICE = build.VITE_CLOUD_SERVICE_NAME || expectedService
+if (!/^(DEV|TEST|STAGE|PROD)$/.test(RELEASE_ENVIRONMENT) || WECHAT_DEVELOPMENT_SERVICE !== expectedService) {
+  throw new Error('WECHAT_CLOUD_BUILD_IDENTITY_INVALID')
+}
 
 type Method = 'GET' | 'POST'
 type Header = Record<string, string>
 export interface CloudContainerResult { statusCode: number; data: unknown; header?: Header }
 export interface WechatCloudPort {
-  init(input: { env: typeof WECHAT_DEVELOPMENT_ENV }): void
-  callContainer(input: { config: { env: typeof WECHAT_DEVELOPMENT_ENV }; header: Header; path: string; method: Method; data?: unknown }): Promise<CloudContainerResult>
+  init(input: { env: string }): void
+  callContainer(input: { config: { env: string }; header: Header; path: string; method: Method; data?: unknown }): Promise<CloudContainerResult>
 }
 
 let initialized = false

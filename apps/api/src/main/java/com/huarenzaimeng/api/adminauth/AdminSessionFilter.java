@@ -21,10 +21,15 @@ public final class AdminSessionFilter extends OncePerRequestFilter {
     public static final String TRUSTED_ROLE = "hz.admin.role";
     private final AdminAuthService auth;
     AdminSessionFilter(AdminAuthService auth) { this.auth = auth; }
+    public static String trustedUserId(HttpServletRequest request){
+        Object value=request.getAttribute(TRUSTED_USER);
+        if(value instanceof AdminAuthStore.AuthenticatedUser user)return user.userId();
+        return value==null?null:String.valueOf(value);
+    }
 
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return !path.startsWith("/admin-read/") && !path.startsWith("/admin-command/");
+        return !path.startsWith("/admin-read/") && !path.startsWith("/admin-command/") && !path.startsWith("/admin-workflow/");
     }
 
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {

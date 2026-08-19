@@ -1,0 +1,29 @@
+FROM node:24-alpine AS admin-web-build
+WORKDIR /workspace/apps/admin-web
+COPY apps/admin-web/package.json apps/admin-web/package-lock.json ./
+RUN npm ci
+COPY apps/admin-web/ ./
+ENV VITE_ADMIN_DATA_MODE=PROJECT_API_PROXY
+RUN npm run build
+
+FROM maven:3.9.11-eclipse-temurin-17 AS build
+WORKDIR /workspace
+COPY .mvn .mvn
+COPY pom.xml pom.xml
+COPY modules/core/pom.xml modules/core/pom.xml
+COPY apps/api/pom.xml apps/api/pom.xml
+RUN mvn -B -ntp -s .mvn/settings.xml -pl apps/api -am dependency:go-offline
+COPY modules/core/src modules/core/src
+COPY apps/api/src apps/api/src
+COPY --from=admin-web-build /workspace/apps/admin-web/dist apps/api/src/main/resources/static
+RUN mvn -B -ntp -s .mvn/settings.xml -pl apps/api -am package -DskipTests
+
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build --chown=10001:10001 /workspace/apps/api/target/*.jar /app/app.jar
+COPY --chown=10001:10001 tools/container-entrypoint.sh /app/container-entrypoint.sh
+RUN chmod 0555 /app/container-entrypoint.sh
+ENV SPRING_PROFILES_ACTIVE=release-mysql,stage-mysql
+USER 10001:10001
+EXPOSE 8080
+ENTRYPOINT ["/app/container-entrypoint.sh"]

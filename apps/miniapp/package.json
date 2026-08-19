@@ -4,9 +4,14 @@
   "private": true,
   "scripts": {
     "dev:h5:p021-it": "uni -p h5",
-    "build:mp-weixin": "node scripts/clean-mp-weixin-output.mjs && uni build -p mp-weixin && node scripts/write-mp-weixin-compat-modules.mjs && node scripts/verify-mp-weixin-output.mjs",
-    "build:mp-weixin:dev": "node scripts/clean-mp-weixin-output.mjs && uni build -p mp-weixin --mode wechat-development && node scripts/write-mp-weixin-compat-modules.mjs && node scripts/verify-mp-weixin-output.mjs",
-    "test:frontend-contracts": "node scripts/assert-development-api-contracts.mjs",
+    "build:mp-weixin": "node scripts/build-mp-weixin.mjs prod",
+    "build:mp-weixin:dev": "node scripts/build-mp-weixin.mjs dev",
+    "build:mp-weixin:test": "node scripts/build-mp-weixin.mjs test",
+    "build:mp-weixin:stage": "node scripts/build-mp-weixin.mjs stage",
+    "build:mp-weixin:prod": "node scripts/build-mp-weixin.mjs prod",
+    "test:frontend-contracts": "node scripts/assert-development-api-contracts.mjs && npm run test:visual-traceability",
+    "test:formal-runtime-contracts": "node --experimental-strip-types scripts/assert-formal-runtime-contracts.mjs && node scripts/assert-release-environments.mjs",
+    "test:visual-traceability": "node ../../docs/product/v1-high-fidelity/assert-visual-traceability.mjs",
     "preflight:p021-visual": "node scripts/preflight-p021-visual-evidence.mjs --preflight"
     ,"test:p021-it-collector": "node scripts/test-p021-it-page-collector.mjs"
   },

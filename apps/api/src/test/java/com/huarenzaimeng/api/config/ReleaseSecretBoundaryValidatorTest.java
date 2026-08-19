@@ -14,7 +14,8 @@ class ReleaseSecretBoundaryValidatorTest {
 
     @Test void acceptsExactIsolatedDevelopmentProfilePair() {
         MockEnvironment environment = releaseEnvironment()
-                .withProperty("hz.dev-function-release.enabled", "true")
+                .withProperty("hz.environment.name", "dev")
+                .withProperty("hz.environment.migration-enabled", "true")
                 .withProperty("hz.v1-dev-data.enabled", "true");
         environment.setActiveProfiles("release-mysql", "local-mysql");
         assertThatCode(() -> new ReleaseSecretBoundaryValidator(environment))
@@ -23,15 +24,81 @@ class ReleaseSecretBoundaryValidatorTest {
 
     @Test void rejectsDevelopmentProfilePairWithoutBothDevelopmentGates() {
         MockEnvironment environment = releaseEnvironment()
-                .withProperty("hz.dev-function-release.enabled", "true")
+                .withProperty("hz.environment.name", "dev")
+                .withProperty("hz.environment.migration-enabled", "true")
                 .withProperty("hz.v1-dev-data.enabled", "false");
         environment.setActiveProfiles("release-mysql", "local-mysql");
         assertRejected(environment, "spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");
     }
 
+    @Test void acceptsExactIsolatedTestProfilePairWithoutDevelopmentData() {
+        MockEnvironment environment = releaseEnvironment()
+                .withProperty("hz.environment.name", "test")
+                .withProperty("hz.environment.migration-enabled", "true")
+                .withProperty("hz.environment.function-release-enabled", "true")
+                .withProperty("hz.v1-dev-data.enabled", "false");
+        environment.setActiveProfiles("release-mysql", "test-mysql");
+        assertThatCode(() -> new ReleaseSecretBoundaryValidator(environment))
+                .doesNotThrowAnyException();
+    }
+
+    @Test void acceptsExactIsolatedStageProfilePairWithoutDevelopmentData() {
+        MockEnvironment environment = releaseEnvironment()
+                .withProperty("hz.environment.name", "stage")
+                .withProperty("hz.environment.migration-enabled", "true")
+                .withProperty("hz.environment.function-release-enabled", "true")
+                .withProperty("hz.v1-dev-data.enabled", "false");
+        environment.setActiveProfiles("release-mysql", "stage-mysql");
+        assertThatCode(() -> new ReleaseSecretBoundaryValidator(environment))
+                .doesNotThrowAnyException();
+    }
+
+    @Test void rejectsStageProfileWhenEnvironmentIdentityIsTest() {
+        MockEnvironment environment = releaseEnvironment()
+                .withProperty("hz.environment.name", "test")
+                .withProperty("hz.environment.migration-enabled", "true")
+                .withProperty("hz.environment.function-release-enabled", "true")
+                .withProperty("hz.v1-dev-data.enabled", "false");
+        environment.setActiveProfiles("release-mysql", "stage-mysql");
+        assertRejected(environment, "spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");
+    }
+
+    @Test void acceptsExactProdProfilePairWithoutDevelopmentData() {
+        MockEnvironment environment = releaseEnvironment()
+                .withProperty("hz.environment.name", "prod")
+                .withProperty("hz.environment.migration-enabled", "true")
+                .withProperty("hz.environment.function-release-enabled", "false")
+                .withProperty("hz.v1-dev-data.enabled", "false");
+        environment.setActiveProfiles("release-mysql", "prod-mysql");
+        assertThatCode(() -> new ReleaseSecretBoundaryValidator(environment))
+                .doesNotThrowAnyException();
+    }
+
+    @Test void ignoresRetiredFunctionReleaseFlagForProdProfileValidation() {
+        MockEnvironment environment = releaseEnvironment()
+                .withProperty("hz.environment.name", "prod")
+                .withProperty("hz.environment.migration-enabled", "true")
+                .withProperty("hz.environment.function-release-enabled", "true")
+                .withProperty("hz.v1-dev-data.enabled", "false");
+        environment.setActiveProfiles("release-mysql", "prod-mysql");
+        assertThatCode(() -> new ReleaseSecretBoundaryValidator(environment))
+                .doesNotThrowAnyException();
+    }
+
+    @Test void rejectsProdProfileWhenEnvironmentIdentityIsStage() {
+        MockEnvironment environment = releaseEnvironment()
+                .withProperty("hz.environment.name", "stage")
+                .withProperty("hz.environment.migration-enabled", "true")
+                .withProperty("hz.environment.function-release-enabled", "false")
+                .withProperty("hz.v1-dev-data.enabled", "false");
+        environment.setActiveProfiles("release-mysql", "prod-mysql");
+        assertRejected(environment, "spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");
+    }
+
     @Test void rejectsDevelopmentProfilePairWithAnyThirdProfile() {
         MockEnvironment environment = releaseEnvironment()
-                .withProperty("hz.dev-function-release.enabled", "true")
+                .withProperty("hz.environment.name", "dev")
+                .withProperty("hz.environment.migration-enabled", "true")
                 .withProperty("hz.v1-dev-data.enabled", "true");
         environment.setActiveProfiles("release-mysql", "local-mysql", "mock");
         assertRejected(environment, "spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");
