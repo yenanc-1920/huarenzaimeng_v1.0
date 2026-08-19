@@ -52,9 +52,10 @@ COPY --chown=10001:10001 tools/container-entrypoint.sh /app/container-entrypoint
 RUN chmod 0555 /app/container-entrypoint.sh
 
 ENV SERVER_PORT=8080
+ENV USE_SYSTEM_CA_CERTS=1
 # No profile default is permitted in the formal image. The hosting service must
 # explicitly select one supported release combination; the entrypoint fails closed otherwise.
 EXPOSE 8080
 
 USER 10001:10001
-ENTRYPOINT ["/app/container-entrypoint.sh"]
+ENTRYPOINT ["/__cacert_entrypoint.sh", "/app/container-entrypoint.sh"]
