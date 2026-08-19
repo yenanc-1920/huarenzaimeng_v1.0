@@ -39,20 +39,25 @@ class BuildSelectionContractTest {
                 .contains("COPY --from=admin-web-build /workspace/apps/admin-web/dist apps/api/src/main/resources/static")
                 .contains("USER 10001:10001")
                 .contains("--chown=10001:10001")
-                .contains("ENTRYPOINT [\"/app/container-entrypoint.sh\"]")
+                .contains("ENV USE_SYSTEM_CA_CERTS=1")
+                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("-Dloader.main=com.huarenzaimeng.api.FlywayV12FunctionVerificationLauncher");
         assertThat(devDockerfile).contains("package -DskipTests -Plocal-devdata")
                 .contains("ENV SPRING_PROFILES_ACTIVE=release-mysql,local-mysql")
-                .contains("ENTRYPOINT [\"/app/container-entrypoint.sh\"]")
+                .contains("ENV USE_SYSTEM_CA_CERTS=1")
+                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("clean test");
         assertThat(testDockerfile).contains("ENV SPRING_PROFILES_ACTIVE=release-mysql,test-mysql")
-                .contains("ENTRYPOINT [\"/app/container-entrypoint.sh\"]")
+                .contains("ENV USE_SYSTEM_CA_CERTS=1")
+                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("clean test");
         assertThat(stageDockerfile).contains("ENV SPRING_PROFILES_ACTIVE=release-mysql,stage-mysql")
-                .contains("ENTRYPOINT [\"/app/container-entrypoint.sh\"]")
+                .contains("ENV USE_SYSTEM_CA_CERTS=1")
+                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("clean test");
         assertThat(prodDockerfile).contains("ENV SPRING_PROFILES_ACTIVE=release-mysql,prod-mysql")
-                .contains("ENTRYPOINT [\"/app/container-entrypoint.sh\"]")
+                .contains("ENV USE_SYSTEM_CA_CERTS=1")
+                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("clean test");
         assertThat(entrypoint).contains("release-mysql,local-mysql")
                 .contains("release-mysql,test-mysql")
