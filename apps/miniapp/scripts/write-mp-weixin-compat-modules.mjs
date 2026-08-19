@@ -24,4 +24,12 @@ writeFileSync(
   'utf8',
 )
 
-console.log('mp-weixin compatibility module written: domain/temporal-overview-flow.js')
+const legacyApiDir = resolve(outputRoot, 'api')
+mkdirSync(legacyApiDir, { recursive: true })
+writeFileSync(
+  resolve(legacyApiDir, 'wechat-payment-port.js'),
+  '"use strict";Object.defineProperty(exports,"__esModule",{value:true});/* WECHAT_PAYMENT_PRECOMPILE_COMPAT_ONLY */\n',
+  'utf8',
+)
+
+console.log('mp-weixin compatibility modules written: domain/temporal-overview-flow.js, api/wechat-payment-port.js')

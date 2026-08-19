@@ -1,4 +1,6 @@
-import { parseWechatPrepayParameters, type WechatPrepayParameters } from './wechat-payment-port.ts'
+export type WechatPrepayParameters = Readonly<{
+  timeStamp:string;nonceStr:string;package:string;signType:'RSA';paySign:string
+}>
 
 export type PaymentState='NEW'|'PREPAY_CREATED'|'PROCESSING'|'PAID'|'CLOSED'|'REFUND_PROCESSING'|'REFUNDED'|'REJECTED'|'UNKNOWN'
 export type RefundState='PENDING'|'SUCCEEDED'|'REJECTED'|'UNKNOWN'
@@ -29,6 +31,13 @@ const exact=(value:Record<string,unknown>,keys:readonly string[])=>Object.keys(v
 const instant=(value:unknown):value is string=>text(value)&&Number.isFinite(Date.parse(value))
 const digest=(value:unknown):value is string=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value)
 const currency=(value:unknown):value is string=>typeof value==='string'&&/^[A-Z]{3}$/.test(value)
+const parseWechatPrepayParameters=(value:unknown):WechatPrepayParameters=>{
+  const keys=['timeStamp','nonceStr','package','signType','paySign'] as const
+  if(!object(value)||!exact(value,keys)||!text(value.timeStamp)||!/^\d+$/.test(value.timeStamp)
+    ||!text(value.nonceStr)||!text(value.package)||!value.package.startsWith('prepay_id=')
+    ||value.signType!=='RSA'||!text(value.paySign))throw new Error('WECHAT_PREPAY_PARAMETERS_INVALID')
+  return Object.freeze({timeStamp:value.timeStamp,nonceStr:value.nonceStr,package:value.package,signType:'RSA',paySign:value.paySign})
+}
 const PAYMENT_STATES:readonly PaymentState[]=['NEW','PREPAY_CREATED','PROCESSING','PAID','CLOSED','REFUND_PROCESSING','REFUNDED','REJECTED','UNKNOWN']
 const REFUND_STATES:readonly RefundState[]=['PENDING','SUCCEEDED','REJECTED','UNKNOWN']
 const TOPUP_STATES:readonly TopupState[]=['RESERVED','SUBMITTED','PROCESSING','DELIVERED','REJECTED','UNKNOWN','RECONCILIATION_REQUIRED']

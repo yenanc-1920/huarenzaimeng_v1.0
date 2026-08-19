@@ -10,6 +10,7 @@ const requiredArtifacts = [
   'api/client.js',
   'api/formal-transaction-client.js',
   'api/formal-transaction-contract.js',
+  'api/wechat-payment-port.js',
   'api/p014-topup-contract.js',
   'pages/index/index.js',
   'pages/index/index.wxml',
@@ -95,7 +96,10 @@ for (const [page, root] of [
 
 const commonClient = readFileSync(resolve(outputRoot, 'api/client.js'), 'utf8')
 const generatedHome = readFileSync(resolve(outputRoot, 'pages/index/index.js'), 'utf8')
+const generatedPayment = readFileSync(resolve(outputRoot, 'pages/payment/status.js'), 'utf8')
+const generatedTransactionContract = readFileSync(resolve(outputRoot, 'api/formal-transaction-contract.js'), 'utf8')
 const retiredTemporalFlow = readFileSync(resolve(outputRoot, 'domain/temporal-overview-flow.js'), 'utf8')
+const retiredPaymentPort = readFileSync(resolve(outputRoot, 'api/wechat-payment-port.js'), 'utf8')
 if (/require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonClient)) {
   throw new Error('MP_WEIXIN_COMMON_ENTRY_PAYMENT_INTENT_DEPENDENCY_NOT_ISOLATED')
 }
@@ -107,6 +111,12 @@ if (/temporal-overview-flow\.js/.test(generatedHome)) {
 }
 if (!/WECHAT_PRECOMPILE_COMPAT_ONLY/.test(retiredTemporalFlow)) {
   throw new Error('MP_WEIXIN_RETIRED_TEMPORAL_MODULE_COMPATIBILITY_MISSING')
+}
+if (/wechat-payment-port\.js/.test(generatedPayment) || /wechat-payment-port\.js/.test(generatedTransactionContract)) {
+  throw new Error('MP_WEIXIN_PAYMENT_COMPAT_MODULE_MUST_NOT_BE_REQUIRED')
+}
+if (!/WECHAT_PAYMENT_PRECOMPILE_COMPAT_ONLY/.test(retiredPaymentPort)) {
+  throw new Error('MP_WEIXIN_RETIRED_PAYMENT_MODULE_COMPATIBILITY_MISSING')
 }
 
 const systemInfo = { statusBarHeight:20, windowWidth:375, pixelRatio:2, platform:'devtools', system:'Windows', language:'zh_CN',
@@ -126,6 +136,7 @@ for (const entry of [
   'pages/directory/list.js',
   'pages/life-content/list.js',
   'pages/order/progress.js',
+  'pages/payment/status.js',
 ]) {
   try {
     createRequire(import.meta.url)(resolve(outputRoot, entry))
@@ -134,4 +145,4 @@ for (const entry of [
   }
 }
 
-console.log(`mp-weixin appservice load: PASS (home + five entry pages including P014; ${staticRequireCount} relative static requires)`)
+console.log(`mp-weixin appservice load: PASS (home + six entry pages including P013/P014; ${staticRequireCount} relative static requires)`)
