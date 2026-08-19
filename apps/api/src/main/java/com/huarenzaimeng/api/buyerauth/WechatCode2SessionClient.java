@@ -69,7 +69,8 @@ final class WechatCode2SessionClient implements WechatCode2SessionPort {
             return new Unknown(switch (failure.kind()) {
                 case TIMEOUT -> "WECHAT_PROVIDER_TIMEOUT";
                 case DNS -> "WECHAT_PROVIDER_DNS_FAILURE";
-                case TLS -> "WECHAT_PROVIDER_TLS_FAILURE";
+                case TLS_CERTIFICATE -> "WECHAT_PROVIDER_TLS_CERTIFICATE_FAILURE";
+                case TLS_HANDSHAKE -> "WECHAT_PROVIDER_TLS_HANDSHAKE_FAILURE";
                 case CONNECTION -> "WECHAT_PROVIDER_CONNECTION_FAILED";
                 case UNAVAILABLE -> "WECHAT_PROVIDER_UNAVAILABLE";
             });

@@ -36,6 +36,11 @@ FROM eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # The API does not need operating-system privileges. Keep a stable numeric
 # identity so the same least-privilege boundary is preserved by CloudBase and
 # other container runtimes.

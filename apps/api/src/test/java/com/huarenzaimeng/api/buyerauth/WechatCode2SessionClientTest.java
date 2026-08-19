@@ -64,8 +64,10 @@ class WechatCode2SessionClientTest {
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TIMEOUT"));
         assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.DNS)),true,APP,SECRET,2000,3000).exchange(command()))
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_DNS_FAILURE"));
-        assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.TLS)),true,APP,SECRET,2000,3000).exchange(command()))
-                .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_FAILURE"));
+        assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE)),true,APP,SECRET,2000,3000).exchange(command()))
+                .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_CERTIFICATE_FAILURE"));
+        assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.TLS_HANDSHAKE)),true,APP,SECRET,2000,3000).exchange(command()))
+                .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_HANDSHAKE_FAILURE"));
         assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.CONNECTION)),true,APP,SECRET,2000,3000).exchange(command()))
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_CONNECTION_FAILED"));
         FakeTransport unavailable=new FakeTransport(new IllegalStateException("leak "+SECRET+" "+CODE));
