@@ -27,6 +27,9 @@ for(const source of formalSources)assert.doesNotMatch(source,/LOCAL_MOCK_NO_REAL
 assert.doesNotMatch(read('src/api/wechat-one-time-code.ts'),/Storage|console\.|log\(/)
 assert.match(authPage,/catch(?:\([^)]*\))?\{\s*clearBuyerSessionToken\(\)/)
 assert.match(authPage,/userAgreementAccepted=ref\(false\),privacyPolicyAccepted=ref\(false\)/)
+assert.match(authPage,/value="AGREEMENTS_BUNDLE"/)
+assert.equal((authPage.match(/<checkbox\s/g)||[]).length,1)
+assert.match(authPage,/userAgreementAccepted\.value=accepted\s+privacyPolicyAccepted\.value=accepted/)
 assert.match(authPage,/open-type="agreePrivacyAuthorization"/)
 assert.match(authPage,/@agreeprivacyauthorization="onOfficialPrivacyAuthorized"/)
 assert.match(authPage,/privacyState\.value!==\'OFFICIAL_PRIVACY_GRANTED\'/)
@@ -39,6 +42,9 @@ assert.match(profilePage,/退出登录/)
 assert.match(profilePage,/注销账号/)
 assert.match(profilePage,/logoutBuyerSession/)
 assert.match(profilePage,/requestBuyerAccountClosure/)
+assert.match(profilePage,/openProfileSignIn=.*pages\/auth\/expired/)
+assert.match(profilePage,/@click="openProfileSignIn"/)
+assert.match(profilePage,/点击登录或注册/)
 assert.match(profilePage,/仅退出当前会话，不会注销账号/)
 assert.match(profilePage,/受理后立即退出所有设备/)
 assert.match(lifecycleContract,/\/buyer-auth\/v1\/session\/logout/)
@@ -51,7 +57,7 @@ assert.match(userAgreementPage,/华人在孟小程序用户协议/)
 assert.match(privacyPolicyPage,/华人在孟小程序隐私政策/)
 assert.match(paymentPage,/:data-payment-sdk="paymentAvailable\?'available':'disabled-by-default'"/)
 assert.match(paymentPage,/v-if="paymentAvailable"[^>]+@click="pay"/)
-assert.match(paymentPage,/invokeWechatPayment\(params,miniProgramWechatPaymentSdk\)/)
+assert.match(paymentPage,/uni\.requestPayment\(\{provider:'wxpay',\.\.\.params/)
 assert.match(paymentPage,/finally\{paying\.value=false;await load\(\)\}/)
 for(const page of [profilePage,progressPage,refundPage])assert.match(page,/open-type="contact"/)
 assert.doesNotMatch(profilePage,/pages\/support\/case/)
@@ -68,10 +74,10 @@ assert.equal(agreementsAccepted({userAgreementAccepted:true,privacyPolicyAccepte
 assert.deepEqual(consentAcceptances({userAgreementAccepted:false,privacyPolicyAccepted:true}),[])
 const acceptances=consentAcceptances({userAgreementAccepted:true,privacyPolicyAccepted:true})
 assert.deepEqual(acceptances.map(({policyType,policyVersion,accepted})=>({policyType,policyVersion,accepted})),[
-  {policyType:'USER_AGREEMENT',policyVersion:'2026-08-28-v1',accepted:true},
-  {policyType:'PRIVACY_POLICY',policyVersion:'2026-08-28-v1',accepted:true}
+  {policyType:'USER_AGREEMENT',policyVersion:'2026-08-28',accepted:true},
+  {policyType:'PRIVACY_POLICY',policyVersion:'2026-08-28',accepted:true}
 ])
-assert.deepEqual(sessionConsentCommand({userAgreementAccepted:true,privacyPolicyAccepted:true}),{userAgreementVersion:'2026-08-28-v1',privacyPolicyVersion:'2026-08-28-v1',userAgreementAccepted:true,privacyPolicyAccepted:true})
+assert.deepEqual(sessionConsentCommand({userAgreementAccepted:true,privacyPolicyAccepted:true}),{userAgreementVersion:'2026-08-28',privacyPolicyVersion:'2026-08-28',userAgreementAccepted:true,privacyPolicyAccepted:true})
 assert.equal(sessionConsentCommand({userAgreementAccepted:true,privacyPolicyAccepted:false}),null)
 const guestStore={value:null,getStorageSync(){return this.value},setStorageSync(_key,value){this.value=value}}
 assert.equal(readOrCreateBuyerGuestRef(guestStore,1723000000000,.25),'GUEST-lzj9pon4-0hra0hs')

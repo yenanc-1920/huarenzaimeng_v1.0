@@ -35,6 +35,14 @@ class BuyerAuthControllerTest {
         assertThat(response.getStatusCode().value()).isEqualTo(400);verifyNoInteractions(service);
     }
 
+    @Test void exposesOnlySafeProviderFailureClassAsServiceUnavailable() throws Exception {
+        BuyerAuthService service=mock(BuyerAuthService.class);
+        when(service.establish(any())).thenThrow(new BuyerAuthService.Rejected("WECHAT_PROVIDER_TIMEOUT"));
+        var response=new BuyerAuthController(service).session(json.readTree("{\"code\":\"opaque-code-synthetic\",\"requestRef\":\"REQUEST-001\",\"guestRef\":\"GUEST-000001\",\"consent\":{\"userAgreementVersion\":\"UA-V1\",\"privacyPolicyVersion\":\"PP-V1\",\"userAgreementAccepted\":true,\"privacyPolicyAccepted\":true}}"),new MockHttpServletRequest());
+        assertThat(response.getStatusCode().value()).isEqualTo(503);
+        assertThat(response.getBody().toString()).contains("WECHAT_PROVIDER_TIMEOUT").doesNotContain("opaque-code-synthetic");
+    }
+
     @Test void wrongContentTypeEmptyAndMalformedBodiesUseControlledEnvelopeWithoutServiceCall() throws Exception {
         BuyerAuthService service=mock(BuyerAuthService.class);MockMvc mvc=MockMvcBuilders.standaloneSetup(new BuyerAuthController(service)).setControllerAdvice(new BuyerAuthHttpErrorHandler()).build();
         mvc.perform(post("/buyer-auth/v1/wechat/session").contentType("text/plain").content("opaque"))

@@ -1,10 +1,6 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance } from 'vue'
 defineProps<{ left?: string; right?: string; title?: string; touchSafe?: boolean }>()
 const emit = defineEmits<{ left: []; right: [] }>()
-const instance = getCurrentInstance()
-const hasLeftHandler = computed(() => !!instance?.vnode.props?.onLeft)
-const hasRightHandler = computed(() => !!instance?.vnode.props?.onRight)
 function readHeaderMetrics() {
   let statusBarHeight = 20
   let navigationHeight = 44
@@ -30,10 +26,10 @@ const rowStyle = `height:${navigationHeight}px`
 
 <template>
   <view class="header" :style="safeStyle"><view class="header-row" :style="rowStyle">
-    <button v-if="left && hasLeftHandler" class="side" :class="{'touch-safe':touchSafe}" :aria-label="left" @click="emit('left')">{{ left }}</button><view v-else class="side spacer" />
+    <button v-if="left" class="side" :class="{'touch-safe':touchSafe}" :aria-label="left" @click="emit('left')">{{ left }}</button><view v-else class="side spacer" />
     <view v-if="title" class="page-title">{{ title }}</view>
     <view v-else class="brand"><image src="/static/logo.png" mode="aspectFill" /><text>华人在孟</text></view>
-    <button v-if="right && hasRightHandler" class="side right" :class="{'touch-safe':touchSafe}" :aria-label="right" @click="emit('right')">{{ right }}</button><view v-else class="side spacer" />
+    <button v-if="right" class="side right" :class="{'touch-safe':touchSafe}" :aria-label="right" @click="emit('right')">{{ right }}</button><view v-else class="side spacer" />
   </view>
   </view>
 </template>

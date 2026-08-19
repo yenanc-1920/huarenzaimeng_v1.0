@@ -1,5 +1,5 @@
-export const USER_AGREEMENT_POLICY_VERSION='2026-08-28-v1'
-export const PRIVACY_POLICY_VERSION='2026-08-28-v1'
+export const USER_AGREEMENT_POLICY_VERSION='2026-08-28'
+export const PRIVACY_POLICY_VERSION='2026-08-28'
 
 export type LoginPrivacyState=
   | 'UNSEEN'
