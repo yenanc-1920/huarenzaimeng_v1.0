@@ -66,8 +66,13 @@ final class WechatCode2SessionClient implements WechatCode2SessionPort {
             response = transport.execute(new WechatCode2SessionTransport.Request(
                     OFFICIAL_ENDPOINT, appId, appSecret, command.oneTimeCode(), connectTimeout, readTimeout));
         } catch (WechatCode2SessionTransport.Failure failure) {
-            return new Unknown(failure.kind() == WechatCode2SessionTransport.FailureKind.TIMEOUT
-                    ? "WECHAT_PROVIDER_TIMEOUT" : "WECHAT_PROVIDER_UNAVAILABLE");
+            return new Unknown(switch (failure.kind()) {
+                case TIMEOUT -> "WECHAT_PROVIDER_TIMEOUT";
+                case DNS -> "WECHAT_PROVIDER_DNS_FAILURE";
+                case TLS -> "WECHAT_PROVIDER_TLS_FAILURE";
+                case CONNECTION -> "WECHAT_PROVIDER_CONNECTION_FAILED";
+                case UNAVAILABLE -> "WECHAT_PROVIDER_UNAVAILABLE";
+            });
         } catch (RuntimeException failure) {
             return new Unknown("WECHAT_PROVIDER_UNAVAILABLE");
         }

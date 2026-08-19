@@ -21,14 +21,23 @@ final class JdkWechatCode2SessionTransport implements WechatCode2SessionTranspor
                     .timeout(request.readTimeout()).GET().build();
             HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             return new Response(response.statusCode(), response.body());
-        } catch (java.net.http.HttpTimeoutException timeout) {
-            throw new Failure(FailureKind.TIMEOUT);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new Failure(FailureKind.UNAVAILABLE);
         } catch (Exception unavailable) {
-            throw new Failure(FailureKind.UNAVAILABLE);
+            throw new Failure(classify(unavailable));
         }
+    }
+
+    static FailureKind classify(Throwable failure) {
+        for (Throwable current = failure; current != null; current = current.getCause()) {
+            if (current instanceof java.net.http.HttpTimeoutException) return FailureKind.TIMEOUT;
+            if (current instanceof java.net.UnknownHostException
+                    || current instanceof java.nio.channels.UnresolvedAddressException) return FailureKind.DNS;
+            if (current instanceof javax.net.ssl.SSLException) return FailureKind.TLS;
+            if (current instanceof java.net.ConnectException) return FailureKind.CONNECTION;
+        }
+        return FailureKind.UNAVAILABLE;
     }
 
     static URI requestUri(Request request) {

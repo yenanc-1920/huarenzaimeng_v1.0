@@ -110,6 +110,9 @@ final class BuyerAuthService {
     private static String sha256(String v){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException(e);}}
     private static String safeUnknownProjectCode(String reason){return switch(reason==null?"":reason){
         case "WECHAT_PROVIDER_TIMEOUT"->"WECHAT_PROVIDER_TIMEOUT";
+        case "WECHAT_PROVIDER_DNS_FAILURE"->"WECHAT_PROVIDER_DNS_FAILURE";
+        case "WECHAT_PROVIDER_TLS_FAILURE"->"WECHAT_PROVIDER_TLS_FAILURE";
+        case "WECHAT_PROVIDER_CONNECTION_FAILED"->"WECHAT_PROVIDER_CONNECTION_FAILED";
         case "WECHAT_PROVIDER_UNAVAILABLE"->"WECHAT_PROVIDER_UNAVAILABLE";
         case "WECHAT_HTTP_STATUS_UNKNOWN"->"WECHAT_PROVIDER_HTTP_UNKNOWN";
         case "WECHAT_RESPONSE_INVALID"->"WECHAT_PROVIDER_RESPONSE_INVALID";
