@@ -39,7 +39,12 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && update-ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && USE_SYSTEM_CA_CERTS=1 /__cacert_entrypoint.sh /bin/true \
+    && install -d -m 0755 /app/truststore \
+    && cp "$JAVA_HOME/lib/security/cacerts" /app/truststore/cacerts \
+    && chmod 0444 /app/truststore/cacerts \
+    && keytool -list -keystore /app/truststore/cacerts -storepass changeit >/dev/null
 
 # The API does not need operating-system privileges. Keep a stable numeric
 # identity so the same least-privilege boundary is preserved by CloudBase and
@@ -52,10 +57,11 @@ COPY --chown=10001:10001 tools/container-entrypoint.sh /app/container-entrypoint
 RUN chmod 0555 /app/container-entrypoint.sh
 
 ENV SERVER_PORT=8080
-ENV USE_SYSTEM_CA_CERTS=1
+ENV HZ_JAVA_TRUSTSTORE_PATH=/app/truststore/cacerts
+ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/app/truststore/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
 # No profile default is permitted in the formal image. The hosting service must
 # explicitly select one supported release combination; the entrypoint fails closed otherwise.
 EXPOSE 8080
 
 USER 10001:10001
-ENTRYPOINT ["/__cacert_entrypoint.sh", "/app/container-entrypoint.sh"]
+ENTRYPOINT ["/app/container-entrypoint.sh"]

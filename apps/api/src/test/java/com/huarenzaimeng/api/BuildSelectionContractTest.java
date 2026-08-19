@@ -39,35 +39,48 @@ class BuildSelectionContractTest {
                 .contains("COPY --from=admin-web-build /workspace/apps/admin-web/dist apps/api/src/main/resources/static")
                 .contains("USER 10001:10001")
                 .contains("--chown=10001:10001")
-                .contains("ENV USE_SYSTEM_CA_CERTS=1")
-                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("-Dloader.main=com.huarenzaimeng.api.FlywayV12FunctionVerificationLauncher");
+        assertFixedJvmTruststore(dockerfile);
         assertThat(devDockerfile).contains("package -DskipTests -Plocal-devdata")
                 .contains("ENV SPRING_PROFILES_ACTIVE=release-mysql,local-mysql")
-                .contains("ENV USE_SYSTEM_CA_CERTS=1")
-                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("clean test");
+        assertFixedJvmTruststore(devDockerfile);
         assertThat(testDockerfile).contains("ENV SPRING_PROFILES_ACTIVE=release-mysql,test-mysql")
-                .contains("ENV USE_SYSTEM_CA_CERTS=1")
-                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("clean test");
+        assertFixedJvmTruststore(testDockerfile);
         assertThat(stageDockerfile).contains("ENV SPRING_PROFILES_ACTIVE=release-mysql,stage-mysql")
-                .contains("ENV USE_SYSTEM_CA_CERTS=1")
-                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("clean test");
+        assertFixedJvmTruststore(stageDockerfile);
         assertThat(prodDockerfile).contains("ENV SPRING_PROFILES_ACTIVE=release-mysql,prod-mysql")
-                .contains("ENV USE_SYSTEM_CA_CERTS=1")
-                .contains("ENTRYPOINT [\"/__cacert_entrypoint.sh\", \"/app/container-entrypoint.sh\"]")
                 .doesNotContain("clean test");
+        assertFixedJvmTruststore(prodDockerfile);
         assertThat(entrypoint).contains("release-mysql,local-mysql")
                 .contains("release-mysql,test-mysql")
                 .contains("release-mysql,stage-mysql")
                 .contains("release-mysql,prod-mysql")
+                .contains("Configured JVM truststore is missing or unreadable")
+                .contains("JAVA_TOOL_OPTIONS does not bind the configured JVM truststore")
+                .contains("Configured JVM truststore failed validation")
+                .contains("keytool -list")
+                .contains("exit 78")
                 .contains("exit 64")
                 .doesNotContain("mock");
         assertThat(gate).contains("run-dev-fast-gate.mjs")
                 .contains("run-dev-deployment-gate.mjs");
         assertThat(Files.readString(PROJECT_ROOT.resolve("apps/api/src/main/java/com/huarenzaimeng/api/MockFlowController.java")))
                 .contains("@Profile({\"mock\", \"test\"})");
+    }
+
+    private static void assertFixedJvmTruststore(String dockerfile) {
+        assertThat(dockerfile)
+                .contains("USE_SYSTEM_CA_CERTS=1 /__cacert_entrypoint.sh /bin/true")
+                .contains("cp \"$JAVA_HOME/lib/security/cacerts\" /app/truststore/cacerts")
+                .contains("chmod 0444 /app/truststore/cacerts")
+                .contains("keytool -list -keystore /app/truststore/cacerts -storepass changeit")
+                .contains("ENV HZ_JAVA_TRUSTSTORE_PATH=/app/truststore/cacerts")
+                .contains("-Djavax.net.ssl.trustStore=/app/truststore/cacerts")
+                .contains("ENTRYPOINT [\"/app/container-entrypoint.sh\"]")
+                .doesNotContain("ENV USE_SYSTEM_CA_CERTS=1")
+                .doesNotContain("ENTRYPOINT [\"/__cacert_entrypoint.sh\"");
     }
 }
