@@ -15,7 +15,20 @@ interface WechatCode2SessionTransport {
         }
     }
     record Response(int statusCode, String body) {}
-    enum FailureKind { TIMEOUT, DNS, TLS_CERTIFICATE, TLS_HANDSHAKE, CONNECTION, UNAVAILABLE }
+    enum FailureKind {
+        TIMEOUT,
+        DNS,
+        TLS_CERTIFICATE_EXPIRED,
+        TLS_CERTIFICATE_NOT_YET_VALID,
+        TLS_CERTIFICATE_REVOKED,
+        TLS_CERTIFICATE_REVOCATION_UNDETERMINED,
+        TLS_CERTIFICATE_ALGORITHM_CONSTRAINED,
+        TLS_CERTIFICATE_PATH_BUILD,
+        TLS_CERTIFICATE,
+        TLS_HANDSHAKE,
+        CONNECTION,
+        UNAVAILABLE
+    }
     final class Failure extends RuntimeException {
         private final FailureKind kind;
         Failure(FailureKind kind) { super("WECHAT_TRANSPORT_" + kind.name()); this.kind = kind; }

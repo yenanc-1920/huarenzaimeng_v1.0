@@ -66,6 +66,8 @@ class WechatCode2SessionClientTest {
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_DNS_FAILURE"));
         assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE)),true,APP,SECRET,2000,3000).exchange(command()))
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_CERTIFICATE_FAILURE"));
+        assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE_PATH_BUILD)),true,APP,SECRET,2000,3000).exchange(command()))
+                .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_CERTIFICATE_PATH_BUILD_FAILURE"));
         assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.TLS_HANDSHAKE)),true,APP,SECRET,2000,3000).exchange(command()))
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_TLS_HANDSHAKE_FAILURE"));
         assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Failure(WechatCode2SessionTransport.FailureKind.CONNECTION)),true,APP,SECRET,2000,3000).exchange(command()))
@@ -76,6 +78,18 @@ class WechatCode2SessionClientTest {
         assertThat(unavailableResult.toString()).doesNotContain(SECRET,CODE,"leak");
         assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Response(503,"secret="+SECRET)),true,APP,SECRET,2000,3000).exchange(command()))
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_HTTP_STATUS_UNKNOWN"));
+    }
+
+    @Test void certificateFailuresAreClassifiedWithoutExposingCertificateDetails() {
+        assertThat(JdkWechatCode2SessionTransport.classify(new java.security.cert.CertificateExpiredException("sensitive")))
+                .isEqualTo(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE_EXPIRED);
+        assertThat(JdkWechatCode2SessionTransport.classify(new java.security.cert.CertificateNotYetValidException("sensitive")))
+                .isEqualTo(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE_NOT_YET_VALID);
+        assertThat(JdkWechatCode2SessionTransport.classify(new java.security.cert.CertPathValidatorException(
+                "sensitive", null, null, -1, java.security.cert.CertPathValidatorException.BasicReason.ALGORITHM_CONSTRAINED)))
+                .isEqualTo(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE_ALGORITHM_CONSTRAINED);
+        assertThat(JdkWechatCode2SessionTransport.classify(new SunCertPathBuilderException()))
+                .isEqualTo(WechatCode2SessionTransport.FailureKind.TLS_CERTIFICATE_PATH_BUILD);
     }
 
     @Test void invalidJsonMissingIdentityAndOversizedBodyFailClosed() {
@@ -113,4 +127,5 @@ class WechatCode2SessionClientTest {
         FakeTransport(Object outcome){this.outcome=outcome;}
         @Override public Response execute(Request request){calls++;last=request;if(outcome instanceof Error e)throw e;if(outcome instanceof RuntimeException e)throw e;return (Response)outcome;}
     }
+    private static final class SunCertPathBuilderException extends Exception {}
 }
