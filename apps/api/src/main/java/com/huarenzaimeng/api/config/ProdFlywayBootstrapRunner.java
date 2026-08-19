@@ -22,6 +22,8 @@ import org.springframework.stereotype.Component;
 @Profile("release-mysql & (local-mysql | test-mysql | stage-mysql | prod-mysql)")
 final class ProdFlywayBootstrapRunner {
     private static final Logger LOG = LoggerFactory.getLogger(ProdFlywayBootstrapRunner.class);
+    static final long EXPECTED_VERSIONED_MIGRATION_COUNT = 24L;
+    static final long EXPECTED_TERMINAL_MIGRATION_VERSION = 24L;
     private final DataSource dataSource;
     private final Flyway flyway;
     private final ReleaseMigrationState state;
@@ -73,7 +75,7 @@ final class ProdFlywayBootstrapRunner {
             if (migrationEnabled) {
                 flyway.migrate();
             }
-            requirePostV15AndExpectedDevelopmentData();
+            requireExpectedMigrationAndDevelopmentData();
             state.ready();
         } catch (Exception failure) {
             state.failed();
@@ -100,7 +102,7 @@ final class ProdFlywayBootstrapRunner {
         }
     }
 
-    private void requirePostV15AndExpectedDevelopmentData() throws Exception {
+    private void requireExpectedMigrationAndDevelopmentData() throws Exception {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement();
              ResultSet history = statement.executeQuery(
@@ -109,10 +111,10 @@ final class ProdFlywayBootstrapRunner {
                              + "SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) "
                              + "FROM flyway_schema_history WHERE version IS NOT NULL")) {
             if (!history.next()
-                    || history.getLong(1) != 15L
-                    || history.getLong(2) != 15L
-                    || history.getLong(3) != 15L
-                    || history.getLong(4) != 15L
+                    || history.getLong(1) != EXPECTED_VERSIONED_MIGRATION_COUNT
+                    || history.getLong(2) != EXPECTED_VERSIONED_MIGRATION_COUNT
+                    || history.getLong(3) != EXPECTED_TERMINAL_MIGRATION_VERSION
+                    || history.getLong(4) != EXPECTED_VERSIONED_MIGRATION_COUNT
                     || history.getLong(5) != 0L
                     || history.next()) {
                 throw new IllegalStateException("ENVIRONMENT_FLYWAY_TERMINAL_STATE_INVALID");

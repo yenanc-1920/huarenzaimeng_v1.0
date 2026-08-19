@@ -11,12 +11,37 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 
 class ProdFlywayBootstrapRunnerTest {
+    private static final Pattern VERSIONED_MIGRATION = Pattern.compile("V(\\d+)__.+\\.sql");
+
+    @Test void terminalExpectationTracksTheCompleteMigrationManifest() throws Exception {
+        try (var files = Files.list(Path.of("src/main/resources/db/migration"))) {
+            var versions = files
+                    .map(path -> path.getFileName().toString())
+                    .map(VERSIONED_MIGRATION::matcher)
+                    .filter(matcher -> matcher.matches())
+                    .mapToLong(matcher -> Long.parseLong(matcher.group(1)))
+                    .sorted()
+                    .toArray();
+
+            org.assertj.core.api.Assertions.assertThat(versions).hasSize(24);
+            org.assertj.core.api.Assertions.assertThat(versions)
+                    .containsExactly(java.util.stream.LongStream.rangeClosed(1L, 24L).toArray());
+            org.assertj.core.api.Assertions.assertThat(ProdFlywayBootstrapRunner.EXPECTED_VERSIONED_MIGRATION_COUNT)
+                    .isEqualTo(versions.length);
+            org.assertj.core.api.Assertions.assertThat(ProdFlywayBootstrapRunner.EXPECTED_TERMINAL_MIGRATION_VERSION)
+                    .isEqualTo(versions[versions.length - 1]);
+        }
+    }
+
     @Test void initializesOnlyAnEmptyExactProdDatabaseAndMarksReady() throws Exception {
         Fixture fixture = fixture("huarenzaimeng_prod", false);
         ReleaseMigrationState state = new ReleaseMigrationState();
@@ -106,10 +131,10 @@ class ProdFlywayBootstrapRunnerTest {
         ResultSet registry = single(registryPresent ? 1L : 0L);
         ResultSet seeds = single(seedCount);
         when(history.next()).thenReturn(true, false);
-        when(history.getLong(1)).thenReturn(15L);
-        when(history.getLong(2)).thenReturn(15L);
-        when(history.getLong(3)).thenReturn(15L);
-        when(history.getLong(4)).thenReturn(15L);
+        when(history.getLong(1)).thenReturn(24L);
+        when(history.getLong(2)).thenReturn(24L);
+        when(history.getLong(3)).thenReturn(24L);
+        when(history.getLong(4)).thenReturn(24L);
         when(history.getLong(5)).thenReturn(0L);
         when(source.getConnection()).thenReturn(connection);
         when(connection.createStatement()).thenReturn(statement);
