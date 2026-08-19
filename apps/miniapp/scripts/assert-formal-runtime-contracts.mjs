@@ -42,6 +42,9 @@ assert.match(profilePage,/退出登录/)
 assert.match(profilePage,/注销账号/)
 assert.match(profilePage,/logoutBuyerSession/)
 assert.match(profilePage,/requestBuyerAccountClosure/)
+assert.match(profilePage,/openProfileSignIn=.*pages\/auth\/expired/)
+assert.match(profilePage,/@click="openProfileSignIn"/)
+assert.match(profilePage,/点击登录或注册/)
 assert.match(profilePage,/仅退出当前会话，不会注销账号/)
 assert.match(profilePage,/受理后立即退出所有设备/)
 assert.match(lifecycleContract,/\/buyer-auth\/v1\/session\/logout/)
@@ -71,10 +74,10 @@ assert.equal(agreementsAccepted({userAgreementAccepted:true,privacyPolicyAccepte
 assert.deepEqual(consentAcceptances({userAgreementAccepted:false,privacyPolicyAccepted:true}),[])
 const acceptances=consentAcceptances({userAgreementAccepted:true,privacyPolicyAccepted:true})
 assert.deepEqual(acceptances.map(({policyType,policyVersion,accepted})=>({policyType,policyVersion,accepted})),[
-  {policyType:'USER_AGREEMENT',policyVersion:'2026-08-28-v1',accepted:true},
-  {policyType:'PRIVACY_POLICY',policyVersion:'2026-08-28-v1',accepted:true}
+  {policyType:'USER_AGREEMENT',policyVersion:'2026-08-28',accepted:true},
+  {policyType:'PRIVACY_POLICY',policyVersion:'2026-08-28',accepted:true}
 ])
-assert.deepEqual(sessionConsentCommand({userAgreementAccepted:true,privacyPolicyAccepted:true}),{userAgreementVersion:'2026-08-28-v1',privacyPolicyVersion:'2026-08-28-v1',userAgreementAccepted:true,privacyPolicyAccepted:true})
+assert.deepEqual(sessionConsentCommand({userAgreementAccepted:true,privacyPolicyAccepted:true}),{userAgreementVersion:'2026-08-28',privacyPolicyVersion:'2026-08-28',userAgreementAccepted:true,privacyPolicyAccepted:true})
 assert.equal(sessionConsentCommand({userAgreementAccepted:true,privacyPolicyAccepted:false}),null)
 const guestStore={value:null,getStorageSync(){return this.value},setStorageSync(_key,value){this.value=value}}
 assert.equal(readOrCreateBuyerGuestRef(guestStore,1723000000000,.25),'GUEST-lzj9pon4-0hra0hs')

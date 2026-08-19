@@ -71,7 +71,7 @@ final class BuyerAuthService {
         try { exchange=provider.exchange(new WeChatIdentityPort.Command(code,providerCallRef)); }
         catch(RuntimeException failure){exchange=new WeChatIdentityPort.Unknown("CONTROLLED_PROVIDER_FAILURE");}
         if(exchange instanceof WeChatIdentityPort.Rejected){store.finishLoginAttempt(attemptRef,"REJECTED",providerCallRef,clock.instant());store.recordLoginWindowOutcome(windowKeyDigest,false,clock.instant());throw new Rejected("WECHAT_LOGIN_REJECTED");}
-        if(exchange instanceof WeChatIdentityPort.Unknown){store.finishLoginAttempt(attemptRef,"UNKNOWN",providerCallRef,clock.instant());store.recordLoginWindowOutcome(windowKeyDigest,false,clock.instant());throw new Rejected("WECHAT_LOGIN_RESULT_UNKNOWN");}
+        if(exchange instanceof WeChatIdentityPort.Unknown unknown){store.finishLoginAttempt(attemptRef,"UNKNOWN",providerCallRef,clock.instant());store.recordLoginWindowOutcome(windowKeyDigest,false,clock.instant());throw new Rejected(safeUnknownProjectCode(unknown.reasonClass()));}
         WeChatIdentityPort.Success success=(WeChatIdentityPort.Success)exchange;
         if(!expectedAppIdRef.equals(success.appIdRef())||!validProviderValue(success.providerSubject())||!validRequestRef(success.evidenceRef())){
             store.finishLoginAttempt(attemptRef,"UNKNOWN",providerCallRef,clock.instant());store.recordLoginWindowOutcome(windowKeyDigest,false,clock.instant());throw new Rejected("WECHAT_LOGIN_APPID_MISMATCH");
@@ -108,6 +108,16 @@ final class BuyerAuthService {
     private static String consentDigest(LoginCommand c){return sha256(c.guestRef()+"\n"+c.requestRef()+"\n"+c.userAgreementVersion()+"\n"+c.privacyPolicyVersion()+"\ntrue\ntrue");}
     private static String hmac(byte[] key,String value){try{Mac mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(key,"HmacSHA256"));return HexFormat.of().formatHex(mac.doFinal(value.getBytes(StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException("BUYER_IDENTITY_DIGEST_UNAVAILABLE");}}
     private static String sha256(String v){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException(e);}}
+    private static String safeUnknownProjectCode(String reason){return switch(reason==null?"":reason){
+        case "WECHAT_PROVIDER_TIMEOUT"->"WECHAT_PROVIDER_TIMEOUT";
+        case "WECHAT_PROVIDER_UNAVAILABLE"->"WECHAT_PROVIDER_UNAVAILABLE";
+        case "WECHAT_HTTP_STATUS_UNKNOWN"->"WECHAT_PROVIDER_HTTP_UNKNOWN";
+        case "WECHAT_RESPONSE_INVALID"->"WECHAT_PROVIDER_RESPONSE_INVALID";
+        case "WECHAT_IDENTITY_INVALID"->"WECHAT_PROVIDER_IDENTITY_INVALID";
+        case "WECHAT_PROVIDER_BUSY"->"WECHAT_PROVIDER_BUSY";
+        case "REAL_PROVIDER_ADAPTER_DISABLED"->"BUYER_AUTH_CONFIGURATION_UNAVAILABLE";
+        default->"WECHAT_LOGIN_RESULT_UNKNOWN";
+    };}
     private static boolean validProviderValue(String v){return v!=null&&v.matches("[A-Za-z0-9._:-]{8,128}");}
     private static boolean validCode(String v){return v!=null&&!v.isBlank()&&v.length()<=256&&v.indexOf('\n')<0&&v.indexOf('\r')<0;}
     private static boolean validRequestRef(String v){return v!=null&&v.matches("[A-Za-z0-9._:-]{8,128}");}

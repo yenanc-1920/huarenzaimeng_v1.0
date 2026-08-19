@@ -83,7 +83,7 @@ class BuyerAuthServiceTest {
         assertCode(service(disabledStore,success,false),"one-time-code-synthetic","BUYER_AUTH_DISABLED");
         assertThat(disabledStore.attemptWrites+disabledStore.sessionWrites+success.calls).isZero();
         MemoryStore rejectedStore=new MemoryStore();assertCode(service(rejectedStore,new FakePort(new WechatCode2SessionPort.Rejected("INVALID")),true),"one-time-code-rejected","WECHAT_LOGIN_REJECTED");
-        MemoryStore unknownStore=new MemoryStore();FakePort unknown=new FakePort(new WechatCode2SessionPort.Unknown("TIMEOUT"));assertCode(service(unknownStore,unknown,true),"one-time-code-unknown","WECHAT_LOGIN_RESULT_UNKNOWN");
+        MemoryStore unknownStore=new MemoryStore();FakePort unknown=new FakePort(new WechatCode2SessionPort.Unknown("WECHAT_PROVIDER_TIMEOUT"));assertCode(service(unknownStore,unknown,true),"one-time-code-unknown","WECHAT_PROVIDER_TIMEOUT");
         assertCode(service(unknownStore,unknown,true),"one-time-code-unknown","LOGIN_CODE_ALREADY_SUBMITTED");assertThat(unknown.calls).isOne();assertThat(unknownStore.sessionWrites).isZero();
     }
 

@@ -56,7 +56,8 @@ async function signIn(){
   }catch(cause){
     clearBuyerSessionToken()
     privacyState.value='AGREEMENTS_ACCEPTED'
-    error.value=cause instanceof Error&&cause.message==='BUYER_ACCOUNT_CLOSURE_PENDING'?'账号注销申请正在处理中，当前不能重新登录。':cause instanceof Error&&cause.message==='BUYER_CONSENT_REQUIRED'?'协议版本已更新，请重新阅读后再试。':'微信登录暂时不可用，请稍后重试。'
+    const code=cause instanceof Error?cause.message:''
+    error.value=code==='BUYER_ACCOUNT_CLOSURE_PENDING'?'账号注销申请正在处理中，当前不能重新登录。':code==='BUYER_CONSENT_REQUIRED'?'协议确认未生效，请取消勾选后重新勾选再试。':code==='BUYER_AUTH_CONFIGURATION_UNAVAILABLE'?'微信登录通道尚未正确启用。':code==='WECHAT_PROVIDER_TIMEOUT'||code==='WECHAT_PROVIDER_BUSY'?'微信登录服务响应较慢，请稍后重试。':code==='WECHAT_PROVIDER_UNAVAILABLE'||code==='WECHAT_PROVIDER_HTTP_UNKNOWN'?'当前服务暂时无法连接微信登录服务。':code==='WECHAT_PROVIDER_RESPONSE_INVALID'||code==='WECHAT_PROVIDER_IDENTITY_INVALID'?'微信身份结果暂时无法确认，请重新登录。':'微信登录暂时不可用，请稍后重试。'
   }finally{loading.value=false}
 }
 </script>
