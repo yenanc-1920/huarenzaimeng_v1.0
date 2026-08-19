@@ -16,7 +16,7 @@ export async function executeWechatDevelopmentSignIn(code:string,requestRef:stri
     const projectCode=object(response.data)&&typeof response.data.projectCode==='string'?response.data.projectCode:''
     if(response.statusCode===409&&projectCode==='BUYER_CONSENT_REQUIRED')throw new Error('BUYER_CONSENT_REQUIRED')
     if(response.statusCode===409&&projectCode==='BUYER_ACCOUNT_CLOSURE_PENDING')throw new Error('BUYER_ACCOUNT_CLOSURE_PENDING')
-    if(response.statusCode===503&&['BUYER_AUTH_CONFIGURATION_UNAVAILABLE','WECHAT_PROVIDER_TIMEOUT','WECHAT_PROVIDER_UNAVAILABLE','WECHAT_PROVIDER_HTTP_UNKNOWN','WECHAT_PROVIDER_RESPONSE_INVALID','WECHAT_PROVIDER_IDENTITY_INVALID','WECHAT_PROVIDER_BUSY'].includes(projectCode))throw new Error(projectCode)
+    if(response.statusCode===503&&['BUYER_AUTH_CONFIGURATION_UNAVAILABLE','WECHAT_PROVIDER_TIMEOUT','WECHAT_PROVIDER_DNS_FAILURE','WECHAT_PROVIDER_TLS_FAILURE','WECHAT_PROVIDER_CONNECTION_FAILED','WECHAT_PROVIDER_UNAVAILABLE','WECHAT_PROVIDER_HTTP_UNKNOWN','WECHAT_PROVIDER_RESPONSE_INVALID','WECHAT_PROVIDER_IDENTITY_INVALID','WECHAT_PROVIDER_BUSY'].includes(projectCode))throw new Error(projectCode)
     throw new Error(response.statusCode===401||response.statusCode===403?'WECHAT_SESSION_REVOKED':'WECHAT_SESSION_UNKNOWN')
   }
   const result = parse(response.data, requestRef)
