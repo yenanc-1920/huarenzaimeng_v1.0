@@ -20,6 +20,8 @@ import static org.assertj.core.api.Assertions.*;
 
 class ReleaseQuoteOrderServiceTest {
     private static final String PHONE_HMAC_SECRET="test-only-phone-digest-secret-32-bytes";
+    private static final Instant MARKET_START=Instant.parse("2000-01-01T00:00:00Z");
+    private static final Instant MARKET_END=Instant.parse("2100-01-01T00:00:00Z");
     private final Instant now=Instant.parse("2026-08-18T00:00:00Z");
     private JdbcTemplate jdbc; private ReleaseQuoteOrderService service;
 
@@ -73,8 +75,8 @@ class ReleaseQuoteOrderServiceTest {
         jdbc.update("UPDATE hz_operator_support_batch SET batch_state='ACTIVE' WHERE supported_operator_set_version=1");
         jdbc.update("UPDATE hz_product_catalog SET expires_at=? WHERE catalog_version=1",Timestamp.from(now.minusSeconds(1)));
         assertThatThrownBy(()->service.createOrder("BUYER-1","O2","OR2",quote.quoteRef())).isInstanceOf(FlowRejectedException.class).hasMessage("QUOTE_VERSION_DRIFT");
-        jdbc.update("UPDATE hz_product_catalog SET expires_at=? WHERE catalog_version=1",Timestamp.from(now.plusSeconds(86400)));
-        jdbc.update("INSERT INTO hz_product_catalog VALUES(2,1,'CAT-2','APP','ACTIVE',?,?,?)",Timestamp.from(now.minusSeconds(60)),Timestamp.from(now.plusSeconds(86400)),Timestamp.from(now));
+        jdbc.update("UPDATE hz_product_catalog SET expires_at=? WHERE catalog_version=1",Timestamp.from(MARKET_END));
+        jdbc.update("INSERT INTO hz_product_catalog VALUES(2,1,'CAT-2','APP','ACTIVE',?,?,?)",Timestamp.from(MARKET_START),Timestamp.from(MARKET_END),Timestamp.from(now));
         assertThatThrownBy(()->service.createOrder("BUYER-1","O3","OR3",quote.quoteRef())).isInstanceOf(FlowRejectedException.class).hasMessage("QUOTE_VERSION_DRIFT");
     }
 
@@ -94,7 +96,7 @@ class ReleaseQuoteOrderServiceTest {
                 .isInstanceOf(FlowRejectedException.class).hasMessage("BANGLADESH_PHONE_INVALID");
     }
 
-    private void seed(){Timestamp start=Timestamp.from(now.minusSeconds(86400)),end=Timestamp.from(now.plusSeconds(86400));
+    private void seed(){Timestamp start=Timestamp.from(MARKET_START),end=Timestamp.from(MARKET_END);
         jdbc.update("INSERT INTO hz_provider_channel VALUES('CH','WINLA','Winla',1,'ENABLED',1,?)",start);
         jdbc.update("INSERT INTO hz_platform_product VALUES('PRODUCT-1','BD','GP','BALANCE','৳100','Balance',100,NULL,NULL,NULL,NULL,'WINLA','SKU-1','BATCH','raw','raw',80,'BDT','AVAILABLE',?,'BALANCE','GP','MAPPED',NULL,1,NULL,?,?,'ENABLED','FIXTURE',1,?)",start,start,end,start);
         jdbc.update("INSERT INTO hz_price_version VALUES('PRICE-1','PRODUCT-1',12.34,80,'BDT','BATCH/SKU-1','FIXTURE','FX-1','BDT_CNY',0.06,?,?,0,0,0,0,0,'HALF_UP','PLATFORM','GLOBAL','ACTIVE',?,?,'SUPER_ADMIN',1,?)",start,end,start,end,start);
