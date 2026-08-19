@@ -16,7 +16,10 @@ final class JdkWechatCode2SessionTransport implements WechatCode2SessionTranspor
     @Override
     public Response execute(Request request) {
         try {
-            HttpClient client = HttpClient.newBuilder().connectTimeout(request.connectTimeout()).build();
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(request.connectTimeout())
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .build();
             HttpRequest httpRequest = HttpRequest.newBuilder(requestUri(request))
                     .timeout(request.readTimeout()).GET().build();
             HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
@@ -30,14 +33,17 @@ final class JdkWechatCode2SessionTransport implements WechatCode2SessionTranspor
     }
 
     static FailureKind classify(Throwable failure) {
+        boolean tlsFailure = false;
         for (Throwable current = failure; current != null; current = current.getCause()) {
             if (current instanceof java.net.http.HttpTimeoutException) return FailureKind.TIMEOUT;
             if (current instanceof java.net.UnknownHostException
                     || current instanceof java.nio.channels.UnresolvedAddressException) return FailureKind.DNS;
-            if (current instanceof javax.net.ssl.SSLException) return FailureKind.TLS;
+            if (current instanceof java.security.cert.CertificateException
+                    || current instanceof java.security.cert.CertPathValidatorException) return FailureKind.TLS_CERTIFICATE;
+            if (current instanceof javax.net.ssl.SSLException) tlsFailure = true;
             if (current instanceof java.net.ConnectException) return FailureKind.CONNECTION;
         }
-        return FailureKind.UNAVAILABLE;
+        return tlsFailure ? FailureKind.TLS_HANDSHAKE : FailureKind.UNAVAILABLE;
     }
 
     static URI requestUri(Request request) {

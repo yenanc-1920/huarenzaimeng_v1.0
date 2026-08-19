@@ -15,7 +15,7 @@ interface WechatCode2SessionTransport {
         }
     }
     record Response(int statusCode, String body) {}
-    enum FailureKind { TIMEOUT, DNS, TLS, CONNECTION, UNAVAILABLE }
+    enum FailureKind { TIMEOUT, DNS, TLS_CERTIFICATE, TLS_HANDSHAKE, CONNECTION, UNAVAILABLE }
     final class Failure extends RuntimeException {
         private final FailureKind kind;
         Failure(FailureKind kind) { super("WECHAT_TRANSPORT_" + kind.name()); this.kind = kind; }
