@@ -100,6 +100,33 @@ class WechatCode2SessionClientTest {
                 .isEqualTo(WechatCode2SessionTransport.FailureKind.TLS_HOSTNAME_MISMATCH);
     }
 
+    @Test
+    void certificateDiagnosticUsesDefaultTrustWithoutLeakingFailureTextOrRawCertificate() throws Exception {
+        var trustManager = JdkWechatCode2SessionTransport.defaultTrustManager();
+        var accepted = trustManager.getAcceptedIssuers();
+        var chain = accepted.length == 0
+                ? null
+                : new java.security.cert.X509Certificate[] {accepted[0]};
+        var diagnostic = JdkWechatCode2SessionTransport.summarizeCertificateFailure(
+                chain,
+                "RSA\r\nAUTH",
+                new java.security.cert.CertificateException("raw-sensitive-failure"),
+                accepted);
+
+        assertThat(JdkWechatCode2SessionTransport.diagnosticSslContext()).isNotNull();
+        assertThat(diagnostic.acceptedIssuerCount()).isEqualTo(accepted.length);
+        assertThat(diagnostic.chainLength()).isEqualTo(chain == null ? 0 : 1);
+        assertThat(diagnostic.authType()).doesNotContain("\r", "\n");
+        assertThat(diagnostic.failureKind()).isEqualTo("TLS_CERTIFICATE");
+        assertThat(diagnostic.toString()).doesNotContain("raw-sensitive-failure", "BEGIN CERTIFICATE");
+        if (chain != null) {
+            var certificate = diagnostic.certificates().get(0);
+            assertThat(certificate.sha256()).matches("[0-9a-f]{64}");
+            assertThat(certificate.subject()).isNotBlank().doesNotContain("\r", "\n");
+            assertThat(certificate.issuer()).isNotBlank().doesNotContain("\r", "\n");
+        }
+    }
+
     @Test void invalidJsonMissingIdentityAndOversizedBodyFailClosed() {
         assertResult("not-json",new WeChatIdentityPort.Unknown("WECHAT_RESPONSE_INVALID"));
         assertResult("{}",new WeChatIdentityPort.Unknown("WECHAT_IDENTITY_INVALID"));
