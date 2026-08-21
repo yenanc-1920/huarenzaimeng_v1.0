@@ -48,6 +48,17 @@ class ReleaseQuoteOrderServiceTest {
         assertThat(quote.catalogVersion()).isEqualTo(2);
     }
 
+    @Test void quoteUsesTheSameLatestEffectivePriceAsThePublicCatalog(){
+        Instant newer=now.minusSeconds(60);
+        jdbc.update("INSERT INTO hz_price_version VALUES('PRICE-2','PRODUCT-1',13.45,80,'BDT','BATCH/SKU-1','FIXTURE','FX-2','BDT_CNY',0.06,?,?,0,0,0,0,0,'HALF_UP','PLATFORM','GLOBAL','ACTIVE',?,?,'SUPER_ADMIN',2,?)",
+                Timestamp.from(newer),Timestamp.from(MARKET_END),Timestamp.from(newer),Timestamp.from(MARKET_END),Timestamp.from(newer));
+        var publicProducts=new V1DevelopmentDataService(jdbc,Clock.fixed(now,ZoneOffset.UTC)).products("GP","BALANCE");
+        var quote=service.createQuote("BUYER-1","IDEM-PRICE-2","REQ-PRICE-2","01712345678","PRODUCT-1");
+        assertThat(publicProducts).singleElement().satisfies(row->assertThat(row).containsValue("PRICE-2"));
+        assertThat(quote.priceVersionRef()).isEqualTo("PRICE-2");
+        assertThat(quote.finalAmountCny()).isEqualByComparingTo("13.45");
+    }
+
     @Test void quoteUsesSameLatestSupportSetAndCatalogAsPublicCatalog(){
         jdbc.update("INSERT INTO hz_operator_support_batch VALUES(2,'OB-2','APP','ACTIVE',1,?,?,NULL,?)",
                 Timestamp.from(MARKET_START),Timestamp.from(MARKET_END),Timestamp.from(now));
