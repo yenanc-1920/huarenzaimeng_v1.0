@@ -17,11 +17,31 @@ import java.util.Set;
 @RequestMapping("/buyer-auth/v1")
 final class BuyerAuthController {
     private static final Set<String> LOGIN_FIELDS=Set.of("code","requestRef","guestRef","consent");
+    private static final Set<String> ANONYMOUS_FIELDS=Set.of("requestRef","guestRef","consent");
     private static final Set<String> CONSENT_FIELDS=Set.of("userAgreementVersion","privacyPolicyVersion","userAgreementAccepted","privacyPolicyAccepted");
     private static final Set<String> CLOSURE_FIELDS=Set.of("requestRef","reason","expectedVersion");
-    private final BuyerAuthService auth; private final BuyerAccountLifecycleService lifecycle;
-    @Autowired BuyerAuthController(BuyerAuthService auth,BuyerAccountLifecycleService lifecycle){this.auth=auth;this.lifecycle=lifecycle;}
-    BuyerAuthController(BuyerAuthService auth){this(auth,null);}
+    private final BuyerAuthService auth; private final BuyerAccountLifecycleService lifecycle; private final AnonymousSessionService anonymous;
+    @Autowired BuyerAuthController(BuyerAuthService auth,BuyerAccountLifecycleService lifecycle,AnonymousSessionService anonymous){this.auth=auth;this.lifecycle=lifecycle;this.anonymous=anonymous;}
+    BuyerAuthController(BuyerAuthService auth,BuyerAccountLifecycleService lifecycle){this(auth,lifecycle,null);}
+    BuyerAuthController(BuyerAuthService auth){this(auth,null,null);}
+
+    @PostMapping(value="/anonymous-sessions",consumes=MediaType.APPLICATION_JSON_VALUE) ResponseEntity<?> anonymous(@RequestBody JsonNode body,HttpServletRequest request){
+        JsonNode consent=body.path("consent");
+        if(request.getQueryString()!=null||!body.isObject()||!fieldNames(body).equals(ANONYMOUS_FIELDS)||!consent.isObject()||!fieldNames(consent).equals(CONSENT_FIELDS)
+                ||!body.path("requestRef").isTextual()||!body.path("guestRef").isTextual()
+                ||!consent.path("userAgreementVersion").isTextual()||!consent.path("privacyPolicyVersion").isTextual()
+                ||!consent.path("userAgreementAccepted").isBoolean()||!consent.path("privacyPolicyAccepted").isBoolean()||anonymous==null)
+            return failure(400,"ANONYMOUS_SESSION_REQUEST_INVALID","NOT_RETRYABLE",text(body,"requestRef"));
+        String requestRef=body.path("requestRef").textValue();
+        try{
+            var result=anonymous.establish(new AnonymousSessionService.Command(requestRef,body.path("guestRef").textValue(),
+                    consent.path("userAgreementVersion").textValue(),consent.path("privacyPolicyVersion").textValue(),
+                    consent.path("userAgreementAccepted").booleanValue(),consent.path("privacyPolicyAccepted").booleanValue()));
+            Map<String,Object> response=envelope("AUTHENTICATED","ANONYMOUS_SESSION_CREATED",requestRef,"NONE");
+            response.put("subjectRef",result.subjectRef());response.put("token",result.token());response.put("absoluteExpiresAt",result.absoluteExpiresAt().toString());
+            return ResponseEntity.status(201).header("Cache-Control","no-store").body(response);
+        }catch(AnonymousSessionService.Rejected rejected){return failure(anonymousStatus(rejected.projectCode),rejected.projectCode,"NOT_RETRYABLE",requestRef);}
+    }
 
     @PostMapping(value="/wechat/session",consumes=MediaType.APPLICATION_JSON_VALUE) ResponseEntity<?> session(@RequestBody JsonNode body,HttpServletRequest request){
         JsonNode consent=body.path("consent");
@@ -52,6 +72,7 @@ final class BuyerAuthController {
                 .orElseGet(()->ResponseEntity.status(409).body(Map.of("projectCode","BUYER_CONSENT_REQUIRED")));
     }
     @PostMapping(value="/wechat/session",consumes=MediaType.ALL_VALUE) ResponseEntity<?> unsupportedMediaType(){return failure(400,"LOGIN_REQUEST_INVALID","NEW_CODE_REQUIRED",null);}
+    @PostMapping(value="/anonymous-sessions",consumes=MediaType.ALL_VALUE) ResponseEntity<?> unsupportedAnonymousMediaType(){return failure(400,"ANONYMOUS_SESSION_REQUEST_INVALID","NOT_RETRYABLE",null);}
 
     @GetMapping("/session") ResponseEntity<?> current(HttpServletRequest request){
         if(request.getQueryString()!=null||request.getContentLengthLong()>0)return ResponseEntity.badRequest().body(Map.of("status","REJECTED","projectCode","SESSION_REQUEST_INVALID"));
@@ -89,4 +110,5 @@ final class BuyerAuthController {
     private static String text(JsonNode n,String key){return n.path(key).isTextual()&&n.path(key).textValue().matches("[A-Za-z0-9._:-]{8,128}")?n.path(key).textValue():null;}
     private static int status(String code){return switch(code){case"BUYER_AUTH_DISABLED","BUYER_AUTH_CONFIGURATION_UNAVAILABLE","WECHAT_LOGIN_RESULT_UNKNOWN","WECHAT_PROVIDER_TIMEOUT","WECHAT_PROVIDER_DNS_FAILURE","WECHAT_PROVIDER_TLS_CERTIFICATE_FAILURE","WECHAT_PROVIDER_TLS_HANDSHAKE_FAILURE","WECHAT_PROVIDER_CONNECTION_FAILED","WECHAT_PROVIDER_UNAVAILABLE","WECHAT_PROVIDER_HTTP_UNKNOWN","WECHAT_PROVIDER_RESPONSE_INVALID","WECHAT_PROVIDER_IDENTITY_INVALID","WECHAT_PROVIDER_BUSY","BUYER_SESSION_RESULT_UNKNOWN"->503;case"LOGIN_CODE_ALREADY_SUBMITTED","BUYER_ACCOUNT_CLOSURE_PENDING","BUYER_CONSENT_REQUIRED"->409;case"WECHAT_LOGIN_REJECTED"->401;default->400;};}
     private static String retry(String code){return code.equals("BUYER_AUTH_DISABLED")||code.equals("BUYER_AUTH_CONFIGURATION_UNAVAILABLE")?"NOT_RETRYABLE":"NEW_CODE_REQUIRED";}
+    private static int anonymousStatus(String code){return code.equals("ANONYMOUS_SESSION_IDEMPOTENCY_CONFLICT")?409:code.equals("ANONYMOUS_SESSION_REQUEST_INVALID")?400:503;}
 }

@@ -2,6 +2,7 @@ package com.huarenzaimeng.api;
 
 import com.huarenzaimeng.api.buyerauth.BuyerSessionFilter;
 import com.huarenzaimeng.api.buyerauth.BuyerSessionPrincipal;
+import com.huarenzaimeng.api.buyerauth.TransactionPrincipal;
 import com.huarenzaimeng.core.MnpState;
 import com.huarenzaimeng.core.OrderProjection;
 import com.huarenzaimeng.core.ProjectEnvelope;
@@ -37,13 +38,13 @@ public final class ReleaseBuyerFlowController {
     @PostMapping("/quotes")
     ResponseEntity<?> quote(HttpServletRequest servlet, @RequestHeader("Idempotency-Key") @NotBlank String idempotencyKey,
                             @Valid @RequestBody QuoteRequest r) {
-        BuyerSessionPrincipal buyer=principal(servlet);requireConsent(buyer);return ok(requireQuoteOrders().createQuote(buyer.subjectRef(),idempotencyKey,r.requestRef(),r.phone(),r.productRef()));
+        TransactionPrincipal principal=transactionPrincipal(servlet);requireConsent(principal);return ok(requireQuoteOrders().createQuote(principal.subjectRef(),idempotencyKey,r.requestRef(),r.phone(),r.productRef()));
     }
 
     @PostMapping("/orders")
     ResponseEntity<?> order(HttpServletRequest servlet, @RequestHeader("Idempotency-Key") @NotBlank String idempotencyKey,
                             @Valid @RequestBody OrderRequest r) {
-        BuyerSessionPrincipal buyer=principal(servlet);requireConsent(buyer);return ok(requireQuoteOrders().createOrder(buyer.subjectRef(),idempotencyKey,r.requestRef(),r.quoteRef()));
+        TransactionPrincipal principal=transactionPrincipal(servlet);requireConsent(principal);return ok(requireQuoteOrders().createOrder(principal.subjectRef(),idempotencyKey,r.requestRef(),r.quoteRef()));
     }
 
     @GetMapping("/orders")
@@ -108,12 +109,17 @@ public final class ReleaseBuyerFlowController {
         if (value instanceof BuyerSessionPrincipal buyer) return buyer;
         throw new FlowRejectedException("BUYER_SESSION_REQUIRED");
     }
+    private static TransactionPrincipal transactionPrincipal(HttpServletRequest request) {
+        Object value=request.getAttribute(BuyerSessionFilter.BUYER);
+        if(value instanceof TransactionPrincipal principal)return principal;
+        throw new FlowRejectedException("TRANSACTION_SESSION_REQUIRED");
+    }
     private static <T> ResponseEntity<ProjectEnvelope<T>> ok(T body) {
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(ProjectEnvelope.accepted(body));
     }
     private static ResponseEntity<?> providerUnavailable(String code){return ResponseEntity.status(503).header("Cache-Control","no-store").body(ProjectEnvelope.rejected(code));}
     private ReleaseQuoteOrderService requireQuoteOrders(){if(quoteOrders==null)throw new IllegalStateException("RELEASE_QUOTE_ORDER_SERVICE_REQUIRED");return quoteOrders;}
-    private void requireConsent(BuyerSessionPrincipal buyer){if(consent!=null)consent.requireTransactionWrite(buyer.subjectRef());}
+    private void requireConsent(TransactionPrincipal principal){if(consent!=null&&principal.type()==TransactionPrincipal.Type.BUYER)consent.requireTransactionWrite(principal.subjectRef());}
 
     @ExceptionHandler(WeChatPayCoordinator.Conflict.class)
     ResponseEntity<?> paymentConflict(WeChatPayCoordinator.Conflict conflict){return ResponseEntity.status(409).header("Cache-Control","no-store").body(ProjectEnvelope.rejected(conflict.getMessage()));}

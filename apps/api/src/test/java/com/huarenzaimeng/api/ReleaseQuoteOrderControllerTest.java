@@ -2,6 +2,7 @@ package com.huarenzaimeng.api;
 
 import com.huarenzaimeng.api.buyerauth.BuyerSessionFilter;
 import com.huarenzaimeng.api.buyerauth.BuyerSessionPrincipal;
+import com.huarenzaimeng.api.buyerauth.AnonymousTransactionPrincipal;
 import com.huarenzaimeng.api.payment.WeChatPayCoordinator;
 import com.huarenzaimeng.api.payment.WeChatPayPort;
 import org.junit.jupiter.api.Test;
@@ -36,10 +37,21 @@ class ReleaseQuoteOrderControllerTest {
         MockHttpServletRequest missing=new MockHttpServletRequest();
 
         assertThatThrownBy(()->controller.quote(missing,"IDEMP",new ReleaseBuyerFlowController.QuoteRequest("R","01712345678","P")))
-                .isInstanceOf(FlowRejectedException.class).hasMessage("BUYER_SESSION_REQUIRED");
+                .isInstanceOf(FlowRejectedException.class).hasMessage("TRANSACTION_SESSION_REQUIRED");
         assertThatThrownBy(()->controller.order(missing,"IDEMP",new ReleaseBuyerFlowController.OrderRequest("R","Q")))
-                .isInstanceOf(FlowRejectedException.class).hasMessage("BUYER_SESSION_REQUIRED");
+                .isInstanceOf(FlowRejectedException.class).hasMessage("TRANSACTION_SESSION_REQUIRED");
         verifyNoInteractions(service);
+    }
+
+    @Test void anonymousQuoteAndOrderUseOnlyTheServerPrincipalSubject(){
+        ReleaseQuoteOrderService service=mock(ReleaseQuoteOrderService.class);
+        ReleaseBuyerFlowController controller=new ReleaseBuyerFlowController(mock(FlowStore.class),mock(WeChatPayCoordinator.class),mock(WeChatPayPort.class),service);
+        MockHttpServletRequest request=new MockHttpServletRequest();
+        request.setAttribute(BuyerSessionFilter.BUYER,new AnonymousTransactionPrincipal("ANON-SUBJECT-1","ANON-SESSION-1"));
+        controller.quote(request,"Q-IDEMP",new ReleaseBuyerFlowController.QuoteRequest("Q-REQUEST","01712345678","PRODUCT-1"));
+        controller.order(request,"O-IDEMP",new ReleaseBuyerFlowController.OrderRequest("O-REQUEST","QUOTE-1"));
+        verify(service).createQuote("ANON-SUBJECT-1","Q-IDEMP","Q-REQUEST","01712345678","PRODUCT-1");
+        verify(service).createOrder("ANON-SUBJECT-1","O-IDEMP","O-REQUEST","QUOTE-1");
     }
 
     private static MockHttpServletRequest request(String buyer){

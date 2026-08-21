@@ -72,6 +72,15 @@ class ReleaseQuoteOrderServiceTest {
                 .isInstanceOf(FlowRejectedException.class).hasMessage("QUOTE_EXPIRED");
     }
 
+    @Test void anonymousQuoteCanCreateOnlyAnOrderForTheSameAnonymousSubject(){
+        var quote=service.createQuote("ANON-SUBJECT-1","ANON-Q-IDEMP","ANON-Q-REQ","01712345678","PRODUCT-1");
+        var order=service.createOrder("ANON-SUBJECT-1","ANON-O-IDEMP","ANON-O-REQ",quote.quoteRef());
+        assertThat(order.quoteRef()).isEqualTo(quote.quoteRef());
+        assertThatThrownBy(()->service.createOrder("ANON-SUBJECT-2","ANON-O-IDEMP-2","ANON-O-REQ-2",quote.quoteRef()))
+                .isInstanceOf(FlowRejectedException.class).hasMessage("QUOTE_NOT_AVAILABLE");
+        assertThat(jdbc.queryForObject("SELECT project_subject_ref FROM hz_release_order_snapshot WHERE order_ref=?",String.class,order.orderRef())).isEqualTo("ANON-SUBJECT-1");
+    }
+
     @Test void concurrentSameOrderKeyProducesOneImmutableOrder() throws Exception {
         var quote=service.createQuote("BUYER-1","IDEM-Q","REQ-Q","01712345678","PRODUCT-1");
         var pool=Executors.newFixedThreadPool(2);

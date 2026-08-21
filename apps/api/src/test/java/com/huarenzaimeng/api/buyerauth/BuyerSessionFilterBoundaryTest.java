@@ -38,4 +38,31 @@ class BuyerSessionFilterBoundaryTest {
         assertThat(request.getAttribute(BuyerSessionFilter.BUYER)).isEqualTo(new BuyerSessionPrincipal("BUYER-1","SESSION-1"));
         verify(chain).doFilter(request,response);
     }
+
+    @Test void anonymousBearerAllowsOnlyQuoteAndOrderPosts() throws Exception {
+        BuyerAuthService auth=mock(BuyerAuthService.class);AnonymousSessionService anonymous=mock(AnonymousSessionService.class);
+        when(auth.authenticate("ANON-TOKEN")).thenReturn(Optional.empty());
+        when(anonymous.authenticate("ANON-TOKEN")).thenReturn(Optional.of(new AnonymousTransactionPrincipal("ANON-SUBJECT","AS-1")));
+        BuyerSessionFilter filter=new BuyerSessionFilter(auth,anonymous);
+        for(String path:new String[]{"/buyer-api/v1/quotes","/buyer-api/v1/orders"}){
+            MockHttpServletRequest request=new MockHttpServletRequest("POST",path);request.addHeader("Authorization","Bearer ANON-TOKEN");
+            MockHttpServletResponse response=new MockHttpServletResponse();FilterChain chain=mock(FilterChain.class);
+            filter.doFilter(request,response,chain);
+            assertThat(request.getAttribute(BuyerSessionFilter.BUYER)).isEqualTo(new AnonymousTransactionPrincipal("ANON-SUBJECT","AS-1"));
+            verify(chain).doFilter(request,response);
+        }
+    }
+
+    @Test void anonymousBearerCannotReadPersonalOrdersOrReachPaymentAndTopup() throws Exception {
+        BuyerAuthService auth=mock(BuyerAuthService.class);AnonymousSessionService anonymous=mock(AnonymousSessionService.class);
+        when(auth.authenticate("ANON-TOKEN")).thenReturn(Optional.empty());
+        when(anonymous.authenticate("ANON-TOKEN")).thenReturn(Optional.of(new AnonymousTransactionPrincipal("ANON-SUBJECT","AS-1")));
+        BuyerSessionFilter filter=new BuyerSessionFilter(auth,anonymous);
+        for(var route:new String[][]{{"GET","/buyer-api/v1/orders"},{"GET","/buyer-api/v1/orders/O-1"},{"POST","/buyer-api/v1/orders/O-1/payment-intents"},{"POST","/buyer-api/v1/orders/O-1/topup"}}){
+            MockHttpServletRequest request=new MockHttpServletRequest(route[0],route[1]);request.addHeader("Authorization","Bearer ANON-TOKEN");
+            MockHttpServletResponse response=new MockHttpServletResponse();FilterChain chain=mock(FilterChain.class);
+            filter.doFilter(request,response,chain);
+            assertThat(response.getStatus()).isEqualTo(401);verifyNoInteractions(chain);
+        }
+    }
 }

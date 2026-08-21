@@ -54,6 +54,34 @@ class BuyerAuthControllerTest {
         verifyNoInteractions(service);
     }
 
+    @Test void anonymousSessionUsesStrictConsentEnvelopeAndSevenFieldResponse() throws Exception {
+        BuyerAuthService buyer=mock(BuyerAuthService.class);AnonymousSessionService anonymous=mock(AnonymousSessionService.class);
+        Instant expiry=Instant.parse("2026-08-23T00:00:00Z");
+        when(anonymous.establish(argThat(c->c!=null&&c.requestRef().equals("ANON-REQUEST-001")
+                &&c.guestRef().equals("GUEST-000001")&&c.userAgreementVersion().equals("UA-V1")
+                &&c.privacyPolicyVersion().equals("PP-V1")&&c.userAgreementAccepted()&&c.privacyPolicyAccepted())))
+                .thenReturn(new AnonymousSessionService.SessionResult("ANON-REQUEST-001","ANON-SUBJECT-1","anonymous-token",expiry));
+        var response=new BuyerAuthController(buyer,null,anonymous).anonymous(json.readTree("{\"requestRef\":\"ANON-REQUEST-001\",\"guestRef\":\"GUEST-000001\",\"consent\":{\"userAgreementVersion\":\"UA-V1\",\"privacyPolicyVersion\":\"PP-V1\",\"userAgreementAccepted\":true,\"privacyPolicyAccepted\":true}}"),new MockHttpServletRequest());
+        assertThat(response.getStatusCode().value()).isEqualTo(201);
+        assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
+        @SuppressWarnings("unchecked") Map<String,Object> body=(Map<String,Object>)response.getBody();
+        assertThat(body.keySet()).containsExactlyInAnyOrder("outcome","projectCode","requestRef","subjectRef","token","absoluteExpiresAt","retryClass");
+        assertThat(body).containsEntry("projectCode","ANONYMOUS_SESSION_CREATED").containsEntry("subjectRef","ANON-SUBJECT-1");
+    }
+
+    @Test void anonymousSessionRejectsAdditionalFieldsAndMalformedMediaBeforeService() throws Exception {
+        BuyerAuthService buyer=mock(BuyerAuthService.class);AnonymousSessionService anonymous=mock(AnonymousSessionService.class);
+        var controller=new BuyerAuthController(buyer,null,anonymous);
+        var response=controller.anonymous(json.readTree("{\"requestRef\":\"ANON-REQUEST-001\",\"guestRef\":\"GUEST-000001\",\"openid\":\"forged\",\"consent\":{\"userAgreementVersion\":\"UA-V1\",\"privacyPolicyVersion\":\"PP-V1\",\"userAgreementAccepted\":true,\"privacyPolicyAccepted\":true}}"),new MockHttpServletRequest());
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        MockMvc mvc=MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(new BuyerAuthHttpErrorHandler()).build();
+        mvc.perform(post("/buyer-auth/v1/anonymous-sessions").contentType("text/plain").content("opaque"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.projectCode").value("ANONYMOUS_SESSION_REQUEST_INVALID"));
+        mvc.perform(post("/buyer-auth/v1/anonymous-sessions").contentType("application/json").content("{broken"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.projectCode").value("ANONYMOUS_SESSION_REQUEST_INVALID"));
+        verifyNoInteractions(anonymous);
+    }
+
     @Test void logoutUnknownNeverClaimsSuccess() {
         BuyerAuthService service=mock(BuyerAuthService.class);when(service.logout("opaque-token")).thenReturn(BuyerAuthStore.LogoutResult.UNKNOWN);
         MockHttpServletRequest request=new MockHttpServletRequest("POST","/buyer-auth/v1/session/logout");request.addHeader("Authorization","Bearer opaque-token");
