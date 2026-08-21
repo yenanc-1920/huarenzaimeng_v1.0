@@ -12,7 +12,10 @@ import type { TemporalOverviewReadResponse } from './temporal-overview-contract'
 import { parseP014Response, P014_BACKEND_IMPLEMENTATION_SHA, type P014Response } from './p014-topup-contract'
 import { parseP021Response, type P021Response } from './order-detail-contract'
 import { callProjectApi } from './wechat-development-transport'
-import { requireBuyerBearerToken } from './buyer-session-token'
+import { readBuyerSessionToken, requireBuyerBearerToken } from './buyer-session-token'
+import { commitAnonymousSessionToken, parseAnonymousSessionResponse, readAnonymousSessionToken } from './anonymous-session-contract'
+import { sessionConsentCommand } from '../domain/login-privacy-state'
+import { readOrCreateBuyerGuestRef } from '../domain/buyer-guest-ref'
 import { createFormalTransactionClient, type FormalTransactionResponse } from './formal-transaction-client'
 import type { PaymentCreateContext } from './formal-transaction-client'
 import { parseReleaseOrderView, parseReleaseQuoteView, type ReleaseOrderView } from './formal-transaction-contract'
@@ -26,11 +29,37 @@ const orderRecoveryExternalAuthReady = import.meta.env.VITE_ORDER_RECOVERY_EXTER
 
 export { ProjectApiError } from './project-envelope'
 
-function requestBody(path: string, method: 'GET' | 'POST', data?: UniNamespace.RequestOptions['data'], root = baseUrl, extraHeaders:Record<string,string>={}): Promise<unknown> {
+function anonymousSessionResponse(requestRef:string):Promise<{statusCode:number;data:unknown;header?:unknown}>{
+  const consent=sessionConsentCommand({userAgreementAccepted:true,privacyPolicyAccepted:true})
+  if(!consent)throw new ProjectApiError('ANONYMOUS_SESSION_REQUEST_INVALID')
+  const body={requestRef,guestRef:readOrCreateBuyerGuestRef(uni),consent}
+  if(useWechatDevelopment)return callProjectApi('/buyer-auth/v1/anonymous-sessions','POST',body)
+  return new Promise((resolve,reject)=>uni.request({
+    url:`${buyerAuthBaseUrl}/anonymous-sessions`,method:'POST',data:body,
+    success:({data:response,statusCode,header})=>resolve({statusCode,data:response,header}),
+    fail:()=>reject(new ProjectApiError('ANONYMOUS_SESSION_UNAVAILABLE')),
+  }))
+}
+async function transactionBearer(data:unknown):Promise<string>{
+  const buyer=readBuyerSessionToken()
+  if(buyer)return buyer.token
+  const cached=readAnonymousSessionToken()
+  if(cached)return cached.token
+  if(!data||typeof data!=='object'||Array.isArray(data)||typeof (data as Record<string,unknown>).requestRef!=='string')throw new ProjectApiError('ANONYMOUS_SESSION_REQUEST_INVALID')
+  const requestRef=(data as Record<string,string>).requestRef
+  try{
+    const result=parseAnonymousSessionResponse(await anonymousSessionResponse(requestRef),requestRef)
+    commitAnonymousSessionToken(result)
+    return result.token
+  }catch{throw new ProjectApiError('ANONYMOUS_SESSION_UNAVAILABLE')}
+}
+async function requestBody(path: string, method: 'GET' | 'POST', data?: UniNamespace.RequestOptions['data'], root = baseUrl, extraHeaders:Record<string,string>={}): Promise<unknown> {
   const protectedRequest = path === '/quotes' || path === '/orders' || path.startsWith('/orders/') || path === '/recovery-cases' || path.startsWith('/recovery-cases/')
+  const anonymousEligible=method==='POST'&&root===baseUrl&&(path==='/quotes'||path==='/orders')
+  const bearer=anonymousEligible?await transactionBearer(data):protectedRequest?requireBuyerBearerToken():undefined
   if (useWechatDevelopment) {
     const effectiveRoot=protectedRequest&&root===baseUrl?buyerBaseUrl:root
-    return callProjectApi(`${effectiveRoot}${path}`, method, data, protectedRequest ? requireBuyerBearerToken() : undefined,extraHeaders).then(result => {
+    return callProjectApi(`${effectiveRoot}${path}`, method, data, bearer,extraHeaders).then(result => {
       if (result.statusCode < 200 || result.statusCode >= 300) throw new ProjectApiError('HTTP_STATUS_REJECTED')
       return result.data
     })
@@ -40,7 +69,7 @@ function requestBody(path: string, method: 'GET' | 'POST', data?: UniNamespace.R
     method,
     data,
     header: protectedRequest
-      ? { ...extraHeaders,Authorization: `Bearer ${requireBuyerBearerToken()}` }
+      ? { ...extraHeaders,Authorization: `Bearer ${bearer}` }
       : extraHeaders,
     success: ({ data: body }) => resolve(body),
     fail: () => reject(new ProjectApiError('NETWORK_ERROR')),

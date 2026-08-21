@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { selectionMatchesCatalog } from '../src/api/topup-recovery-contract.ts'
+import { commitAnonymousSessionToken, parseAnonymousSessionResponse, readAnonymousSessionToken, resetAnonymousSessionTokenForTests } from '../src/api/anonymous-session-contract.ts'
 
 const root=process.cwd()
 const read=path=>readFileSync(resolve(root,path),'utf8')
@@ -31,7 +32,12 @@ assert.match(client,/\/directory\/cities/)
 assert.match(client,/\/directory\/entries/)
 assert.match(client,/\/content\/life-items/)
 assert.match(client,/\/home\/temporal-overview/)
-assert.match(client,/Authorization: `Bearer \$\{requireBuyerBearerToken\(\)\}`/)
+assert.match(client,/anonymousEligible\?await transactionBearer\(data\):protectedRequest\?requireBuyerBearerToken\(\):undefined/)
+assert.match(client,/method==='POST'.*path==='\/quotes'.*path==='\/orders'/)
+assert.match(client,/\/buyer-auth\/v1|buyerAuthBaseUrl/)
+assert.match(client,/const body=\{requestRef,guestRef:readOrCreateBuyerGuestRef\(uni\),consent\}/,'anonymous session body must contain only the frozen request fields')
+assert.match(client,/sessionConsentCommand\(\{userAgreementAccepted:true,privacyPolicyAccepted:true\}\)/,'anonymous session must bind the current accepted consent versions')
+assert.doesNotMatch(client,/Authorization: `Bearer \$\{(?:''|undefined|null)\}`/)
 assert.doesNotMatch(payment,/paymentIntentApi|LocalSynthetic|createPaymentIntent|confirmPayment/)
 assert.match(payment,/api\.getCoreProjection/)
 assert.match(payment,/当前暂不可支付/)
@@ -66,10 +72,10 @@ assert.match(quote,/quote\.entitlement\.benefitText/)
 assert.match(quote,/quote\.entitlement\.displayName/)
 assert.doesNotMatch(quote,/quote\.faceValue\.minor|totalAmountMinor.*到账内容|到账内容[\s\S]{0,100}quote\.total/)
 assert.doesNotMatch(quote,/parseRechargeSelection\(uni\.getStorageSync\('rechargeSelection'\)\)[\s\S]{0,160}currentSelectionIsValid/,'P012 must not repeat the catalog read before createQuote')
-const buyerSessionBranch=quote.match(/if\(code==='BUYER_SESSION_REQUIRED'\)\{([\s\S]*?)\}\s*else/)?.[1]??''
-assert.match(buyerSessionBranch,/pages\/auth\/expired/,'a missing BUYER session must enter login instead of masquerading as catalog drift')
-assert.match(buyerSessionBranch,/quote\.value=null/,'a missing BUYER session must not retain a quote')
-assert.doesNotMatch(buyerSessionBranch,/invalidateSelection|removeStorageSync/,'a missing BUYER session must retain the fresh selection for an explicit retry')
+assert.doesNotMatch(quote,/uni\.navigateTo\(\{url:'\/pages\/auth\/expired'\}\)/,'guest quote creation must not force login')
+const anonymousSessionBranch=quote.match(/if\(code==='ANONYMOUS_SESSION_UNAVAILABLE'\)\{([\s\S]*?)\}\s*else/)?.[1]??''
+assert.match(anonymousSessionBranch,/quote\.value=null/)
+assert.doesNotMatch(anonymousSessionBranch,/invalidateSelection|removeStorageSync/,'anonymous session failure must retain the fresh selection')
 assert.match(client,/async createQuote\(selection:RechargeSelection\)[\s\S]*loadCatalog\(selection\.operatorCode\)[\s\S]*selectionMatchesCatalog\(selection,current\)[\s\S]*requestBody\('\/quotes','POST'/,'the single pre-quote catalog validation must fail closed before POST')
 const freshSelection={recipientPhone:'+8801712345678',maskedPhone:'+88017****678',operatorCode:'GRAMEENPHONE',operatorName:'Grameenphone',productRef:'GP-BALANCE-100',denominationRef:'BDT-100',itemKind:'PRESET_DENOMINATION',faceValue:{minor:10000,currency:'BDT'},productType:'BALANCE',displayName:'100塔卡余额',benefitText:'到账100塔卡余额',validityText:null,priceVersionRef:'PRICE-GP-BALANCE-100-V1',supportedOperatorSetVersion:1,catalogVersion:1}
 const freshCatalog={operatorQualification:'SUPPORTED',supportedOperatorSetVersion:1,catalogVersion:1,operatorCode:'GRAMEENPHONE',items:[{operatorCode:'GRAMEENPHONE',productRef:'GP-BALANCE-100',denominationRef:'BDT-100',itemKind:'PRESET_DENOMINATION',faceValue:{minor:10000,currency:'BDT'},productType:'BALANCE',displayName:'Grameenphone 100塔卡余额',benefitText:'到账100 BDT话费余额',validityText:'长期有效',finalAmountCny:6.8,priceVersionRef:'PRICE-GP-BALANCE-100-V1',available:true}],evidenceSemantics:'LOCAL_DATABASE_STATE_NOT_EXTERNAL_OPERATOR_FACT'}
@@ -80,6 +86,24 @@ for(const item of [{...freshCatalog.items[0],productRef:'OTHER'},{...freshCatalo
 assert.equal(selectionMatchesCatalog(freshSelection,{...freshCatalog,items:[{...freshCatalog.items[0],itemKind:'PRESET_PACKAGE'}]}),false,'itemKind drift must remain fail closed')
 assert.equal(selectionMatchesCatalog(freshSelection,{...freshCatalog,items:[{...freshCatalog.items[0],faceValue:{minor:10000,currency:'CNY'}}]}),false,'faceValue.currency drift must remain fail closed')
 assert.equal(selectionMatchesCatalog(freshSelection,{...freshCatalog,items:[{...freshCatalog.items[0],productType:'DATA'}]}),false,'productType drift must remain fail closed')
+
+const anonymousRequestRef='REQ-ANON-0001',anonymousExpiry='2026-08-24T00:00:00Z'
+const anonymousBody={outcome:'AUTHENTICATED',projectCode:'ANONYMOUS_SESSION_CREATED',requestRef:anonymousRequestRef,subjectRef:'ANON-SUBJECT-0001',token:'opaque-anonymous-token',absoluteExpiresAt:anonymousExpiry,retryClass:'NONE'}
+const parsedAnonymous=parseAnonymousSessionResponse({statusCode:201,header:{'Cache-Control':'private, no-store'},data:anonymousBody},anonymousRequestRef,Date.parse('2026-08-23T00:00:00Z'))
+assert.equal(parsedAnonymous.token,'opaque-anonymous-token')
+for(const invalid of [
+  {statusCode:200,header:{'Cache-Control':'no-store'},data:anonymousBody},
+  {statusCode:201,header:{},data:anonymousBody},
+  {statusCode:201,header:{'Cache-Control':'no-store'},data:{...anonymousBody,extra:true}},
+  {statusCode:201,header:{'Cache-Control':'no-store'},data:{...anonymousBody,requestRef:'REQ-OTHER-0001'}},
+  {statusCode:201,header:{'Cache-Control':'no-store'},data:{...anonymousBody,absoluteExpiresAt:'2026-08-24'}},
+])assert.throws(()=>parseAnonymousSessionResponse(invalid,anonymousRequestRef,Date.parse('2026-08-23T00:00:00Z')),/ANONYMOUS_SESSION_RESPONSE_INVALID/)
+resetAnonymousSessionTokenForTests()
+commitAnonymousSessionToken(parsedAnonymous,Date.parse('2026-08-23T00:00:00Z'))
+assert.equal(readAnonymousSessionToken(Date.parse('2026-08-23T23:59:59Z'))?.token,'opaque-anonymous-token')
+assert.equal(readAnonymousSessionToken(Date.parse(anonymousExpiry)),null,'expired anonymous token must be removed from memory')
+const anonymousSource=read('src/api/anonymous-session-contract.ts')
+assert.doesNotMatch(anonymousSource,/setStorage|console\.|uni\.|localStorage|sessionStorage/,'anonymous bearer must remain memory-only and unlogged')
 
 assert.match(directory,/getDirectoryCities/)
 assert.match(directory,/cityCode/)
