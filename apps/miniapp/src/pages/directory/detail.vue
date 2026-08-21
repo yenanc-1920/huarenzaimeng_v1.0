@@ -5,6 +5,7 @@ import AppHeader from '../../components/AppHeader.vue'
 import StatusNotice from '../../components/StatusNotice.vue'
 import { api } from '../../api/client'
 import type { DirectoryItem } from '../../domain/types'
+import { directoryCategoryLabel } from '../../domain/directory-display'
 
 const entryRef=ref('')
 const item=ref<DirectoryItem|null>(null)
@@ -54,7 +55,7 @@ onLoad(query=>{entryRef.value=typeof query?.entryRef==='string'?decodeURICompone
         </view>
         <view class="card detail-card">
           <view class="kv"><text>城市</text><text>{{item.cityName}}</text></view>
-          <view class="kv"><text>分类</text><text>{{item.category}}</text></view>
+          <view class="kv"><text>分类</text><text>{{directoryCategoryLabel(item.category)}}</text></view>
           <view class="kv"><text>当地地址</text><text>{{item.localAddress}}</text></view>
           <view class="kv"><text>联系电话</text><text>{{item.phone}}</text></view>
           <view class="kv"><text>信息来源</text><text>{{item.sourceLabel||'来源暂未提供'}}</text></view>
