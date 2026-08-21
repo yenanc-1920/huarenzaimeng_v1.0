@@ -19,14 +19,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class V15MigrationGateTest {
     private static final Path MIGRATIONS=Path.of("src/main/resources/db/migration");
 
-    @Test void emptyDatabaseMigrationManifestIsUniqueAndContinuousThroughV24() throws Exception {
+    @Test void emptyDatabaseMigrationManifestIsUniqueAndContinuousThroughV25() throws Exception {
         Pattern version=Pattern.compile("^V(\\d+)__.+\\.sql$");
         List<Integer> versions;
         try(var files=Files.list(MIGRATIONS)){
             versions=files.map(path->path.getFileName().toString()).map(version::matcher).filter(Matcher::matches)
                     .map(matcher->Integer.parseInt(matcher.group(1))).sorted().toList();
         }
-        assertThat(versions).containsExactly(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24);
+        assertThat(versions).containsExactly(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25);
     }
 
     @Test void exactV15ExecutesAgainstV14ShapeWithoutARealDatabase() throws Exception {
