@@ -11,7 +11,9 @@ class BuyerAuthenticationBoundaryContractTest {
         String controller=Files.readString(root.resolve("BuyerAuthController.java"));
         String client=Files.readString(root.resolve("WechatCode2SessionClient.java"));
         assertThat(release).contains("enabled: ${HZ_BUYER_AUTH_ENABLED:false}","provider-mode: ${HZ_BUYER_AUTH_PROVIDER_MODE:disabled}","code-pepper: ${HZ_BUYER_AUTH_CODE_PEPPER:}",
-                        "enabled: ${HZ_WECHAT_IDENTITY_ENABLED:false}","endpoint: https://api.weixin.qq.com/sns/jscode2session")
+                        "enabled: ${HZ_WECHAT_IDENTITY_ENABLED:false}",
+                        "endpoint: ${HZ_WECHAT_ENDPOINT:https://api.weixin.qq.com/sns/jscode2session}",
+                        "transport-mode: ${HZ_WECHAT_TRANSPORT_MODE:official-https}")
                 .doesNotContain("trusted-ingress","ingress-hmac-secret","expected-appid-digest");
         assertThat(controller).contains("Set.of(\"code\",\"requestRef\",\"guestRef\",\"consent\")","CONSENT_FIELDS","/wechat/session")
                 .doesNotContain("X-WX-APPID","X-WX-OPENID","openid","session_key","idleExpiresAt");
