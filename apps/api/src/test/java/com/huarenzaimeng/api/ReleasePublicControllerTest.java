@@ -23,6 +23,9 @@ class ReleasePublicControllerTest {
         ProjectEnvelope<?> envelope=(ProjectEnvelope<?>)accepted.getBody();
         assertEquals("UNKNOWN",((Map<?,?>)envelope.data()).get("outcome"));
         assertEquals("GRAMEENPHONE",((Map<?,?>)envelope.data()).get("operatorCode"));
+        var localNumber=controller.eligibility("1312345678");
+        ProjectEnvelope<?> localEnvelope=(ProjectEnvelope<?>)localNumber.getBody();
+        assertEquals("GRAMEENPHONE",((Map<?,?>)localEnvelope.data()).get("operatorCode"));
         var rejected=controller.eligibility("NOT-A-PHONE");
         assertEquals(400,rejected.getStatusCode().value());
     }
