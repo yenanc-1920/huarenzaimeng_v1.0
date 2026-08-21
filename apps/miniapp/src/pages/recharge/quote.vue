@@ -27,7 +27,6 @@ async function currentSelectionIsValid(current:RechargeSelection){const catalog=
 onMounted(async()=>{
   try{
     const current=parseRechargeSelection(uni.getStorageSync('rechargeSelection'))
-    if(!await currentSelectionIsValid(current)){invalidateSelection('支持集或目录已更新，请返回重新选择。');return}
     selection.value=current;quote.value=await api.createQuote(current)
   }catch{invalidateSelection('商品信息已更新，请返回重新选择。')}finally{loading.value=false}
 })

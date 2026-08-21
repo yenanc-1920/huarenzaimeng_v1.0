@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { selectionMatchesCatalog } from '../src/api/topup-recovery-contract.ts'
 
 const root=process.cwd()
 const read=path=>readFileSync(resolve(root,path),'utf8')
@@ -64,6 +65,12 @@ assert.match(quote,/quote\.value\.validUntil/)
 assert.match(quote,/quote\.entitlement\.benefitText/)
 assert.match(quote,/quote\.entitlement\.displayName/)
 assert.doesNotMatch(quote,/quote\.faceValue\.minor|totalAmountMinor.*到账内容|到账内容[\s\S]{0,100}quote\.total/)
+assert.doesNotMatch(quote,/parseRechargeSelection\(uni\.getStorageSync\('rechargeSelection'\)\)[\s\S]{0,160}currentSelectionIsValid/,'P012 must not repeat the catalog read before createQuote')
+assert.match(client,/async createQuote\(selection:RechargeSelection\)[\s\S]*loadCatalog\(selection\.operatorCode\)[\s\S]*selectionMatchesCatalog\(selection,current\)[\s\S]*requestBody\('\/quotes','POST'/,'the single pre-quote catalog validation must fail closed before POST')
+const freshSelection={recipientPhone:'+8801712345678',maskedPhone:'+88017****678',operatorCode:'GRAMEENPHONE',operatorName:'Grameenphone',productRef:'GP-100',denominationRef:'BDT-100',itemKind:'PRESET_DENOMINATION',faceValue:{minor:10000,currency:'BDT'},productType:'BALANCE',displayName:'100塔卡余额',benefitText:'到账100塔卡余额',validityText:null,priceVersionRef:'PV-GP-100',supportedOperatorSetVersion:3,catalogVersion:7}
+const freshCatalog={operatorQualification:'SUPPORTED',supportedOperatorSetVersion:3,catalogVersion:7,operatorCode:'GRAMEENPHONE',items:[{operatorCode:'GRAMEENPHONE',productRef:'GP-100',denominationRef:'BDT-100',itemKind:'PRESET_DENOMINATION',faceValue:{minor:10000,currency:'BDT'},productType:'BALANCE',displayName:'100塔卡余额',benefitText:'到账100塔卡余额',validityText:null,finalAmountCny:6.8,priceVersionRef:'PV-GP-100',available:true}],evidenceSemantics:'LOCAL_DATABASE_STATE_NOT_EXTERNAL_OPERATOR_FACT'}
+assert.equal(selectionMatchesCatalog(freshSelection,freshCatalog),true,'a fresh catalog-backed selection must reach quote creation')
+assert.equal(selectionMatchesCatalog(freshSelection,{...freshCatalog,catalogVersion:8}),false,'a genuinely stale catalog version must remain fail closed')
 
 assert.match(directory,/getDirectoryCities/)
 assert.match(directory,/cityCode/)
