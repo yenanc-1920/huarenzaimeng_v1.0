@@ -5,7 +5,8 @@ import AppHeader from '../../components/AppHeader.vue'
 import StatusNotice from '../../components/StatusNotice.vue'
 import { api } from '../../api/client'
 import type { DirectoryItem } from '../../domain/types'
-import { directoryCategoryLabel } from '../../domain/directory-display'
+
+const directoryCategoryLabel=(category:string):string=>({LIFE_SERVICE:'生活服务',MEDICAL:'医疗服务'}[category]||'其他服务')
 
 const entryRef=ref('')
 const item=ref<DirectoryItem|null>(null)

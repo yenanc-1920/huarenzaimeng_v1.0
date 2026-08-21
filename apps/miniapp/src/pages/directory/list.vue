@@ -4,7 +4,8 @@ import AppHeader from '../../components/AppHeader.vue'
 import BottomNav from '../../components/BottomNav.vue'
 import { api } from '../../api/client'
 import type { DirectoryCity, DirectorySummary } from '../../domain/types'
-import { directoryCategoryLabel } from '../../domain/directory-display'
+
+const directoryCategoryLabel=(category:string):string=>({LIFE_SERVICE:'生活服务',MEDICAL:'医疗服务'}[category]||'其他服务')
 
 const cities=ref<DirectoryCity[]>([]),items=ref<DirectorySummary[]>([]),cityCode=ref(''),category=ref('ALL'),loading=ref(true),error=ref('')
 const categories=computed(()=>['ALL',...new Set(items.value.map(item=>item.category))])
