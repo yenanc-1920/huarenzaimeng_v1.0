@@ -66,12 +66,12 @@ INSERT IGNORE INTO hz_news_article
 
 INSERT IGNORE INTO hz_platform_product
 (platform_product_ref,operator_code,product_type,display_name,benefit_text,denomination_bdt,validity_text,
- provider_code,provider_sku,enable_state,source_mode,aggregate_version,updated_at) VALUES
-('GP-BALANCE-100','GRAMEENPHONE','BALANCE','Grameenphone 100塔卡余额','到账100 BDT话费余额',100.00,NULL,'WINLA','DEV-GP-BALANCE-100','ENABLED','MANUAL_DEV_SAMPLE',1,'2026-08-16 00:00:00.000'),
-('ROBI-DATA-5GB','ROBI','DATA','Robi 5GB流量包','5GB流量',NULL,'7天','WINLA','DEV-ROBI-DATA-5GB','ENABLED','MANUAL_DEV_SAMPLE',1,'2026-08-16 00:00:00.000'),
-('BANGLALINK-COMBO-10GB','BANGLALINK','BUNDLE','Banglalink畅享套餐','10GB流量与100分钟通话',NULL,'30天','WINLA','DEV-BL-COMBO-10GB','ENABLED','MANUAL_DEV_SAMPLE',1,'2026-08-16 00:00:00.000'),
-('AIRTEL-BALANCE-200','AIRTEL','BALANCE','Airtel 200塔卡余额','到账200 BDT话费余额',200.00,NULL,'WINLA','DEV-AIRTEL-BALANCE-200','ENABLED','MANUAL_DEV_SAMPLE',1,'2026-08-16 00:00:00.000'),
-('TELETALK-DATA-2GB','TELETALK','DATA','Teletalk 2GB流量包','2GB流量',NULL,'7天','WINLA','DEV-TELETALK-DATA-2GB','ENABLED','MANUAL_DEV_SAMPLE',1,'2026-08-16 00:00:00.000');
+ provider_code,provider_sku,enable_state,source_mode,mapping_state,supplier_availability,aggregate_version,updated_at) VALUES
+('GP-BALANCE-100','GRAMEENPHONE','BALANCE','Grameenphone 100塔卡余额','到账100 BDT话费余额',100.00,NULL,'WINLA','DEV-GP-BALANCE-100','ENABLED','MANUAL_DEV_SAMPLE','MAPPED','AVAILABLE',1,'2026-08-16 00:00:00.000'),
+('ROBI-DATA-5GB','ROBI','DATA','Robi 5GB流量包','5GB流量',NULL,'7天','WINLA','DEV-ROBI-DATA-5GB','ENABLED','MANUAL_DEV_SAMPLE','MAPPED','AVAILABLE',1,'2026-08-16 00:00:00.000'),
+('BANGLALINK-COMBO-10GB','BANGLALINK','BUNDLE','Banglalink畅享套餐','10GB流量与100分钟通话',NULL,'30天','WINLA','DEV-BL-COMBO-10GB','ENABLED','MANUAL_DEV_SAMPLE','MAPPED','AVAILABLE',1,'2026-08-16 00:00:00.000'),
+('AIRTEL-BALANCE-200','AIRTEL','BALANCE','Airtel 200塔卡余额','到账200 BDT话费余额',200.00,NULL,'WINLA','DEV-AIRTEL-BALANCE-200','ENABLED','MANUAL_DEV_SAMPLE','MAPPED','AVAILABLE',1,'2026-08-16 00:00:00.000'),
+('TELETALK-DATA-2GB','TELETALK','DATA','Teletalk 2GB流量包','2GB流量',NULL,'7天','WINLA','DEV-TELETALK-DATA-2GB','ENABLED','MANUAL_DEV_SAMPLE','MAPPED','AVAILABLE',1,'2026-08-16 00:00:00.000');
 
 INSERT IGNORE INTO hz_price_version
 (price_version_ref,platform_product_ref,final_amount_cny,fx_source,fx_snapshot_ref,price_state,

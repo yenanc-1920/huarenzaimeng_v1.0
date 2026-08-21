@@ -35,6 +35,8 @@ class V1PersistentDevelopmentDataContractTest {
         for(String operator:new String[]{"GRAMEENPHONE","ROBI","BANGLALINK","AIRTEL","TELETALK"})
             assertTrue(sql.contains("'"+operator+"'"),operator);
         for(String type:new String[]{"'BALANCE'","'DATA'","'BUNDLE'"}) assertTrue(sql.contains(type),type);
+        assertTrue(sql.contains("source_mode,mapping_state,supplier_availability,aggregate_version"));
+        assertTrue(sql.contains("'MANUAL_DEV_SAMPLE','MAPPED','AVAILABLE',1"));
         assertFalse(sql.contains("RAND(")); assertFalse(sql.contains("UUID("));
         sql.lines().filter(line -> line.startsWith("INSERT ")).forEach(line ->
                 assertTrue(line.startsWith("INSERT IGNORE INTO ")||line.startsWith("INSERT INTO hz_v1_dev_seed_registry"),
