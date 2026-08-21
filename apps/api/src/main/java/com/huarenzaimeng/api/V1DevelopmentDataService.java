@@ -154,9 +154,14 @@ final class V1DevelopmentDataService {
         value.put("ruleRef", authority == null ? null : authority.get("ruleRef"));
         value.put("sourceLabel", authority == null ? null : authority.get("sourceLabel"));
         value.put("ruleVersion", authority == null ? null : String.valueOf(authority.get("ruleVersion")));
-        value.put("effectiveFrom", authority == null ? null : ((java.sql.Timestamp)authority.get("effectiveFrom")).toInstant());
-        value.put("effectiveUntil", authority == null ? null : ((java.sql.Timestamp)authority.get("effectiveUntil")).toInstant());
+        value.put("effectiveFrom", authority == null ? null : databaseInstant(authority.get("effectiveFrom")));
+        value.put("effectiveUntil", authority == null ? null : databaseInstant(authority.get("effectiveUntil")));
         return value;
+    }
+
+    static Instant databaseInstant(Object value) {
+        if (value instanceof java.time.LocalDateTime dateTime) return dateTime.toInstant(java.time.ZoneOffset.UTC);
+        return ((java.sql.Timestamp) value).toInstant();
     }
 
     private static boolean present(String value) { return value != null && !value.isBlank(); }

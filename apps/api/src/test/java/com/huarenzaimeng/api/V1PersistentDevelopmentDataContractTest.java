@@ -11,6 +11,12 @@ class V1PersistentDevelopmentDataContractTest {
     private static final Path MAIN=Path.of("src/main");
     private static final Path LOCAL=Path.of("src/local");
 
+    @Test void databaseDatetimeSupportsMysqlRuntimeTypes() {
+        java.time.Instant expected=java.time.Instant.parse("2026-08-21T09:00:00Z");
+        assertEquals(expected,V1DevelopmentDataService.databaseInstant(java.time.LocalDateTime.of(2026,8,21,9,0)));
+        assertEquals(expected,V1DevelopmentDataService.databaseInstant(java.sql.Timestamp.from(expected)));
+    }
+
     @Test void v14AddsFormalReadModelsWithoutChangingEarlierMigrations() throws Exception {
         String sql=Files.readString(MAIN.resolve("resources/db/migration/V14__add_v1_business_read_models.sql"));
         for(String table:new String[]{"hz_city","hz_directory_entry","hz_holiday_rule","hz_news_article",
