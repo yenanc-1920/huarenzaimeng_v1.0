@@ -195,8 +195,15 @@ class ReleaseFlywayMigrationRunnerTest {
 
     @Test void nonzeroRetryConfigurationIsRejected() {
         assertThatThrownBy(() -> new ReleaseFlywayConfiguration().releaseFlyway(
-                "jdbc:mysql://127.0.0.1:1/noop", "u", "p", "classpath:db/migration", 1, true, false))
+                "jdbc:mysql://127.0.0.1:1/noop", "u", "p", "noop", "classpath:db/migration", 1, true, false))
                 .isInstanceOf(IllegalStateException.class).hasMessage("FLYWAY_CONNECT_RETRIES_MUST_BE_ZERO");
+    }
+
+    @Test void expectedDatabaseIsTheFlywayDefaultSchema() {
+        var flyway = new ReleaseFlywayConfiguration().releaseFlyway(
+                "jdbc:mysql://127.0.0.1:1/noop", "u", "p", "noop", "classpath:db/migration", 0, true, false);
+
+        assertThat(flyway.getConfiguration().getDefaultSchema()).isEqualTo("noop");
     }
 
     private Fixture fixture(String runId, Instant validFrom, Instant validUntil,

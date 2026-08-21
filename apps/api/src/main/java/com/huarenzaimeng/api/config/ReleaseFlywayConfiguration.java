@@ -21,6 +21,7 @@ public class ReleaseFlywayConfiguration {
             @Value("${spring.flyway.url}") String url,
             @Value("${spring.flyway.user}") String user,
             @Value("${spring.flyway.password}") String password,
+            @Value("${hz.environment.database-name}") String expectedDatabase,
             @Value("${spring.flyway.locations:classpath:db/migration}") String locations,
             @Value("${spring.flyway.connect-retries:0}") int connectRetries,
             @Value("${spring.flyway.validate-on-migrate:true}") boolean validateOnMigrate,
@@ -30,6 +31,7 @@ public class ReleaseFlywayConfiguration {
         }
         return Flyway.configure()
                 .dataSource(url, user, password)
+                .defaultSchema(expectedDatabase)
                 .locations(locations.split(","))
                 .connectRetries(connectRetries)
                 .validateOnMigrate(validateOnMigrate)

@@ -18,7 +18,9 @@ class ReleaseMigrationStartupContractTest {
         assertThat(yaml).contains("flyway:\n    #", "enabled: false")
                 .contains("user: ${SPRING_FLYWAY_USER}", "password: ${SPRING_FLYWAY_PASSWORD}")
                 .doesNotContain("SPRING_DATASOURCE_PASSWORD: ${SPRING_FLYWAY_PASSWORD}");
-        assertThat(configuration).contains("Flyway.configure()", ".dataSource(url, user, password)")
+        assertThat(configuration).contains("Flyway.configure()", ".dataSource(url, user, password)",
+                        "@Value(\"${hz.environment.database-name}\") String expectedDatabase",
+                        ".defaultSchema(expectedDatabase)")
                 .doesNotContain("System.out", "logger.", "printStackTrace");
         assertThat(runner).doesNotContain("implements ApplicationRunner", "flyway.migrate();")
                 .contains("stages.migrateTo(\"11\")", "DataMigrationOracleVerifier.State.MID_V11",

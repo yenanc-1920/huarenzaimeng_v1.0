@@ -1,5 +1,10 @@
 # 基线变更记录
 
+## 2026-08-21 — OPEN-12-FLYWAY-SCHEMA-01
+
+- DEV 037 确认数据库连接成功，但自定义 Flyway 在执行迁移 SQL 前因 `currentSchema=null` 启动失败；DEV 已回退 036。
+- `releaseFlyway` 改为复用已冻结的 `hz.environment.database-name` 作为 `defaultSchema`，不新增平台环境变量、不 repair、不改迁移 SQL。
+
 ## 2026-08-21 — OPEN-11-QUOTE-CATALOG-02
 
 - DEV复测确认首轮修复仍会跨多个有效运营商支持集连接商品；报价选择现与公开目录完全对齐为“最高有效支持集＋其中最高有效目录”。
