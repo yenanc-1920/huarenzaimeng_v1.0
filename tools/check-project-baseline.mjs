@@ -20,6 +20,7 @@ const required = [
   "11-来源与历史映射.md",
   "12-V1全功能验收矩阵.md",
   "13-V1上线试运行执行规划.md",
+  "14-V1需求UI实现映射.md",
   "CHANGELOG.md",
 ];
 
