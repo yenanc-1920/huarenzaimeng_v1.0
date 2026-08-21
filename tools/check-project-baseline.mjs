@@ -18,6 +18,8 @@ const required = [
   "09-问题台账与经验.md",
   "10-版本计划与任务台账.md",
   "11-来源与历史映射.md",
+  "12-V1全功能验收矩阵.md",
+  "13-V1上线试运行执行规划.md",
   "CHANGELOG.md",
 ];
 
@@ -51,6 +53,14 @@ if (fs.existsSync(ledgerFile)) {
   const ledger = read(ledgerFile);
   for (const marker of ["OPEN-01", "OPEN-09", "责任角色", "唯一下一动作", "关闭条件"]) {
     if (!ledger.includes(marker)) failures.push(`ledger-missing:${marker}`);
+  }
+}
+
+const acceptanceFile = path.join(baselineDir, "12-V1全功能验收矩阵.md");
+if (fs.existsSync(acceptanceFile)) {
+  const acceptance = read(acceptanceFile);
+  for (const marker of ["FN-MP-01", "FN-AD-01", "FN-PL-01", "当前状态", "目标证据", "唯一下一动作"]) {
+    if (!acceptance.includes(marker)) failures.push(`acceptance-missing:${marker}`);
   }
 }
 
