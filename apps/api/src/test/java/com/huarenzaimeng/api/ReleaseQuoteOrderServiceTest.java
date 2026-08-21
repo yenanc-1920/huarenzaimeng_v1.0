@@ -48,6 +48,17 @@ class ReleaseQuoteOrderServiceTest {
         assertThat(quote.catalogVersion()).isEqualTo(2);
     }
 
+    @Test void quoteUsesSameLatestSupportSetAndCatalogAsPublicCatalog(){
+        jdbc.update("INSERT INTO hz_operator_support_batch VALUES(2,'OB-2','APP','ACTIVE',1,?,?,NULL,?)",
+                Timestamp.from(MARKET_START),Timestamp.from(MARKET_END),Timestamp.from(now));
+        jdbc.update("INSERT INTO hz_operator_membership VALUES(2,'GP','SUPPORTED','E-2',?)",Timestamp.from(now));
+        jdbc.update("INSERT INTO hz_product_catalog VALUES(2,2,'CAT-2','APP','ACTIVE',?,?,?)",
+                Timestamp.from(MARKET_START),Timestamp.from(MARKET_END),Timestamp.from(now));
+        var quote=service.createQuote("BUYER-1","IDEM-Q3","REQ-Q3","01712345678","PRODUCT-1");
+        assertThat(jdbc.queryForObject("SELECT supported_operator_set_version FROM hz_release_quote_snapshot WHERE quote_ref=?",Long.class,quote.quoteRef())).isEqualTo(2);
+        assertThat(quote.catalogVersion()).isEqualTo(2);
+    }
+
     @Test void orderBindsSubjectRejectsExpiryAndVersionDrift(){
         var quote=service.createQuote("BUYER-1","IDEM-Q","REQ-Q","01712345678","PRODUCT-1");
         assertThatThrownBy(()->service.createOrder("BUYER-2","IDEM-O","REQ-O",quote.quoteRef()))
