@@ -63,8 +63,17 @@ jobs:
         working-directory: apps/miniapp
       - name: Full deterministic release gate
         run: node tools/run-dev-deployment-gate.mjs
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Build exact DEV image without repeating tests
-        run: docker build --file Dockerfile.dev --tag huaren-api-dev:${{ github.sha }} .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.dev
+          push: false
+          tags: huaren-api-dev:${{ github.sha }}
+          cache-from: type=gha,scope=huaren-api-dev
+          cache-to: type=gha,mode=max,scope=huaren-api-dev
 
   promote-deploy-branch:
     if: github.event_name == 'push'
