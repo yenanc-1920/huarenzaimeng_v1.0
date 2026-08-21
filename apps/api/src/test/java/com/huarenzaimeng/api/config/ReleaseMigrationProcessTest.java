@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -49,7 +50,7 @@ class ReleaseMigrationProcessTest {
 
         ConfigurableApplicationContext context = null;
         try {
-            assertThat(migrationStarted.await(20, TimeUnit.SECONDS)).isTrue();
+            awaitMigrationStarted(migrationStarted, startup, Duration.ofSeconds(20));
             assertTcpConnects(port, Duration.ofSeconds(5));
 
             HttpURLConnection connection = (HttpURLConnection) URI.create("http://127.0.0.1:" + port + "/probe")
@@ -102,9 +103,51 @@ class ReleaseMigrationProcessTest {
             assertTcpCloses(port, Duration.ofSeconds(5));
             assertThat(process.descendants().noneMatch(ProcessHandle::isAlive)).isTrue();
         } finally {
-            if (process.isAlive()) process.destroyForcibly();
-            Files.deleteIfExists(output);
+            if (process.isAlive()) {
+                process.destroyForcibly();
+                process.waitFor(5, TimeUnit.SECONDS);
+            }
+            process.onExit().get(5, TimeUnit.SECONDS);
+            process.getInputStream().close();
+            process.getErrorStream().close();
+            process.getOutputStream().close();
+            deleteWhenUnlocked(output, Duration.ofSeconds(5));
         }
+    }
+
+    private static void awaitMigrationStarted(CountDownLatch migrationStarted,
+                                              CompletableFuture<ConfigurableApplicationContext> startup,
+                                              Duration timeout) throws Exception {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (migrationStarted.await(50, TimeUnit.MILLISECONDS)) return;
+            if (startup.isDone()) {
+                try {
+                    ConfigurableApplicationContext unexpected = startup.join();
+                    if (unexpected != null) unexpected.close();
+                    throw new AssertionError("APPLICATION_COMPLETED_BEFORE_MIGRATION_RUNNER_STARTED");
+                } catch (CompletionException failure) {
+                    throw new AssertionError("APPLICATION_STARTUP_FAILED_BEFORE_MIGRATION_RUNNER_STARTED: "
+                            + failure.getCause(), failure.getCause());
+                }
+            }
+        }
+        throw new AssertionError("MIGRATION_RUNNER_NOT_STARTED_WITHIN_TIMEOUT; startupDone=" + startup.isDone());
+    }
+
+    private static void deleteWhenUnlocked(Path output, Duration timeout) throws Exception {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        Exception last = null;
+        do {
+            try {
+                Files.deleteIfExists(output);
+                return;
+            } catch (java.nio.file.FileSystemException locked) {
+                last = locked;
+                Thread.sleep(50);
+            }
+        } while (System.nanoTime() < deadline);
+        throw last == null ? new IllegalStateException("OUTPUT_FILE_UNLOCK_TIMEOUT") : last;
     }
 
     private static int availablePort() throws Exception {
