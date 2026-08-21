@@ -1,5 +1,11 @@
 # 基线变更记录
 
+## 2026-08-21 — OPEN-12-DEV-038-01
+
+- 将当前提交与已确认 CloudBase DEV 版本更新为 `2ff264c` / `huaren-api-dev-038`，登记精确实例与发布链。
+- 依据固定 038 实例首次启动日志和业务探针证据关闭 OPEN-12。
+- 将一次未影响探针的 Hikari `connection closed` 告警归入 OPEN-02／P1 继续观察，不触发重启或配置修改。
+
 ## 2026-08-21 — OPEN-12-FLYWAY-SCHEMA-01
 
 - DEV 037 确认数据库连接成功，但自定义 Flyway 在执行迁移 SQL 前因 `currentSchema=null` 启动失败；DEV 已回退 036。
