@@ -28,7 +28,13 @@ onMounted(async()=>{
   try{
     const current=parseRechargeSelection(uni.getStorageSync('rechargeSelection'))
     selection.value=current;quote.value=await api.createQuote(current)
-  }catch{invalidateSelection('商品信息已更新，请返回重新选择。')}finally{loading.value=false}
+  }catch(caught){
+    const code=caught instanceof ProjectApiError?caught.projectCode:caught instanceof Error?caught.message:'UNKNOWN'
+    if(code==='BUYER_SESSION_REQUIRED'){
+      quote.value=null;error.value='请先完成微信快捷登录，再重新选择商品获取报价。'
+      uni.navigateTo({url:'/pages/auth/expired'})
+    }else invalidateSelection('商品信息已更新，请返回重新选择。')
+  }finally{loading.value=false}
 })
 
 async function createOrder(){
