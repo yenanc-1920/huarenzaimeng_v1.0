@@ -128,21 +128,34 @@ final class V1DevelopmentDataService {
         LocalDate date = now.atZone(zone).toLocalDate();
         String day = date.getDayOfWeek().name().substring(0, 3);
         List<Map<String,Object>> holidays = camel(jdbc.queryForList("""
-                SELECT display_name AS displayName FROM hz_holiday_rule
+                SELECT rule_ref AS ruleRef,display_name AS displayName,source_label AS sourceLabel,
+                       aggregate_version AS ruleVersion,effective_from AS effectiveFrom,effective_until AS effectiveUntil
+                  FROM hz_holiday_rule
                  WHERE country_code=? AND rule_type='HOLIDAY' AND publish_state='PUBLISHED'
                    AND ? BETWEEN start_date AND end_date
                    AND effective_from<=? AND effective_until>?
                 """, countryCode, date, java.sql.Timestamp.from(now), java.sql.Timestamp.from(now)));
-        boolean weekend = !jdbc.queryForList("""
-                SELECT rule_ref FROM hz_holiday_rule WHERE country_code=? AND rule_type='WEEKEND'
-                  AND publish_state='PUBLISHED' AND FIND_IN_SET(?,weekend_days)>0
+        List<Map<String,Object>> weekendRules = camel(jdbc.queryForList("""
+                SELECT rule_ref AS ruleRef,display_name AS displayName,weekend_days AS weekendDays,
+                       source_label AS sourceLabel,aggregate_version AS ruleVersion,
+                       effective_from AS effectiveFrom,effective_until AS effectiveUntil
+                  FROM hz_holiday_rule WHERE country_code=? AND rule_type='WEEKEND'
+                  AND publish_state='PUBLISHED'
                   AND effective_from<=? AND effective_until>?
-                """, String.class, countryCode, day, java.sql.Timestamp.from(now), java.sql.Timestamp.from(now)).isEmpty();
+                """, countryCode, java.sql.Timestamp.from(now), java.sql.Timestamp.from(now)));
+        Map<String,Object> authority = holidays.isEmpty() ? (weekendRules.isEmpty() ? null : weekendRules.get(0)) : holidays.get(0);
+        boolean weekend = authority != null && holidays.isEmpty()
+                && java.util.Arrays.asList(String.valueOf(authority.get("weekendDays")).split(",")).contains(day);
         Map<String,Object> value = new LinkedHashMap<>();
         value.put("countryCode", countryCode); value.put("timezone", zone.getId()); value.put("date", date);
         value.put("localTime", now.atZone(zone).toLocalTime().withNano(0));
         value.put("dayType", holidays.isEmpty() ? (weekend ? "REST_DAY" : "WORK_DAY") : "HOLIDAY");
         value.put("holidayName", holidays.isEmpty() ? null : holidays.get(0).get("displayName"));
+        value.put("ruleRef", authority == null ? null : authority.get("ruleRef"));
+        value.put("sourceLabel", authority == null ? null : authority.get("sourceLabel"));
+        value.put("ruleVersion", authority == null ? null : String.valueOf(authority.get("ruleVersion")));
+        value.put("effectiveFrom", authority == null ? null : ((java.sql.Timestamp)authority.get("effectiveFrom")).toInstant());
+        value.put("effectiveUntil", authority == null ? null : ((java.sql.Timestamp)authority.get("effectiveUntil")).toInstant());
         return value;
     }
 

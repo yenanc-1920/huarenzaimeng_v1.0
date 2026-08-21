@@ -77,7 +77,11 @@ class V1PersistentDevelopmentDataContractTest {
         assertTrue(command.contains("@ConditionalOnProperty(name=\"hz.admin-command.enabled\",havingValue=\"true\",matchIfMissing=true)"));
         assertFalse(command.contains("@Profile({\"mock\""));
         String data=Files.readString(MAIN.resolve("java/com/huarenzaimeng/api/V1DevelopmentDataService.java"));
-        assertFalse(data.contains("AS sourceLabel"));
+        assertTrue(data.contains("source_label AS sourceLabel"));
+        assertTrue(data.contains("aggregate_version AS ruleVersion"));
+        assertTrue(data.contains("value.put(\"ruleRef\""));
+        assertTrue(data.contains("value.put(\"effectiveFrom\""));
+        assertTrue(data.contains("value.put(\"effectiveUntil\""));
         String buyer=Files.readString(MAIN.resolve("java/com/huarenzaimeng/api/ReleaseBuyerFlowController.java"));
         assertFalse(buyer.contains("MockFlowService"));
         assertFalse(buyer.contains("createLocalSynthetic"));

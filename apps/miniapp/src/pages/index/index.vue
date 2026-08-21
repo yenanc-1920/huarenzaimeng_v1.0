@@ -214,7 +214,7 @@ const holidayTitle=(country:'中国'|'孟加拉',holiday:TemporalHoliday|null)=>
 }
 
 const holidayMeta=(holiday:TemporalHoliday|null)=>holiday&&['NO_HOLIDAY_CONFIRMED','CONFIRMED_HOLIDAY','PENDING_CONFIRMATION'].includes(holiday.state)
-  ?'已登记公开来源 · '+updatedLabel(temporalOverview.value!.generatedAt):''
+  ?`${holiday.sourceType||'来源未提供'} · ${updatedLabel(temporalOverview.value!.generatedAt)}`:''
 
 onShow(()=>{
   const trigger:TemporalReadTrigger=shownOnce?'FOREGROUND_SHOW':'FIRST_SHOW'

@@ -27,7 +27,6 @@ assert.match(directoryDetail, /LIFE_SERVICE:'生活服务'/, 'directory detail c
 assert.match(directoryDetail, /MEDICAL:'医疗服务'/, 'directory detail category MEDICAL must have Chinese copy')
 assert.match(directory, /directoryCategoryLabel\(item\.category\)/, 'directory list must not expose category codes')
 assert.match(directoryDetail, /directoryCategoryLabel\(item\.category\)/, 'directory detail must not expose category codes')
-const directoryDetail = read('src/pages/directory/detail.vue')
 const quote = read('src/pages/recharge/quote.vue')
 const products = read('src/pages/recharge/products.vue')
 
@@ -57,5 +56,8 @@ assert.match(directory, /entryRef=\$\{encodeURIComponent\(item\.entryRef\)\}/, '
 assert.match(directoryDetail, /loading\.value=true[\s\S]*item\.value=null[\s\S]*api\.getDirectoryDetail\(entryRef\.value\)/, 'P041 must revoke old detail before reread')
 assert.match(directoryDetail, /INCORRECT_INFO[\s\S]*PHONE_INVALID[\s\S]*ADDRESS_INVALID[\s\S]*CLOSED[\s\S]*OTHER/, 'P041 must use the fixed feedback reason set')
 assert.match(directoryDetail, /reportNote[\s\S]*maxlength="500"/, 'P041 must provide the bounded optional report note')
+assert.match(client, /source\.dayType==='REST_DAY'/, 'P001 must map the published weekend rule to rest-day copy')
+assert.match(client, /source\.dayType==='HOLIDAY'/, 'P001 must map the published holiday rule to holiday copy')
+assert.match(client, /state:'READ_ERROR'[\s\S]*sourceType:null/, 'P001 must fail closed when holiday rule metadata is incomplete')
 
 console.log('legacy frontend contract compatibility gate: PASS')
