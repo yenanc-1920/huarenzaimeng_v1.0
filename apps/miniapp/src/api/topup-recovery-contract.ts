@@ -31,8 +31,7 @@ export function selectionMatchesCatalog(selection: RechargeSelection, catalog: C
       ||catalog.supportedOperatorSetVersion!==selection.supportedOperatorSetVersion||catalog.catalogVersion!==selection.catalogVersion)return false
   return catalog.items.some((item)=>item.productRef===selection.productRef&&item.denominationRef===selection.denominationRef
     &&item.itemKind===selection.itemKind&&item.faceValue.minor===selection.faceValue.minor&&item.faceValue.currency===selection.faceValue.currency
-    &&item.productType===selection.productType&&item.displayName===selection.displayName&&item.benefitText===selection.benefitText
-    &&(item.validityText??null)===selection.validityText&&item.priceVersionRef===selection.priceVersionRef)
+    &&item.productType===selection.productType&&item.priceVersionRef===selection.priceVersionRef)
 }
 
 export function parseRechargeSelection(value:unknown):RechargeSelection{
