@@ -8,6 +8,7 @@ const requiredArtifacts = [
   'app.js',
   'app.json',
   'api/client.js',
+  'api/anonymous-session-contract.js',
   'api/formal-transaction-client.js',
   'api/formal-transaction-contract.js',
   'api/wechat-payment-port.js',
@@ -95,6 +96,7 @@ for (const [page, root] of [
 }
 
 const commonClient = readFileSync(resolve(outputRoot, 'api/client.js'), 'utf8')
+const generatedApp = readFileSync(resolve(outputRoot, 'app.js'), 'utf8')
 const generatedHome = readFileSync(resolve(outputRoot, 'pages/index/index.js'), 'utf8')
 const generatedPayment = readFileSync(resolve(outputRoot, 'pages/payment/status.js'), 'utf8')
 const generatedTransactionContract = readFileSync(resolve(outputRoot, 'api/formal-transaction-contract.js'), 'utf8')
@@ -102,6 +104,9 @@ const retiredTemporalFlow = readFileSync(resolve(outputRoot, 'domain/temporal-ov
 const retiredPaymentPort = readFileSync(resolve(outputRoot, 'api/wechat-payment-port.js'), 'utf8')
 if (/require\(["']\.\/payment-intent-contract\.js["']\)/.test(commonClient)) {
   throw new Error('MP_WEIXIN_COMMON_ENTRY_PAYMENT_INTENT_DEPENDENCY_NOT_ISOLATED')
+}
+if (!/require\(["']\.\/api\/anonymous-session-contract\.js["']\)/.test(generatedApp)) {
+  throw new Error('MP_WEIXIN_ANONYMOUS_SESSION_MODULE_NOT_REGISTERED_BY_APP')
 }
 if (/require\(["']\.\/temporal-overview-contract\.js["']\)/.test(commonClient)) {
   throw new Error('MP_WEIXIN_COMMON_ENTRY_TEMPORAL_CONTRACT_DEPENDENCY_NOT_ISOLATED')
@@ -129,6 +134,7 @@ globalThis.wx = {
   createApp:()=>undefined,createPage:()=>undefined,createComponent:()=>undefined,
 }
 for (const entry of [
+  'app.js',
   'pages/index/index.js',
   'pages/recharge/select.js',
   'pages/order/list.js',

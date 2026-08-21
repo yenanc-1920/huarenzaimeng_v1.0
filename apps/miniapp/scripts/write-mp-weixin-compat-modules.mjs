@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 
 const projectRoot = resolve(process.cwd())
@@ -32,4 +32,11 @@ writeFileSync(
   'utf8',
 )
 
-console.log('mp-weixin compatibility modules written: domain/temporal-overview-flow.js, api/wechat-payment-port.js')
+const appPath = resolve(outputRoot, 'app.js')
+const anonymousSessionPreload = 'require("./api/anonymous-session-contract.js");'
+const appSource = readFileSync(appPath, 'utf8')
+if (!appSource.includes(anonymousSessionPreload)) {
+  writeFileSync(appPath, appSource.replace('"use strict";', `"use strict";${anonymousSessionPreload}`), 'utf8')
+}
+
+console.log('mp-weixin compatibility modules written: domain/temporal-overview-flow.js, api/wechat-payment-port.js; anonymous session app preload registered')
