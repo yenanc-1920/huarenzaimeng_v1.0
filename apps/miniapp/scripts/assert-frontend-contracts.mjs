@@ -15,6 +15,8 @@ if (formal.stderr) process.stderr.write(formal.stderr)
 assert.equal(formal.status, 0, 'formal development API contracts must pass')
 
 const client = read('src/api/client.ts')
+assert.doesNotMatch(client, /new URLSearchParams\(/, 'miniapp API client must not depend on browser-only URLSearchParams')
+assert.match(client, /cityCode=\$\{encodeURIComponent\(cityCode\)\}/, 'directory city query must be encoded without browser-only APIs')
 const payment = read('src/pages/payment/status.vue')
 const progress = read('src/pages/order/progress.vue')
 const directory = read('src/pages/directory/list.vue')

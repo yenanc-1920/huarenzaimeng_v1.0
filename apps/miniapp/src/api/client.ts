@@ -196,7 +196,7 @@ export const api = {
   },
   getSupportCase: async (): Promise<SupportCase> => await requestTrustedSessionRead('/support/case') as SupportCase,
   async getDirectoryCities():Promise<DirectoryCity[]>{return parseDirectoryCities(await requestData('/directory/cities','GET'))},
-  async getDirectory(cityCode?:string,category?:string): Promise<DirectorySummary[]> {const query=new URLSearchParams();if(cityCode)query.set('cityCode',cityCode);if(category)query.set('category',category);return parseDirectoryEntries(await requestData(`/directory/entries${query.size?`?${query}`:''}`,'GET'))},
+  async getDirectory(cityCode?:string,category?:string): Promise<DirectorySummary[]> {const query:string[]=[];if(cityCode)query.push(`cityCode=${encodeURIComponent(cityCode)}`);if(category)query.push(`category=${encodeURIComponent(category)}`);return parseDirectoryEntries(await requestData(`/directory/entries${query.length?`?${query.join('&')}`:''}`,'GET'))},
   async getDirectoryDetail(entryRef:string):Promise<DirectoryItem>{if(!entryRef)throw new ProjectApiError('DIRECTORY_ENTRY_REF_REQUIRED');return parseDirectoryItem(await requestData(`/directory/entries/${encodeURIComponent(entryRef)}`,'GET'))},
   async reportDirectoryError(entryRef:string,reasonCode:string,description:string):Promise<ContentErrorReportResult>{
     const identity=getOrCreateCommand(uni,`directory-report:${entryRef}:${reasonCode}:${localScopeFingerprint(description)}`)
