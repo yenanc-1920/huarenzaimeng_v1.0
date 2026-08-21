@@ -4,7 +4,6 @@ import AppHeader from '../../components/AppHeader.vue'
 import { executeWechatDevelopmentSignIn } from '../../api/auth-entry-contract'
 import { callProjectApi } from '../../api/wechat-development-transport'
 import { clearBuyerSessionToken,readBuyerSessionToken } from '../../api/buyer-session-token'
-import { storeBuyerSessionProjection } from '../../domain/session'
 import { requestWechatOneTimeCode } from '../../api/wechat-one-time-code'
 import { agreementsAccepted,officialPrivacyGranted,sessionConsentCommand,type LoginPrivacyState } from '../../domain/login-privacy-state'
 import { readOrCreateBuyerGuestRef } from '../../domain/buyer-guest-ref'
@@ -48,9 +47,12 @@ async function signIn(){
     await executeWechatDevelopmentSignIn(code,`LOGIN-${Date.now().toString(36)}`,readOrCreateBuyerGuestRef(uni),consent)
     const token=readBuyerSessionToken()
     if(!token)throw new Error('BUYER_SESSION_REQUIRED')
-    const response=await callProjectApi('/buyer-api/v1/session','GET',undefined,token.token)
-    if(response.statusCode!==200)throw new Error('BUYER_SESSION_PROJECTION_UNAVAILABLE')
-    storeBuyerSessionProjection(uni,response.data)
+    const response=await callProjectApi('/buyer-auth/v1/session','GET',undefined,token.token)
+    const session=response.data
+    if(response.statusCode!==200||!session||typeof session!=='object'||Array.isArray(session)
+      ||(session as Record<string,unknown>).outcome!=='ACCEPTED'
+      ||(session as Record<string,unknown>).projectCode!=='BUYER_SESSION_READY'
+      ||(session as Record<string,unknown>).role!=='BUYER')throw new Error('BUYER_SESSION_CONFIRMATION_UNAVAILABLE')
     privacyState.value='SESSION_ACTIVE'
     uni.reLaunch({url:'/pages/index/index'})
   }catch(cause){
