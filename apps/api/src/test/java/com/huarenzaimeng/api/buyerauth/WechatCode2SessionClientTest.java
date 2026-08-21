@@ -4,7 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.net.http.HttpHeaders;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -15,7 +18,7 @@ class WechatCode2SessionClientTest {
     private static final String CALL = "CALL-12345678";
 
     @Test void disabledIsZeroTransportAndNeedsNoCredentials() {
-        FakeTransport transport = new FakeTransport(new WechatCode2SessionTransport.Response(200, "{}"));
+        FakeTransport transport = new FakeTransport(new WechatCode2SessionTransport.Response(200, "{}", null));
         WechatCode2SessionClient client = client(transport, false, "", "", 2000, 3000);
         assertThat(client.exchange(new WeChatIdentityPort.Command(CODE, CALL)))
                 .isEqualTo(new WeChatIdentityPort.Unknown("REAL_PROVIDER_ADAPTER_DISABLED"));
@@ -25,7 +28,8 @@ class WechatCode2SessionClientTest {
     @Test void enabledConfigurationIsStrictAndOfficialEndpointOnly() {
         FakeTransport transport = new FakeTransport(null);
         assertThatThrownBy(() -> new WechatCode2SessionClient(transport,new ObjectMapper(),true,
-                "http://api.weixin.qq.com/sns/jscode2session",APP,SECRET,2000,3000))
+                "http://api.weixin.qq.com/sns/jscode2session", WechatCode2SessionClient.OFFICIAL_HTTPS,
+                "dev", WechatCode2SessionClient.CLOUDBASE_ENVIRONMENT_ID, APP,SECRET,2000,3000))
                 .hasMessage("WECHAT_IDENTITY_CONFIGURATION_INCOMPLETE");
         assertThatThrownBy(() -> client(transport,true,"",SECRET,2000,3000)).hasMessage("WECHAT_IDENTITY_CONFIGURATION_INCOMPLETE");
         assertThatThrownBy(() -> client(transport,true,APP,"",2000,3000)).hasMessage("WECHAT_IDENTITY_CONFIGURATION_INCOMPLETE");
@@ -36,7 +40,7 @@ class WechatCode2SessionClientTest {
 
     @Test void successBindsOfficialRequestAppIdOpenIdAndEvidenceWithoutLeakingUnionOrSessionKey() {
         String body="{\"openid\":\"openid_12345678\",\"unionid\":\"unionid_12345678\",\"session_key\":\"provider-session-secret\",\"errcode\":0}";
-        FakeTransport transport=new FakeTransport(new WechatCode2SessionTransport.Response(200,body));
+        FakeTransport transport=new FakeTransport(new WechatCode2SessionTransport.Response(200,body,null));
         WeChatIdentityPort.Result result=client(transport,true,APP,SECRET,2000,3000)
                 .exchange(new WeChatIdentityPort.Command(CODE,CALL));
         assertThat(result).isEqualTo(new WeChatIdentityPort.Success(APP,"openid_12345678",CALL));
@@ -78,7 +82,7 @@ class WechatCode2SessionClientTest {
         WeChatIdentityPort.Result unavailableResult=client(unavailable,true,APP,SECRET,2000,3000).exchange(command());
         assertThat(unavailableResult).isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_PROVIDER_UNAVAILABLE"));
         assertThat(unavailableResult.toString()).doesNotContain(SECRET,CODE,"leak");
-        assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Response(503,"secret="+SECRET)),true,APP,SECRET,2000,3000).exchange(command()))
+        assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Response(503,"secret="+SECRET,null)),true,APP,SECRET,2000,3000).exchange(command()))
                 .isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_HTTP_STATUS_UNKNOWN"));
     }
 
@@ -150,12 +154,68 @@ class WechatCode2SessionClientTest {
         assertThat(transport.calls).isZero();
     }
 
+    @Test void cloudBaseSafeLinkHttpRequiresExactControlledEnvironmentAndBypassHeader() {
+        String body="{\"openid\":\"openid_12345678\",\"errcode\":0}";
+        FakeTransport accepted = new FakeTransport(new WechatCode2SessionTransport.Response(200, body, "bypass"));
+        WechatCode2SessionClient client = cloudBaseClient(accepted, "dev",
+                WechatCode2SessionClient.CLOUDBASE_ENVIRONMENT_ID);
+        assertThat(client.exchange(command())).isEqualTo(new WeChatIdentityPort.Success(APP,"openid_12345678",CALL));
+        assertThat(accepted.last.endpoint()).isEqualTo(WechatCode2SessionClient.CLOUDBASE_SAFELINK_ENDPOINT);
+        assertThat(JdkWechatCode2SessionTransport.requestUri(accepted.last).getScheme()).isEqualTo("http");
+
+        for (String rule : new String[] {null, "BYPASS", " bypass", "bypass ", "other"}) {
+            FakeTransport rejected = new FakeTransport(new WechatCode2SessionTransport.Response(200, body, rule));
+            assertThat(cloudBaseClient(rejected, "dev", WechatCode2SessionClient.CLOUDBASE_ENVIRONMENT_ID)
+                    .exchange(command())).isEqualTo(new WeChatIdentityPort.Unknown("WECHAT_CLOUDBASE_RULE_NOT_BYPASSED"));
+            assertThat(rejected.calls).isOne();
+        }
+    }
+
+    @Test void cloudBaseSafeLinkHttpFailsClosedOutsideExactEnvironmentBeforeTransport() {
+        FakeTransport transport = new FakeTransport(new AssertionError("transport must not run"));
+        assertThatThrownBy(() -> cloudBaseClient(transport, "test", WechatCode2SessionClient.CLOUDBASE_ENVIRONMENT_ID))
+                .hasMessage("WECHAT_IDENTITY_CONFIGURATION_INCOMPLETE");
+        assertThatThrownBy(() -> cloudBaseClient(transport, "dev", "wrong-environment"))
+                .hasMessage("WECHAT_IDENTITY_CONFIGURATION_INCOMPLETE");
+        assertThatThrownBy(() -> new WechatCode2SessionClient(transport,new ObjectMapper(),true,
+                "http://example.invalid/sns/jscode2session", WechatCode2SessionClient.CLOUDBASE_SAFELINK_HTTP,
+                "dev", WechatCode2SessionClient.CLOUDBASE_ENVIRONMENT_ID, APP,SECRET,2000,3000))
+                .hasMessage("WECHAT_IDENTITY_CONFIGURATION_INCOMPLETE");
+        assertThat(transport.calls).isZero();
+    }
+
+    @Test void transportRejectsEveryEndpointOutsideTheTwoFixedUris() {
+        var request = new WechatCode2SessionTransport.Request(
+                URI.create("http://user@api.weixin.qq.com:80/sns/jscode2session#fragment"),
+                APP, SECRET, CODE, Duration.ofSeconds(2), Duration.ofSeconds(3));
+        assertThatThrownBy(() -> JdkWechatCode2SessionTransport.requestUri(request))
+                .isInstanceOf(WechatCode2SessionTransport.Failure.class);
+    }
+
+    @Test void openApiRuleHeaderNameIsCaseInsensitiveButValueAndCardinalityAreExact() {
+        HttpHeaders exact = HttpHeaders.of(Map.of("X-OpenAPI-Rule", List.of("bypass")), (name,value) -> true);
+        HttpHeaders duplicate = HttpHeaders.of(Map.of("x-openapi-rule", List.of("bypass", "bypass")), (name,value) -> true);
+        HttpHeaders wrongValue = HttpHeaders.of(Map.of("X-OPENAPI-RULE", List.of("BYPASS")), (name,value) -> true);
+        assertThat(JdkWechatCode2SessionTransport.exactOpenApiRule(exact)).isEqualTo("bypass");
+        assertThat(JdkWechatCode2SessionTransport.exactOpenApiRule(duplicate)).isNull();
+        assertThat(JdkWechatCode2SessionTransport.exactOpenApiRule(wrongValue)).isEqualTo("BYPASS");
+    }
+
     private static void assertResult(String body,WeChatIdentityPort.Result expected){
-        assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Response(200,body)),true,APP,SECRET,2000,3000).exchange(command())).isEqualTo(expected);
+        assertThat(client(new FakeTransport(new WechatCode2SessionTransport.Response(200,body,null)),true,APP,SECRET,2000,3000).exchange(command())).isEqualTo(expected);
     }
     private static WeChatIdentityPort.Command command(){return new WeChatIdentityPort.Command(CODE,CALL);}
     private static WechatCode2SessionClient client(WechatCode2SessionTransport transport,boolean enabled,String appId,String secret,long connect,long read){
-        return new WechatCode2SessionClient(transport,new ObjectMapper(),enabled,WechatCode2SessionClient.OFFICIAL_ENDPOINT.toString(),appId,secret,connect,read);
+        return new WechatCode2SessionClient(transport,new ObjectMapper(),enabled,
+                WechatCode2SessionClient.OFFICIAL_ENDPOINT.toString(), WechatCode2SessionClient.OFFICIAL_HTTPS,
+                "", "", appId,secret,connect,read);
+    }
+    private static WechatCode2SessionClient cloudBaseClient(WechatCode2SessionTransport transport,
+            String environmentName, String cloudBaseEnvironmentId) {
+        return new WechatCode2SessionClient(transport,new ObjectMapper(),true,
+                WechatCode2SessionClient.CLOUDBASE_SAFELINK_ENDPOINT.toString(),
+                WechatCode2SessionClient.CLOUDBASE_SAFELINK_HTTP, environmentName, cloudBaseEnvironmentId,
+                APP,SECRET,2000,3000);
     }
     private static final class FakeTransport implements WechatCode2SessionTransport {
         final Object outcome; int calls; Request last;

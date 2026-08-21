@@ -14,7 +14,7 @@ interface WechatCode2SessionTransport {
                     + ", connectTimeout=" + connectTimeout + ", readTimeout=" + readTimeout + "]";
         }
     }
-    record Response(int statusCode, String body) {}
+    record Response(int statusCode, String body, String openApiRule) {}
     enum FailureKind {
         TIMEOUT,
         DNS,

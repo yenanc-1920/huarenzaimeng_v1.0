@@ -14,11 +14,22 @@ final class BuyerAuthConfigurationValidator {
             @Value("${hz.buyer-auth.provider-mode:disabled}") String providerMode,
             @Value("${hz.buyer-auth.expected-app-id-ref:}") String expectedAppId,
             @Value("${hz.buyer-auth.wechat.enabled:false}") boolean wechatEnabled,
+            @Value("${hz.buyer-auth.wechat.endpoint:https://api.weixin.qq.com/sns/jscode2session}") String endpoint,
+            @Value("${hz.buyer-auth.wechat.transport-mode:official-https}") String transportMode,
+            @Value("${hz.environment.name:}") String environmentName,
+            @Value("${TCB_ENV_ID:}") String cloudBaseEnvironmentId,
             @Value("${hz.buyer-auth.wechat.app-id:}") String appId,
             @Value("${hz.buyer-auth.wechat.app-secret:}") String appSecret) {
         if (!enabled) return;
         boolean fake = "fake-only".equals(providerMode) && !wechatEnabled;
+        boolean officialHttps = WechatCode2SessionClient.OFFICIAL_HTTPS.equals(transportMode)
+                && WechatCode2SessionClient.OFFICIAL_ENDPOINT.toString().equals(endpoint);
+        boolean cloudBaseSafeLink = WechatCode2SessionClient.CLOUDBASE_SAFELINK_HTTP.equals(transportMode)
+                && WechatCode2SessionClient.CLOUDBASE_SAFELINK_ENDPOINT.toString().equals(endpoint)
+                && "dev".equals(environmentName)
+                && WechatCode2SessionClient.CLOUDBASE_ENVIRONMENT_ID.equals(cloudBaseEnvironmentId);
         boolean real = "wechat-code2session".equals(providerMode) && wechatEnabled
+                && (officialHttps || cloudBaseSafeLink)
                 && appId != null && appId.equals(expectedAppId)
                 && appId.matches("[A-Za-z0-9_-]{8,64}")
                 && appSecret != null && appSecret.matches("[A-Za-z0-9_-]{16,128}");

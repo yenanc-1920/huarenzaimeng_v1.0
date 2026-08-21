@@ -42,7 +42,8 @@ hz:
     code-pepper: ${HZ_BUYER_AUTH_CODE_PEPPER:}
     wechat:
       enabled: ${HZ_WECHAT_IDENTITY_ENABLED:false}
-      endpoint: https://api.weixin.qq.com/sns/jscode2session
+      endpoint: ${HZ_WECHAT_ENDPOINT:https://api.weixin.qq.com/sns/jscode2session}
+      transport-mode: ${HZ_WECHAT_TRANSPORT_MODE:official-https}
       app-id: ${HZ_WECHAT_APP_ID:}
       app-secret: ${HZ_WECHAT_APP_SECRET:}
       connect-timeout-ms: ${HZ_WECHAT_CONNECT_TIMEOUT_MS:2000}

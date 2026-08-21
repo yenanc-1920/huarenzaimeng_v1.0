@@ -19,6 +19,10 @@ import java.util.regex.Pattern;
 @Profile("release-mysql")
 final class WechatCode2SessionClient implements WechatCode2SessionPort {
     static final URI OFFICIAL_ENDPOINT = URI.create("https://api.weixin.qq.com/sns/jscode2session");
+    static final URI CLOUDBASE_SAFELINK_ENDPOINT = URI.create("http://api.weixin.qq.com/sns/jscode2session");
+    static final String OFFICIAL_HTTPS = "official-https";
+    static final String CLOUDBASE_SAFELINK_HTTP = "cloudbase-safelink-http";
+    static final String CLOUDBASE_ENVIRONMENT_ID = "prod-d3g9ntdmsdf9d7877";
     private static final int MAX_RESPONSE_CHARS = 16_384;
     private static final Pattern PROVIDER_VALUE = Pattern.compile("[A-Za-z0-9_-]{8,128}");
     private static final Pattern CALL_REF = Pattern.compile("[A-Za-z0-9._:-]{8,128}");
@@ -30,6 +34,8 @@ final class WechatCode2SessionClient implements WechatCode2SessionPort {
     private final String appSecret;
     private final Duration connectTimeout;
     private final Duration readTimeout;
+    private final URI endpoint;
+    private final boolean requireCloudBaseBypass;
 
     @Autowired
     WechatCode2SessionClient(
@@ -37,6 +43,9 @@ final class WechatCode2SessionClient implements WechatCode2SessionPort {
             ObjectMapper json,
             @Value("${hz.buyer-auth.wechat.enabled:false}") boolean enabled,
             @Value("${hz.buyer-auth.wechat.endpoint:https://api.weixin.qq.com/sns/jscode2session}") String endpoint,
+            @Value("${hz.buyer-auth.wechat.transport-mode:official-https}") String transportMode,
+            @Value("${hz.environment.name:}") String environmentName,
+            @Value("${TCB_ENV_ID:}") String cloudBaseEnvironmentId,
             @Value("${hz.buyer-auth.wechat.app-id:}") String appId,
             @Value("${hz.buyer-auth.wechat.app-secret:}") String appSecret,
             @Value("${hz.buyer-auth.wechat.connect-timeout-ms:2000}") long connectTimeoutMs,
@@ -48,7 +57,15 @@ final class WechatCode2SessionClient implements WechatCode2SessionPort {
         this.appSecret = appSecret == null ? "" : appSecret;
         this.connectTimeout = Duration.ofMillis(Math.max(0, connectTimeoutMs));
         this.readTimeout = Duration.ofMillis(Math.max(0, readTimeoutMs));
-        if (enabled && (!OFFICIAL_ENDPOINT.toString().equals(endpoint)
+        boolean officialHttps = OFFICIAL_HTTPS.equals(transportMode)
+                && OFFICIAL_ENDPOINT.toString().equals(endpoint);
+        boolean cloudBaseSafeLink = CLOUDBASE_SAFELINK_HTTP.equals(transportMode)
+                && CLOUDBASE_SAFELINK_ENDPOINT.toString().equals(endpoint)
+                && "dev".equals(environmentName)
+                && CLOUDBASE_ENVIRONMENT_ID.equals(cloudBaseEnvironmentId);
+        this.endpoint = cloudBaseSafeLink ? CLOUDBASE_SAFELINK_ENDPOINT : OFFICIAL_ENDPOINT;
+        this.requireCloudBaseBypass = cloudBaseSafeLink;
+        if (enabled && ((!officialHttps && !cloudBaseSafeLink)
                 || !validAppId(this.appId) || !validSecret(this.appSecret)
                 || !validTimeout(connectTimeoutMs) || !validTimeout(readTimeoutMs))) {
             throw new IllegalStateException("WECHAT_IDENTITY_CONFIGURATION_INCOMPLETE");
@@ -64,7 +81,7 @@ final class WechatCode2SessionClient implements WechatCode2SessionPort {
         WechatCode2SessionTransport.Response response;
         try {
             response = transport.execute(new WechatCode2SessionTransport.Request(
-                    OFFICIAL_ENDPOINT, appId, appSecret, command.oneTimeCode(), connectTimeout, readTimeout));
+                    endpoint, appId, appSecret, command.oneTimeCode(), connectTimeout, readTimeout));
         } catch (WechatCode2SessionTransport.Failure failure) {
             return new Unknown(switch (failure.kind()) {
                 case TIMEOUT -> "WECHAT_PROVIDER_TIMEOUT";
@@ -85,6 +102,9 @@ final class WechatCode2SessionClient implements WechatCode2SessionPort {
             return new Unknown("WECHAT_PROVIDER_UNAVAILABLE");
         }
         if (response == null || response.statusCode() != 200) return new Unknown("WECHAT_HTTP_STATUS_UNKNOWN");
+        if (requireCloudBaseBypass && !"bypass".equals(response.openApiRule())) {
+            return new Unknown("WECHAT_CLOUDBASE_RULE_NOT_BYPASSED");
+        }
         String body = response.body();
         if (body == null || body.isBlank() || body.length() > MAX_RESPONSE_CHARS) {
             return new Unknown("WECHAT_RESPONSE_INVALID");

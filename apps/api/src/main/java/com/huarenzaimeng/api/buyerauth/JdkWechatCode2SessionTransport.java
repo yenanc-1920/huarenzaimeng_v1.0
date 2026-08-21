@@ -11,6 +11,10 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedTrustManager;
 import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.http.HttpHeaders;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -41,11 +45,13 @@ final class JdkWechatCode2SessionTransport implements WechatCode2SessionTranspor
                     .connectTimeout(request.connectTimeout())
                     .sslContext(diagnosticSslContext())
                     .version(HttpClient.Version.HTTP_1_1)
+                    .followRedirects(HttpClient.Redirect.NEVER)
+                    .proxy(new DirectOnlyProxySelector())
                     .build();
             HttpRequest httpRequest = HttpRequest.newBuilder(requestUri(request))
                     .timeout(request.readTimeout()).GET().build();
             HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            return new Response(response.statusCode(), response.body());
+            return new Response(response.statusCode(), response.body(), exactOpenApiRule(response.headers()));
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new Failure(FailureKind.UNAVAILABLE);
@@ -202,7 +208,8 @@ final class JdkWechatCode2SessionTransport implements WechatCode2SessionTranspor
     }
 
     static URI requestUri(Request request) {
-        if (!WechatCode2SessionClient.OFFICIAL_ENDPOINT.equals(request.endpoint())) {
+        if (!WechatCode2SessionClient.OFFICIAL_ENDPOINT.equals(request.endpoint())
+                && !WechatCode2SessionClient.CLOUDBASE_SAFELINK_ENDPOINT.equals(request.endpoint())) {
             throw new Failure(FailureKind.UNAVAILABLE);
         }
         String query = "appid=" + encode(request.appId())
@@ -210,6 +217,16 @@ final class JdkWechatCode2SessionTransport implements WechatCode2SessionTranspor
                 + "&js_code=" + encode(request.oneTimeCode())
                 + "&grant_type=authorization_code";
         return URI.create(request.endpoint() + "?" + query);
+    }
+
+    static String exactOpenApiRule(HttpHeaders headers) {
+        List<String> values = headers.allValues("x-openapi-rule");
+        return values.size() == 1 ? values.get(0) : null;
+    }
+
+    private static final class DirectOnlyProxySelector extends ProxySelector {
+        @Override public List<Proxy> select(URI uri) { return List.of(Proxy.NO_PROXY); }
+        @Override public void connectFailed(URI uri, SocketAddress address, java.io.IOException failure) { }
     }
 
     private static String encode(String value) {

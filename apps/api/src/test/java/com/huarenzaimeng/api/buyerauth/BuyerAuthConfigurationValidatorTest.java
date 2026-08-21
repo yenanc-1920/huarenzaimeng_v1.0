@@ -16,8 +16,25 @@ class BuyerAuthConfigurationValidatorTest {
         assertThatThrownBy(()->validator(true,A,B,"wechat-code2session",APP,true,APP,"")).hasMessage("BUYER_AUTH_CONFIGURATION_INCOMPLETE");
         assertThatThrownBy(()->validator(true,A,B,"wechat-code2session","wx_other_app",true,APP,SECRET)).hasMessage("BUYER_AUTH_CONFIGURATION_INCOMPLETE");
     }
+    @Test void cloudBaseSafeLinkModeRequiresExactDevEnvironmentAndFixedEndpoint(){
+        assertThatCode(()->new BuyerAuthConfigurationValidator(true,A,B,"wechat-code2session",APP,true,
+                WechatCode2SessionClient.CLOUDBASE_SAFELINK_ENDPOINT.toString(),
+                WechatCode2SessionClient.CLOUDBASE_SAFELINK_HTTP,"dev",
+                WechatCode2SessionClient.CLOUDBASE_ENVIRONMENT_ID,APP,SECRET)).doesNotThrowAnyException();
+        assertThatThrownBy(()->new BuyerAuthConfigurationValidator(true,A,B,"wechat-code2session",APP,true,
+                WechatCode2SessionClient.CLOUDBASE_SAFELINK_ENDPOINT.toString(),
+                WechatCode2SessionClient.CLOUDBASE_SAFELINK_HTTP,"test",
+                WechatCode2SessionClient.CLOUDBASE_ENVIRONMENT_ID,APP,SECRET))
+                .hasMessage("BUYER_AUTH_CONFIGURATION_INCOMPLETE");
+        assertThatThrownBy(()->new BuyerAuthConfigurationValidator(true,A,B,"wechat-code2session",APP,true,
+                "http://example.invalid/sns/jscode2session", WechatCode2SessionClient.CLOUDBASE_SAFELINK_HTTP,
+                "dev",WechatCode2SessionClient.CLOUDBASE_ENVIRONMENT_ID,APP,SECRET))
+                .hasMessage("BUYER_AUTH_CONFIGURATION_INCOMPLETE");
+    }
     private static BuyerAuthConfigurationValidator validator(boolean enabled,String pepper,String codePepper,
             String mode,String expectedAppId,boolean wechatEnabled,String appId,String secret){
-        return new BuyerAuthConfigurationValidator(enabled,pepper,codePepper,mode,expectedAppId,wechatEnabled,appId,secret);
+        return new BuyerAuthConfigurationValidator(enabled,pepper,codePepper,mode,expectedAppId,wechatEnabled,
+                WechatCode2SessionClient.OFFICIAL_ENDPOINT.toString(), WechatCode2SessionClient.OFFICIAL_HTTPS,
+                "", "", appId,secret);
     }
 }
