@@ -41,6 +41,13 @@ class ReleaseQuoteOrderServiceTest {
                 .isInstanceOf(FlowRejectedException.class).hasMessage("QUOTE_IDEMPOTENCY_CONFLICT");
     }
 
+    @Test void quoteUsesLatestEffectiveCatalogWhenPreviousCatalogIsStillValid(){
+        jdbc.update("INSERT INTO hz_product_catalog VALUES(2,1,'CAT-2','APP','ACTIVE',?,?,?)",
+                Timestamp.from(MARKET_START),Timestamp.from(MARKET_END),Timestamp.from(now));
+        var quote=service.createQuote("BUYER-1","IDEM-Q2","REQ-Q2","01712345678","PRODUCT-1");
+        assertThat(quote.catalogVersion()).isEqualTo(2);
+    }
+
     @Test void orderBindsSubjectRejectsExpiryAndVersionDrift(){
         var quote=service.createQuote("BUYER-1","IDEM-Q","REQ-Q","01712345678","PRODUCT-1");
         assertThatThrownBy(()->service.createOrder("BUYER-2","IDEM-O","REQ-O",quote.quoteRef()))
