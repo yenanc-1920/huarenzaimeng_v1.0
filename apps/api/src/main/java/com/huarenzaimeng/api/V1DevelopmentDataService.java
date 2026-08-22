@@ -40,17 +40,28 @@ final class V1DevelopmentDataService {
 
     Map<String,Object> catalog(String operatorCode,String productType) {
         List<Map<String,Object>> supported=camel(jdbc.queryForList("""
-                SELECT DISTINCT p.operator_code AS operatorCode
+                SELECT DISTINCT p.operator_code AS operator_code
                   FROM hz_platform_product p JOIN hz_price_version v ON v.platform_product_ref=p.platform_product_ref
                  WHERE p.enable_state='ENABLED' AND v.price_state='ACTIVE'
                    AND v.effective_from<=CURRENT_TIMESTAMP(3) AND v.effective_until>CURRENT_TIMESTAMP(3)
                  ORDER BY p.operator_code
                 """)).stream().map(row -> Map.<String,Object>of(
                         "operatorCode",row.get("operatorCode"),"displayName",operatorName(String.valueOf(row.get("operatorCode"))))).toList();
-        Long version=jdbc.queryForObject("SELECT COALESCE(MAX(aggregate_version),1) FROM hz_platform_product",Long.class);
+        Long operatorSetVersion=jdbc.queryForObject("""
+                SELECT COALESCE(MAX(b.supported_operator_set_version),1)
+                  FROM hz_operator_support_batch b
+                  JOIN hz_product_catalog c ON c.supported_operator_set_version=b.supported_operator_set_version
+                   AND c.catalog_state='ACTIVE' AND c.effective_from<=CURRENT_TIMESTAMP(3) AND c.expires_at>CURRENT_TIMESTAMP(3)
+                 WHERE b.batch_state='ACTIVE' AND b.effective_from<=CURRENT_TIMESTAMP(3) AND b.expires_at>CURRENT_TIMESTAMP(3)
+                """,Long.class);
+        Long catalogVersion=jdbc.queryForObject("""
+                SELECT COALESCE(MAX(catalog_version),1) FROM hz_product_catalog
+                 WHERE supported_operator_set_version=? AND catalog_state='ACTIVE'
+                   AND effective_from<=CURRENT_TIMESTAMP(3) AND expires_at>CURRENT_TIMESTAMP(3)
+                """,Long.class,operatorSetVersion);
         Map<String,Object> result=new LinkedHashMap<>();
-        result.put("supportedOperatorSetVersion",version==null?1:version);
-        result.put("catalogVersion",version==null?1:version);
+        result.put("supportedOperatorSetVersion",operatorSetVersion);
+        result.put("catalogVersion",catalogVersion);
         result.put("operatorCode",operatorCode);
         result.put("operatorName",operatorName(operatorCode));
         result.put("supportedOperators",supported);
