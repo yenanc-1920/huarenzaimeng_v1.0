@@ -26,6 +26,8 @@ class ReleasePublicControllerTest {
         var localNumber=controller.eligibility("1312345678");
         ProjectEnvelope<?> localEnvelope=(ProjectEnvelope<?>)localNumber.getBody();
         assertEquals("GRAMEENPHONE",((Map<?,?>)localEnvelope.data()).get("operatorCode"));
+        var internationalDialingPrefix=controller.eligibility("008801300000000");
+        assertEquals(200,internationalDialingPrefix.getStatusCode().value());
         var rejected=controller.eligibility("NOT-A-PHONE");
         assertEquals(400,rejected.getStatusCode().value());
     }

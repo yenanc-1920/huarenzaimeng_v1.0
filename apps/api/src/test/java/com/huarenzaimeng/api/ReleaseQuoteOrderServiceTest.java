@@ -138,6 +138,7 @@ class ReleaseQuoteOrderServiceTest {
 
     @Test void bangladeshPhoneNormalizationFailsClosed(){
         assertThat(ReleaseQuoteOrderService.normalizeBangladeshPhone("017 1234 5678")).isEqualTo("+8801712345678");
+        assertThat(ReleaseQuoteOrderService.normalizeBangladeshPhone("008801300000000")).isEqualTo("+8801300000000");
         assertThatThrownBy(()->ReleaseQuoteOrderService.normalizeBangladeshPhone("123"))
                 .isInstanceOf(FlowRejectedException.class).hasMessage("BANGLADESH_PHONE_INVALID");
     }

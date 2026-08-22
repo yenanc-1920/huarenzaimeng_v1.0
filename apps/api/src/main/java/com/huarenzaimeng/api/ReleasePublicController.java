@@ -37,11 +37,12 @@ final class ReleasePublicController {
     }
 
     @GetMapping("/eligibility") ResponseEntity<?> eligibility(@RequestParam String phone) {
-        String normalized = phone == null ? "" : phone.replaceAll("[\\s-]", "");
-        if(!normalized.matches("(?:\\+880|880|0)?1[3-9][0-9]{8}"))
+        String normalized;
+        try { normalized = ReleaseQuoteOrderService.normalizeBangladeshPhone(phone); }
+        catch (FlowRejectedException invalid) {
             return ResponseEntity.badRequest().body(new ProjectEnvelope<>("REJECTED","RECHARGE_INPUT_INVALID",null));
-        String local=normalized.replaceFirst("^\\+?880","0");
-        if(local.length()==10) local="0"+local;
+        }
+        String local=normalized.replaceFirst("^\\+880","0");
         String operator=operatorCode(local);
         Map<String,Object> data=new LinkedHashMap<>();
         data.put("outcome","UNKNOWN");
