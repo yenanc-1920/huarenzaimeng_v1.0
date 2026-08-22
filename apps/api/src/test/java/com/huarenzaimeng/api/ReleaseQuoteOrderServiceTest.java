@@ -48,6 +48,12 @@ class ReleaseQuoteOrderServiceTest {
         assertThat(quote.catalogVersion()).isEqualTo(2);
     }
 
+    @Test void quoteAllowsNullableSupplierSourceReference(){
+        jdbc.update("UPDATE hz_price_version SET supplier_source_ref=NULL WHERE price_version_ref='PRICE-1'");
+        var quote=service.createQuote("BUYER-1","IDEM-NULL-SOURCE","REQ-NULL-SOURCE","01712345678","PRODUCT-1");
+        assertThat(quote.priceVersionRef()).isEqualTo("PRICE-1");
+    }
+
     @Test void quoteUsesTheSameLatestEffectivePriceAsThePublicCatalog(){
         Instant newer=now.minusSeconds(60);
         jdbc.update("INSERT INTO hz_price_version VALUES('PRICE-2','PRODUCT-1',13.45,80,'BDT','BATCH/SKU-1','FIXTURE','FX-2','BDT_CNY',0.06,?,?,0,0,0,0,0,'HALF_UP','PLATFORM','GLOBAL','ACTIVE',?,?,'SUPER_ADMIN',2,?)",

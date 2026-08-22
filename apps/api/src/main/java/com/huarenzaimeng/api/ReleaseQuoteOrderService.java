@@ -71,7 +71,7 @@ final class ReleaseQuoteOrderService {
                         Map.entry("validityText", nullable(p.validityText()))));
                 String price = toJson(Map.of(
                         "priceVersionRef", p.priceVersionRef(), "finalAmountCny", p.finalAmountCny(),
-                        "fxSnapshotRef", p.fxSnapshotRef(), "supplierSourceRef", p.supplierSourceRef()));
+                        "fxSnapshotRef", p.fxSnapshotRef(), "supplierSourceRef", nullable(p.supplierSourceRef())));
                 String snapshotDigest = sha256(phoneDigest, p.operatorCode(), p.productRef(), entitlement,
                         p.priceVersionRef(), price, Long.toString(p.catalogVersion()), Long.toString(validUntil.toEpochMilli()));
                 String quoteRef = "Q-" + UUID.randomUUID();
