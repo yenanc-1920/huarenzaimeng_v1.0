@@ -1,5 +1,11 @@
 # 基线变更记录
 
+## 2026-08-22 — OPEN-11-ORDER-READ-01／DETAIL-01／PROGRESS-01
+
+- P020、P021、P014统一消费release BUYER只读接口的`ProjectEnvelope`与`OrderProjection`；列表不再发送旧授权查询参数，详情不再把客户端`authorizedOrderRefs`当订单所有权门禁。
+- P014删除支付、充值提交和原单查询写入口，只保留服务端订单投影刷新；支付与WINLA disabled期间不会从该页触发写动作。
+- release合同定向测试、TypeScript检查及DEV小程序构建通过；状态仅为`LOCAL_PASS／DEV_RETEST_REQUIRED`，P023恢复、匿名认领/迁移/合并及任何资金、部署、数据库动作均不在本次范围。
+
 ## 2026-08-22 — FN-MP-07-00880-01
 
 - 资格接口删除独立号码正则，改为复用报价入口已有的孟加拉号码归一化；共享入口仅补齐获批的`00880`国际拨号前缀，不改变运营商映射或资格业务。
