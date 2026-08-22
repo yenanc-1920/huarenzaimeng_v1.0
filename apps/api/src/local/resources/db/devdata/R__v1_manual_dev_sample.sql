@@ -94,6 +94,22 @@ INSERT IGNORE INTO hz_provider_channel
 (channel_ref,provider_code,display_name,channel_priority,channel_state,aggregate_version,updated_at) VALUES
 ('CHANNEL-WINLA-DEV','WINLA','WINLA manual development channel',100,'ENABLED',1,'2026-08-16 00:00:00.000');
 
+INSERT IGNORE INTO hz_operator_support_batch
+(supported_operator_set_version,batch_ref,approval_ref,batch_state,qualification_known,effective_from,expires_at,rollback_version,created_at) VALUES
+(2026082201,'OPERATOR-SET-DEV-20260822','MANUAL-DEV-SAMPLE','ACTIVE',1,'2026-08-16 00:00:00.000','2027-08-16 00:00:00.000',NULL,'2026-08-16 00:00:00.000');
+
+INSERT IGNORE INTO hz_operator_membership
+(supported_operator_set_version,operator_code,membership_state,evidence_ref,created_at) VALUES
+(2026082201,'GRAMEENPHONE','SUPPORTED','MANUAL-DEV-SAMPLE','2026-08-16 00:00:00.000'),
+(2026082201,'ROBI','SUPPORTED','MANUAL-DEV-SAMPLE','2026-08-16 00:00:00.000'),
+(2026082201,'BANGLALINK','SUPPORTED','MANUAL-DEV-SAMPLE','2026-08-16 00:00:00.000'),
+(2026082201,'AIRTEL','SUPPORTED','MANUAL-DEV-SAMPLE','2026-08-16 00:00:00.000'),
+(2026082201,'TELETALK','SUPPORTED','MANUAL-DEV-SAMPLE','2026-08-16 00:00:00.000');
+
+INSERT IGNORE INTO hz_product_catalog
+(catalog_version,supported_operator_set_version,catalog_ref,approval_ref,catalog_state,effective_from,expires_at,created_at) VALUES
+(2026082201,2026082201,'PRODUCT-CATALOG-DEV-20260822','MANUAL-DEV-SAMPLE','ACTIVE','2026-08-16 00:00:00.000','2027-08-16 00:00:00.000','2026-08-16 00:00:00.000');
+
 INSERT IGNORE INTO hz_quote
 (quote_ref,project_subject_ref,phone_masked,operator_code,product_code,denomination_ref,
  supported_operator_set_version,catalog_version,mnp_state,total_amount,total_amount_minor,total_currency,
