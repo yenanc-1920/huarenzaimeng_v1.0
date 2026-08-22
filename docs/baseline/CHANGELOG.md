@@ -1,5 +1,11 @@
 # 基线变更记录
 
+## 2026-08-23 — FN-MP-03 登录返回与P020会话门禁
+
+- 南哥确认固定提交`ef7f6db`在微信开发者工具中可以退出并重新登录，`FN-MP-03-LOGOUT-01`登记为`DEV_PASS`；未触发注销。
+- 新发现P020仍用旧`projectSessionProjection`判断登录，导致真实BUYER token存在时仍提示登录；现改为BUYER token唯一门禁，API继续携带Bearer读取。
+- 登录成功不再固定跳首页，仅允许返回P024“我的”或P020“我的订单”两个固定来源；前端合同、正式运行合同及DEV构建通过，尚未推送和发布，状态为`LOCAL_PASS／DEV_RETEST_REQUIRED`。
+
 ## 2026-08-23 — FN-MP-03 退出合同与P024身份卡
 
 - RunId `FN-MP-03-DEV-20260823-01`确认个人中心登录态和退出确认框通过；退出请求在微信云托管返回400／`LOGOUT_REQUEST_INVALID`，确认不是开发者工具缓存，本次停止后未重试登录。

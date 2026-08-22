@@ -1,18 +1,15 @@
-import type { OrderSummary,ProjectSessionProjection } from './types'
-import { readSessionProjection,revokeOrderListAccess,type SessionStorage } from './session.ts'
+import type { OrderSummary } from './types'
 
 export type AuthorizedOrderListLoad=
-  | {outcome:'GUEST';session:ProjectSessionProjection;orders:[]}
-  | {outcome:'READY';session:ProjectSessionProjection;orders:OrderSummary[]}
-  | {outcome:'ERROR';session:ProjectSessionProjection;orders:[]}
+  | {outcome:'GUEST';orders:[]}
+  | {outcome:'READY';orders:OrderSummary[]}
+  | {outcome:'ERROR';orders:[]}
 
 export async function loadAuthorizedOrderList(
-  storage:SessionStorage,
-  request:(session:ProjectSessionProjection)=>Promise<OrderSummary[]>,
-  now=Date.now(),
+  authenticated:boolean,
+  request:()=>Promise<OrderSummary[]>,
 ):Promise<AuthorizedOrderListLoad>{
-  const current=readSessionProjection(storage,now)
-  if(current.role!=='BUYER')return{outcome:'GUEST',session:revokeOrderListAccess(storage),orders:[]}
-  try{return{outcome:'READY',session:current,orders:await request(current)}}
-  catch{return{outcome:'ERROR',session:revokeOrderListAccess(storage),orders:[]}}
+  if(!authenticated)return{outcome:'GUEST',orders:[]}
+  try{return{outcome:'READY',orders:await request()}}
+  catch{return{outcome:'ERROR',orders:[]}}
 }

@@ -6,8 +6,7 @@ import { canonicalFingerprint } from '../domain/canonical-fingerprint'
 import { readPendingRecoveryCaseRef } from '../domain/session'
 import { parseAcceptedProjectEnvelope, ProjectApiError } from './project-envelope'
 import { buildOrderCreationCommand, parseOrderCreationResult, type OrderCreationResult } from './order-creation-contract'
-import { readSessionProjection } from '../domain/session'
-import type { CatalogProjection, ContentErrorReportResult, DirectoryCity, DirectoryItem, DirectorySummary, EligibilityResult, LifeContentDetailResult, LifeContentListResult, OrderProjection, OrderSummary, ProjectSessionProjection, QuoteSnapshot, RechargeSelection, RecoveryResult, SupportCase } from '../domain/types'
+import type { CatalogProjection, ContentErrorReportResult, DirectoryCity, DirectoryItem, DirectorySummary, EligibilityResult, LifeContentDetailResult, LifeContentListResult, OrderProjection, OrderSummary, QuoteSnapshot, RechargeSelection, RecoveryResult, SupportCase } from '../domain/types'
 import type { TemporalOverviewReadResponse } from './temporal-overview-contract'
 import { P014_BACKEND_IMPLEMENTATION_SHA } from './p014-topup-contract'
 import { callProjectApi } from './wechat-development-transport'
@@ -208,8 +207,8 @@ export const api = {
     const projection = toOrderProjection(await projectProjection(`/orders/${encodeURIComponent(orderRef)}/projection`, 'GET'))
     return acceptNewerProjection(orderRef, projection)
   },
-  async getOrders(session:ProjectSessionProjection):Promise<OrderSummary[]>{
-    if(session.role!=='BUYER')throw new ProjectApiError('BUYER_SESSION_REQUIRED')
+  async getOrders():Promise<OrderSummary[]>{
+    requireBuyerBearerToken()
     const data=parseAcceptedProjectEnvelope(await requestTrustedSessionRead('/orders'))
     if(!Array.isArray(data))throw new ProjectApiError('INVALID_ORDER_LIST_DTO')
     return data.map(value=>{const order=parseReleaseOrderProjection(value);return{orderRef:order.orderRef,stateCode:orderSummaryState(order.orderState),projectionVersion:order.projectionVersion,updatedAt:`v${order.projectionVersion}`}})

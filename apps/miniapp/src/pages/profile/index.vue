@@ -13,7 +13,7 @@ const displayName=computed(()=>nickname.value||`${sessionActive.value?'用户':'
 function ensureGuestId(){const stored=uni.getStorageSync('guestDisplayId');if(typeof stored==='string'&&/^\d{6}$/.test(stored)){guestId.value=stored;return}const created=String(Math.floor(100000+Math.random()*900000));uni.setStorageSync('guestDisplayId',created);guestId.value=created}
 function loadProfile(){ensureGuestId();sessionActive.value=readBuyerSessionToken()!==null;const stored=uni.getStorageSync('wechatDisplayProfile');if(stored&&typeof stored==='object'){nickname.value=typeof stored.nickname==='string'?stored.nickname.trim():'';avatarUrl.value=typeof stored.avatarUrl==='string'?stored.avatarUrl.trim():''}}
 const openOrders=()=>uni.navigateTo({url:'/pages/order/list'}),openRecovery=()=>uni.navigateTo({url:'/pages/order/recovery'})
-const openProfileSignIn=()=>{if(!sessionActive.value)uni.navigateTo({url:'/pages/auth/expired'})}
+const openProfileSignIn=()=>{if(!sessionActive.value)uni.navigateTo({url:'/pages/auth/expired?returnTo=%2Fpages%2Fprofile%2Findex'})}
 const openUserAgreement=()=>uni.navigateTo({url:'/pages/legal/user-agreement'}),openPrivacyPolicy=()=>uni.navigateTo({url:'/pages/legal/privacy-policy'})
 const actionRef=(prefix:string)=>`${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random()*0x100000000).toString(36)}`
 const confirmAction=(title:string,content:string)=>new Promise<boolean>(resolve=>uni.showModal({title,content,confirmColor:'#b8453b',success:result=>resolve(result.confirm===true),fail:()=>resolve(false)}))
