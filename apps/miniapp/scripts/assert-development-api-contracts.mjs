@@ -135,6 +135,7 @@ assert.match(profile,/注销账号/)
 assert.match(profile,/logoutBuyerSession/)
 assert.match(profile,/requestBuyerAccountClosure/)
 assert.match(profile,/仅退出当前会话，不会注销账号/)
+assert.doesNotMatch(profile,/当前使用默认头像|头像与昵称授权/)
 
 const output=resolve(root,'dist/build/mp-weixin')
 if(existsSync(output)){

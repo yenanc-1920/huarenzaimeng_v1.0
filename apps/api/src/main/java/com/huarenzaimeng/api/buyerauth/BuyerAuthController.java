@@ -83,8 +83,8 @@ final class BuyerAuthController {
                 .orElseGet(()->ResponseEntity.status(401).body(Map.of("outcome","REJECTED","projectCode","BUYER_SESSION_UNAVAILABLE")));
     }
 
-    @PostMapping("/session/logout") ResponseEntity<?> logout(HttpServletRequest request){
-        if(request.getQueryString()!=null||request.getContentLengthLong()>0)return ResponseEntity.badRequest().body(Map.of("status","REJECTED","projectCode","LOGOUT_REQUEST_INVALID"));
+    @PostMapping("/session/logout") ResponseEntity<?> logout(@RequestBody(required=false) JsonNode body,HttpServletRequest request){
+        if(request.getQueryString()!=null||(body!=null&&(!body.isObject()||body.size()>0)))return ResponseEntity.badRequest().body(Map.of("status","REJECTED","projectCode","LOGOUT_REQUEST_INVALID"));
         String header=request.getHeader("Authorization");String token=header!=null&&header.startsWith("Bearer ")?header.substring(7):null;
         BuyerAuthStore.LogoutResult result=auth.logout(token);
         return switch(result){case SUCCEEDED->ResponseEntity.noContent().build();case UNAVAILABLE->ResponseEntity.status(401).body(Map.of("outcome","REJECTED","projectCode","BUYER_SESSION_UNAVAILABLE"));case UNKNOWN->ResponseEntity.status(503).body(Map.of("outcome","UNKNOWN","projectCode","BUYER_LOGOUT_RESULT_UNKNOWN"));};

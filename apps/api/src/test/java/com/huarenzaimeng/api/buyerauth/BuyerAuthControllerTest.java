@@ -85,7 +85,17 @@ class BuyerAuthControllerTest {
     @Test void logoutUnknownNeverClaimsSuccess() {
         BuyerAuthService service=mock(BuyerAuthService.class);when(service.logout("opaque-token")).thenReturn(BuyerAuthStore.LogoutResult.UNKNOWN);
         MockHttpServletRequest request=new MockHttpServletRequest("POST","/buyer-auth/v1/session/logout");request.addHeader("Authorization","Bearer opaque-token");
-        var response=new BuyerAuthController(service).logout(request);assertThat(response.getStatusCode().value()).isEqualTo(503);assertThat(response.getBody().toString()).contains("BUYER_LOGOUT_RESULT_UNKNOWN").doesNotContain("SUCCEEDED");
+        var response=new BuyerAuthController(service).logout(null,request);assertThat(response.getStatusCode().value()).isEqualTo(503);assertThat(response.getBody().toString()).contains("BUYER_LOGOUT_RESULT_UNKNOWN").doesNotContain("SUCCEEDED");
+    }
+
+    @Test void logoutAcceptsWechatCloudEmptyObjectButRejectsFields() throws Exception {
+        BuyerAuthService service=mock(BuyerAuthService.class);when(service.logout("opaque-token")).thenReturn(BuyerAuthStore.LogoutResult.SUCCEEDED);
+        MockMvc mvc=MockMvcBuilders.standaloneSetup(new BuyerAuthController(service)).setControllerAdvice(new BuyerAuthHttpErrorHandler()).build();
+        mvc.perform(post("/buyer-auth/v1/session/logout").contentType("application/json").header("Authorization","Bearer opaque-token").content("{}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/buyer-auth/v1/session/logout").contentType("application/json").header("Authorization","Bearer opaque-token").content("{\"unexpected\":true}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.projectCode").value("LOGOUT_REQUEST_INVALID"));
+        verify(service,times(1)).logout("opaque-token");
     }
 
     @Test void consentReadAndClosureRequestUseFrozenTypedContracts() throws Exception {
