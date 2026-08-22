@@ -1,5 +1,5 @@
 import { parseProjectProjection, parseProjectQuote, toOrderProjection, toQuoteSnapshot, type ProjectProjection } from './project-contract'
-import { parseAuthorizedOrders, parseCatalogProjection, parseRecoveryResult, selectionMatchesCatalog } from './topup-recovery-contract'
+import { parseCatalogProjection, parseRecoveryResult, selectionMatchesCatalog } from './topup-recovery-contract'
 import { acceptNewerProjection } from '../domain/projection'
 import { getOrCreateCommand } from '../domain/command-identity'
 import { canonicalFingerprint } from '../domain/canonical-fingerprint'
@@ -9,8 +9,7 @@ import { buildOrderCreationCommand, parseOrderCreationResult, type OrderCreation
 import { readSessionProjection } from '../domain/session'
 import type { CatalogProjection, ContentErrorReportResult, DirectoryCity, DirectoryItem, DirectorySummary, EligibilityResult, LifeContentDetailResult, LifeContentListResult, OrderProjection, OrderSummary, ProjectSessionProjection, QuoteSnapshot, RechargeSelection, RecoveryResult, SupportCase } from '../domain/types'
 import type { TemporalOverviewReadResponse } from './temporal-overview-contract'
-import { parseP014Response, P014_BACKEND_IMPLEMENTATION_SHA, type P014Response } from './p014-topup-contract'
-import { parseP021Response, type P021Response } from './order-detail-contract'
+import { P014_BACKEND_IMPLEMENTATION_SHA } from './p014-topup-contract'
 import { callProjectApi } from './wechat-development-transport'
 import { readBuyerSessionToken, requireBuyerBearerToken } from './buyer-session-token'
 import { commitAnonymousSessionToken, parseAnonymousSessionResponse, readAnonymousSessionToken } from './anonymous-session-contract'
@@ -18,7 +17,7 @@ import { sessionConsentCommand } from '../domain/login-privacy-state'
 import { readOrCreateBuyerGuestRef } from '../domain/buyer-guest-ref'
 import { createFormalTransactionClient, type FormalTransactionResponse } from './formal-transaction-client'
 import type { PaymentCreateContext } from './formal-transaction-client'
-import { parseReleaseOrderView, parseReleaseQuoteView, type ReleaseOrderView } from './formal-transaction-contract'
+import { parseReleaseOrderProjection, parseReleaseOrderView, parseReleaseQuoteView, type ReleaseOrderProjection, type ReleaseOrderView } from './formal-transaction-contract'
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
 const buyerBaseUrl = (import.meta.env.VITE_BUYER_API_BASE_URL || '/buyer-api/v1').replace(/\/$/, '')
@@ -122,6 +121,12 @@ const projectProjection = async (path: string, method: 'GET' | 'POST', data?: Un
 function localScopeFingerprint(value:string):string{let hash=2166136261;for(let index=0;index<value.length;index++){hash^=value.charCodeAt(index);hash=Math.imul(hash,16777619)}return(hash>>>0).toString(36)}
 const record=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value)
 const requiredText=(value:unknown):value is string=>typeof value==='string'&&value.trim().length>0
+function orderSummaryState(value:string):OrderSummary['stateCode']{
+  const mapped:Record<string,OrderSummary['stateCode']>={AWAITING_PAYMENT:'AWAITING_PAYMENT',PAYMENT_CONFIRMED:'PAID_AWAITING_TOPUP',TOPUP_REVIEW:'TOPUP_PROCESSING',COMPLETED:'DELIVERED'}
+  const state=mapped[value]
+  if(!state)throw new ProjectApiError('INVALID_ORDER_STATE_DTO')
+  return state
+}
 function parseSupportedOperators(value:unknown):Array<{operatorCode:string;displayName:string}>{
   if(!record(value)||!Array.isArray(value.supportedOperators))throw new ProjectApiError('INVALID_SUPPORTED_OPERATORS_DTO')
   return value.supportedOperators.map(entry=>{
@@ -182,17 +187,17 @@ export const api = {
     if(!quoteRef||!commandId||!idempotencyKey)throw new ProjectApiError('ORDER_CREATION_INPUT_REQUIRED')
     return parseReleaseOrderView(parseAcceptedProjectEnvelope(await requestBody('/orders','POST',{requestRef:commandId,quoteRef},baseUrl,{'Idempotency-Key':idempotencyKey})))
   },
-  async getP014Progress(orderRef:string):Promise<P014Response>{
+  async getP014Progress(orderRef:string):Promise<ReleaseOrderProjection>{
     if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
-    return parseP014Response(await requestBody(`/orders/${encodeURIComponent(orderRef)}/projection`,'GET'))
+    return parseReleaseOrderProjection(parseAcceptedProjectEnvelope(await requestTrustedSessionRead(`/orders/${encodeURIComponent(orderRef)}`)))
   },
-  async getP014TopupResult(orderRef:string,_query:unknown):Promise<P014Response>{
+  async getP014TopupResult(orderRef:string,_query:unknown):Promise<ReleaseOrderProjection>{
     if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
-    return parseP014Response(await requestBody(`/orders/${encodeURIComponent(orderRef)}/projection`,'GET'))
+    return parseReleaseOrderProjection(parseAcceptedProjectEnvelope(await requestTrustedSessionRead(`/orders/${encodeURIComponent(orderRef)}`)))
   },
-  async getOrderDetail(orderRef:string):Promise<P021Response>{
+  async getOrderDetail(orderRef:string):Promise<ReleaseOrderProjection>{
     if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
-    return parseP021Response(await requestTrustedSessionRead(`/orders/${encodeURIComponent(orderRef)}`))
+    return parseReleaseOrderProjection(parseAcceptedProjectEnvelope(await requestTrustedSessionRead(`/orders/${encodeURIComponent(orderRef)}`)))
   },
   async getCoreProjection(orderRef:string):Promise<ReleaseOrderView>{
     if(!orderRef)throw new ProjectApiError('ORDER_REF_REQUIRED')
@@ -205,9 +210,9 @@ export const api = {
   },
   async getOrders(session:ProjectSessionProjection):Promise<OrderSummary[]>{
     if(session.role!=='BUYER')throw new ProjectApiError('BUYER_SESSION_REQUIRED')
-    if(!orderRecoveryExternalAuthReady)throw new ProjectApiError('ORDER_RECOVERY_EXTERNAL_AUTH_NOT_READY')
-    const query=`?sessionVersion=${session.sessionVersion}&authorizationSetRef=${encodeURIComponent(session.authorizationSetRef!)}`
-    return parseAuthorizedOrders(await requestData(`/orders${query}`,'GET'),session)
+    const data=parseAcceptedProjectEnvelope(await requestTrustedSessionRead('/orders'))
+    if(!Array.isArray(data))throw new ProjectApiError('INVALID_ORDER_LIST_DTO')
+    return data.map(value=>{const order=parseReleaseOrderProjection(value);return{orderRef:order.orderRef,stateCode:orderSummaryState(order.orderState),projectionVersion:order.projectionVersion,updatedAt:`v${order.projectionVersion}`}})
   },
   async recoverOrder(orderRef:string,recoveryMaterialRef:string):Promise<RecoveryResult>{
     if(!orderRef||!recoveryMaterialRef)throw new ProjectApiError('RECOVERY_INPUT_REQUIRED')

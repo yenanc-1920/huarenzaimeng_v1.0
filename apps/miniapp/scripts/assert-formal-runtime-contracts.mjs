@@ -6,7 +6,7 @@ import { invokeWechatPayment, parseWechatPrepayParameters } from '../src/api/wec
 import { factStateCopy, p014FactStateCopy, p014StateCopy, projectOrderStateCopy } from '../src/domain/formal-status-copy.ts'
 import { parseCatalogProjection } from '../src/api/topup-recovery-contract.ts'
 import { createFormalTransactionClient } from '../src/api/formal-transaction-client.ts'
-import { parsePaymentView, parseReleaseOrderView, parseReleaseQuoteView, parseTopupView } from '../src/api/formal-transaction-contract.ts'
+import { parsePaymentView, parseReleaseOrderProjection, parseReleaseOrderView, parseReleaseQuoteView, parseTopupView } from '../src/api/formal-transaction-contract.ts'
 import { agreementsAccepted,consentAcceptances,officialPrivacyGranted,sessionConsentCommand } from '../src/domain/login-privacy-state.ts'
 import { readOrCreateBuyerGuestRef } from '../src/domain/buyer-guest-ref.ts'
 import { parseBuyerClosureView } from '../src/domain/buyer-account-lifecycle.ts'
@@ -117,6 +117,9 @@ assert.throws(()=>parseReleaseQuoteView({...quote,phoneDigest:digest}),/INVALID_
 const order=parseReleaseOrderView({orderRef:'O-1',quoteRef:'Q-1',requestRef:'cmd-2',snapshotDigest:digest,orderState:'CREATED',paymentState:'UNPAID',deliveryState:'NOT_STARTED',refundState:'NOT_REQUESTED',projectionVersion:1,aggregateVersion:1})
 assert.equal(order.paymentState,'UNPAID')
 assert.throws(()=>parseReleaseOrderView({...order,requestDigest:digest}),/INVALID_RELEASE_ORDER_DTO/)
+const projection=parseReleaseOrderProjection({orderRef:'O-1',quoteRef:'Q-1',orderState:'AWAITING_PAYMENT',paymentState:'UNPAID',upstreamDebitState:'NOT_STARTED',deliveryState:'NOT_STARTED',refundState:'NOT_REQUESTED',totalAmountMinor:525,currency:'CNY',projectionVersion:1,aggregateVersion:1,nextAction:'CREATE_PAYMENT'})
+assert.equal(projection.orderRef,'O-1')
+assert.throws(()=>parseReleaseOrderProjection({...projection,authorizedOrderRefs:['O-1']}),/INVALID_RELEASE_ORDER_PROJECTION_DTO/)
 const payment=parsePaymentView({orderRef:'O-1',state:'PREPAY_CREATED',providerRef:'WX-1',amountMinor:525,currency:'CNY',refundedMinor:0,version:1,prepayParameters:null})
 assert.equal(payment.prepayParameters,null)
 assert.throws(()=>parsePaymentView({...payment,prepayParameters:{timeStamp:'x'}}),/INVALID_PAYMENT_VIEW_DTO/)

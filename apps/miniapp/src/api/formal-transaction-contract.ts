@@ -15,6 +15,11 @@ export interface ReleaseOrderView{
   orderRef:string;quoteRef:string;requestRef:string;snapshotDigest:string;orderState:string
   paymentState:string;deliveryState:string;refundState:string;projectionVersion:number;aggregateVersion:number
 }
+export interface ReleaseOrderProjection{
+  orderRef:string;quoteRef:string;orderState:string;paymentState:string;upstreamDebitState:string
+  deliveryState:string;refundState:string;totalAmountMinor:number;currency:string
+  projectionVersion:number;aggregateVersion:number;nextAction:string
+}
 export interface PaymentView{
   orderRef:string;state:PaymentState;providerRef:string|null;amountMinor:number;currency:string;refundedMinor:number
   version:number;prepayParameters:WechatPrepayParameters|null
@@ -57,6 +62,15 @@ export function parseReleaseOrderView(value:unknown):ReleaseOrderView{
     ||!digest(value.snapshotDigest)||!text(value.orderState)||!text(value.paymentState)||!text(value.deliveryState)||!text(value.refundState)
     ||!positive(value.projectionVersion)||!positive(value.aggregateVersion))throw new Error('INVALID_RELEASE_ORDER_DTO')
   return value as unknown as ReleaseOrderView
+}
+
+export function parseReleaseOrderProjection(value:unknown):ReleaseOrderProjection{
+  const keys=['orderRef','quoteRef','orderState','paymentState','upstreamDebitState','deliveryState','refundState','totalAmountMinor','currency','projectionVersion','aggregateVersion','nextAction']
+  if(!object(value)||!exact(value,keys)||!text(value.orderRef)||!text(value.quoteRef)||!text(value.orderState)
+    ||!text(value.paymentState)||!text(value.upstreamDebitState)||!text(value.deliveryState)||!text(value.refundState)
+    ||!positive(value.totalAmountMinor)||!currency(value.currency)||!positive(value.projectionVersion)
+    ||!positive(value.aggregateVersion)||!text(value.nextAction))throw new Error('INVALID_RELEASE_ORDER_PROJECTION_DTO')
+  return value as unknown as ReleaseOrderProjection
 }
 
 export function parsePaymentView(value:unknown):PaymentView{
