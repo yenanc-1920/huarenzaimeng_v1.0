@@ -67,10 +67,10 @@ function collectFiles(directory) {
 const outputFiles = collectFiles(outputRoot)
 const packageBytes = outputFiles.reduce((total, file) => total + readFileSync(file).byteLength, 0)
 if (packageBytes > 1.5 * 1024 * 1024) throw new Error(`MP_WEIXIN_MAIN_PACKAGE_TOO_LARGE:${packageBytes}`)
-for (const image of outputFiles.filter((file) => /\.(?:png|jpe?g|gif|webp|svg)$/i.test(file))) {
-  const bytes = readFileSync(image).byteLength
-  if (bytes > 200 * 1024) throw new Error(`MP_WEIXIN_STATIC_IMAGE_TOO_LARGE:${relative(outputRoot, image).replaceAll('\\', '/')}:${bytes}`)
-}
+const mediaBytes = outputFiles
+  .filter((file) => /\.(?:png|jpe?g|gif|webp|svg|mp3|aac|wav)$/i.test(file))
+  .reduce((total, file) => total + readFileSync(file).byteLength, 0)
+if (mediaBytes > 200 * 1024) throw new Error(`MP_WEIXIN_STATIC_MEDIA_TOO_LARGE:${mediaBytes}`)
 
 let staticRequireCount = 0
 const forbiddenRuntimeSemantics = /LOCAL_MOCK_NO_REAL_OPERATOR_FACTS|legacy-price-v1|REQUEST_MOCK_PAYMENT|CREATE_LOCAL_SYNTHETIC_PAYMENT_INTENT|QUERY_LOCAL_SYNTHETIC_PAYMENT_INTENT|REQUEST_MOCK_TOPUP|CREATE_LOCAL_SYNTHETIC_TOPUP|MOCK_PROJECTION_ONLY_NO_EXTERNAL_FACTS/
