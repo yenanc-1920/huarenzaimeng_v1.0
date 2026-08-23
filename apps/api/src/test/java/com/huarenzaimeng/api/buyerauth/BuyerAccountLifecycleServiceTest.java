@@ -38,6 +38,7 @@ class BuyerAccountLifecycleServiceTest {
         int cleanup=position(jdbc.updates,"task_state='SUCCEEDED'");int close=position(jdbc.updates,"closure_state='CLOSED'");
         assertThat(cleanup).isGreaterThanOrEqualTo(0).isLessThan(close);
         assertThat(jdbc.updates).anySatisfy(sql->assertThat(sql).contains("DELETE FROM buyer_session"));
+        assertThat(jdbc.updates).anySatisfy(sql->assertThat(sql).contains("UPDATE buyer_identity SET subject_ref=?","provider_appid_digest=?","provider_subject_digest=?","status_code='CLOSED'"));
         assertThat(jdbc.updates).allSatisfy(sql->assertThat(sql).doesNotContain("DELETE FROM hz_order","DELETE FROM hz_payment","DELETE FROM hz_topup","DELETE FROM hz_release_order_snapshot"));
     }
 

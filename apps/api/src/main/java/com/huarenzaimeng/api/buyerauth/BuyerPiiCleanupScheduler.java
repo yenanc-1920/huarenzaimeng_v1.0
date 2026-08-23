@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @Profile("release-mysql")
-@ConditionalOnProperty(name="hz.buyer-closure.cleanup.scheduler-enabled",havingValue="true")
+@ConditionalOnProperty(name="hz.buyer-closure.cleanup.scheduler-enabled",havingValue="true",matchIfMissing=true)
 class BuyerPiiCleanupScheduler {
     private final BuyerPiiCleanupWorker worker;
     BuyerPiiCleanupScheduler(BuyerPiiCleanupWorker worker){this.worker=worker;}

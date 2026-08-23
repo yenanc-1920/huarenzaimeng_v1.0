@@ -72,7 +72,7 @@ hz:
     read-timeout-ms: ${HZ_WECHAT_PAY_READ_TIMEOUT_MS:3000}
   buyer-closure:
     cleanup:
-      scheduler-enabled: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_ENABLED:false}
+      scheduler-enabled: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_ENABLED:true}
       scheduler-delay-ms: ${HZ_BUYER_CLOSURE_CLEANUP_SCHEDULER_DELAY_MS:30000}
       lease-seconds: ${HZ_BUYER_CLOSURE_CLEANUP_LEASE_SECONDS:30}
       retry-seconds: ${HZ_BUYER_CLOSURE_CLEANUP_RETRY_SECONDS:30}

@@ -83,7 +83,9 @@ class BuyerAccountLifecycleService {
                 :jdbc.update("UPDATE buyer_pii_cleanup_task SET task_state='SUCCEEDED',completed_at=?,updated_at=?,lease_owner=NULL,lease_until=NULL,last_error_code=NULL,aggregate_version=aggregate_version+1 WHERE closure_ref=? AND buyer_id=? AND task_state='LEASED' AND lease_owner=? AND aggregate_version=?",ts(now),ts(now),closureRef,buyerId,leaseOwner,taskVersion);
         if(task!=1){Integer done=jdbc.queryForObject("SELECT COUNT(*) FROM buyer_pii_cleanup_task WHERE closure_ref=? AND buyer_id=? AND task_state='SUCCEEDED'",Integer.class,closureRef,buyerId);if(done==null||done!=1)throw new Conflict("PII_CLEANUP_NOT_READY");}
         int changed=jdbc.update("UPDATE buyer_account_closure_request SET closure_state='CLOSED',blocker_count=0,aggregate_version=aggregate_version+1,closed_at=?,updated_at=? WHERE closure_ref=? AND closure_state='REQUESTED' AND aggregate_version=?",ts(now),ts(now),closureRef,expected);
-        if(changed!=1)throw new Conflict("CLOSURE_VERSION_CONFLICT");jdbc.update("UPDATE buyer_identity SET status_code='CLOSED',updated_at=? WHERE buyer_id=? AND status_code='CLOSURE_REQUESTED'",ts(now),buyerId);
+        if(changed!=1)throw new Conflict("CLOSURE_VERSION_CONFLICT");
+        jdbc.update("UPDATE buyer_identity SET subject_ref=?,provider_appid_digest=?,provider_subject_digest=?,status_code='CLOSED',updated_at=? WHERE buyer_id=? AND status_code='CLOSURE_REQUESTED'",
+                tombstone,digest("APPID\n"+closureRef),digest("SUBJECT\n"+closureRef),ts(now),buyerId);
         return new ClosureView("BUYER_CLOSURE_V1",closureRef,"CLOSED",0,expected+1,String.valueOf(row.get("request_ref")),false);
     }
 
