@@ -25,4 +25,16 @@ page {
 
 view, text, image, button, input { box-sizing: border-box; }
 button::after { border: 0; }
+.primary, .secondary, .identify, .retry, .readonly-retry, .report-trigger,
+.filters button, .product-tabs button, .dialog button, .recovery-card button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+.tabs button { display: inline-flex; align-items: center; justify-content: center; line-height: 1.2; }
+.side { display: flex; align-items: center; line-height: 1.2; }
+.side.right { justify-content: flex-end; }
+.city-filter, .item, .order, .product-card, .story-card, .service-row, .support-card { align-items: center; }
+.operator-logo { width: 96rpx; height: 96rpx; margin-right: 24rpx; flex: none; border-radius: 22rpx; background: #fff; }
 </style>
