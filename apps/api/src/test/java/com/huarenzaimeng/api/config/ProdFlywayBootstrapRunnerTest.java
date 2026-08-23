@@ -32,9 +32,9 @@ class ProdFlywayBootstrapRunnerTest {
                     .sorted()
                     .toArray();
 
-            org.assertj.core.api.Assertions.assertThat(versions).hasSize(25);
+            org.assertj.core.api.Assertions.assertThat(versions).hasSize(26);
             org.assertj.core.api.Assertions.assertThat(versions)
-                    .containsExactly(java.util.stream.LongStream.rangeClosed(1L, 25L).toArray());
+                    .containsExactly(java.util.stream.LongStream.rangeClosed(1L, 26L).toArray());
             org.assertj.core.api.Assertions.assertThat(ProdFlywayBootstrapRunner.EXPECTED_VERSIONED_MIGRATION_COUNT)
                     .isEqualTo(versions.length);
             org.assertj.core.api.Assertions.assertThat(ProdFlywayBootstrapRunner.EXPECTED_TERMINAL_MIGRATION_VERSION)
@@ -131,10 +131,10 @@ class ProdFlywayBootstrapRunnerTest {
         ResultSet registry = single(registryPresent ? 1L : 0L);
         ResultSet seeds = single(seedCount);
         when(history.next()).thenReturn(true, false);
-        when(history.getLong(1)).thenReturn(25L);
-        when(history.getLong(2)).thenReturn(25L);
-        when(history.getLong(3)).thenReturn(25L);
-        when(history.getLong(4)).thenReturn(25L);
+        when(history.getLong(1)).thenReturn(26L);
+        when(history.getLong(2)).thenReturn(26L);
+        when(history.getLong(3)).thenReturn(26L);
+        when(history.getLong(4)).thenReturn(26L);
         when(history.getLong(5)).thenReturn(0L);
         when(source.getConnection()).thenReturn(connection);
         when(connection.createStatement()).thenReturn(statement);

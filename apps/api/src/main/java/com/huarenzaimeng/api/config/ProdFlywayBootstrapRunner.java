@@ -22,8 +22,8 @@ import org.springframework.stereotype.Component;
 @Profile("release-mysql & (local-mysql | test-mysql | stage-mysql | prod-mysql)")
 final class ProdFlywayBootstrapRunner {
     private static final Logger LOG = LoggerFactory.getLogger(ProdFlywayBootstrapRunner.class);
-    static final long EXPECTED_VERSIONED_MIGRATION_COUNT = 25L;
-    static final long EXPECTED_TERMINAL_MIGRATION_VERSION = 25L;
+    static final long EXPECTED_VERSIONED_MIGRATION_COUNT = 26L;
+    static final long EXPECTED_TERMINAL_MIGRATION_VERSION = 26L;
     private final DataSource dataSource;
     private final Flyway flyway;
     private final ReleaseMigrationState state;

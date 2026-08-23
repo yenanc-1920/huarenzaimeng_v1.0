@@ -5,6 +5,8 @@
 - 南哥授权专用微信测试账号`Kongkong_1920`执行注销；确认框正常，但微信云托管`huaren-api-dev-051`在2026-08-23 13:32:41（控制台北京时间）报`Data too long for column 'status_code'`，事务回滚，账号未注销。
 - 根因为`buyer_identity.status_code VARCHAR(16)`无法容纳17字符的`CLOSURE_REQUESTED`；同一事务随后写入的`buyer_consent_state.consent_state`也为16字符容量。
 - 新增V26，仅将上述两个字段扩至`VARCHAR(24)`；生命周期、控制器与迁移合同定向测试14/14通过。当前仅`LOCAL_PASS`，未推送、未部署、未执行DEV数据库迁移，唯一下一动作是发布后单次重测。
+- 首次推送提交`cca3e7b`触发GitHub Run `32620936447`，因两处迁移清单仍固定到V25而失败关闭，未推进`deploy/dev`、未触发微信云托管部署或DEV数据库迁移。
+- 已同步V26终态迁移计数和清单断言；定向测试24/24、与GitHub相同的本地完整DEV门禁通过（后端937项、失败0、跳过65，最终`DEV_DEPLOYMENT_GATE_GO`）。须取得新的明确推送授权后再生成新Run，不重跑失败Run。
 
 ## 2026-08-23 — FN-MP-04 注销申请就绪门禁
 
