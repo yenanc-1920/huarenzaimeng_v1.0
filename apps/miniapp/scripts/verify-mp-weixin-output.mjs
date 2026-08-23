@@ -4,6 +4,10 @@ import { createRequire } from 'node:module'
 
 const projectRoot = resolve(process.cwd())
 const outputRoot = resolve(projectRoot, 'dist/build/mp-weixin')
+const generatedProjectConfig = JSON.parse(readFileSync(resolve(outputRoot, 'project.config.json'), 'utf8'))
+const generatedAppConfig = JSON.parse(readFileSync(resolve(outputRoot, 'app.json'), 'utf8'))
+if (generatedProjectConfig.setting?.minified !== true) throw new Error('MP_WEIXIN_MINIFICATION_NOT_ENABLED')
+if (generatedAppConfig.lazyCodeLoading !== 'requiredComponents') throw new Error('MP_WEIXIN_COMPONENT_LAZY_LOADING_NOT_ENABLED')
 const requiredArtifacts = [
   'app.js',
   'app.json',
@@ -51,6 +55,21 @@ function collectJavaScript(directory) {
     else if (entry.isFile() && entry.name.endsWith('.js')) files.push(path)
   }
   return files
+}
+
+function collectFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = resolve(directory, entry.name)
+    return entry.isDirectory() ? collectFiles(path) : [path]
+  })
+}
+
+const outputFiles = collectFiles(outputRoot)
+const packageBytes = outputFiles.reduce((total, file) => total + readFileSync(file).byteLength, 0)
+if (packageBytes > 1.5 * 1024 * 1024) throw new Error(`MP_WEIXIN_MAIN_PACKAGE_TOO_LARGE:${packageBytes}`)
+for (const image of outputFiles.filter((file) => /\.(?:png|jpe?g|gif|webp|svg)$/i.test(file))) {
+  const bytes = readFileSync(image).byteLength
+  if (bytes > 200 * 1024) throw new Error(`MP_WEIXIN_STATIC_IMAGE_TOO_LARGE:${relative(outputRoot, image).replaceAll('\\', '/')}:${bytes}`)
 }
 
 let staticRequireCount = 0

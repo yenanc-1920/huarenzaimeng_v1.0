@@ -4,6 +4,10 @@
   "description": "华人在孟开发版小程序",
   "versionName": "0.1.0",
   "versionCode": "100",
-  "mp-weixin": {"appid":"wx91e4e752ea4a55ee","setting":{"urlCheck":false}},
+  "mp-weixin": {
+    "appid": "wx91e4e752ea4a55ee",
+    "lazyCodeLoading": "requiredComponents",
+    "setting": {"urlCheck":false,"minified":true}
+  },
   "uniStatistics": {"enable": false}
 }
