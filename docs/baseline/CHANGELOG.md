@@ -1,5 +1,11 @@
 # 基线变更记录
 
+## 2026-08-23 — FN-MP-04 DEV失败定位与V26本地修复
+
+- 南哥授权专用微信测试账号`Kongkong_1920`执行注销；确认框正常，但微信云托管`huaren-api-dev-051`在2026-08-23 13:32:41（控制台北京时间）报`Data too long for column 'status_code'`，事务回滚，账号未注销。
+- 根因为`buyer_identity.status_code VARCHAR(16)`无法容纳17字符的`CLOSURE_REQUESTED`；同一事务随后写入的`buyer_consent_state.consent_state`也为16字符容量。
+- 新增V26，仅将上述两个字段扩至`VARCHAR(24)`；生命周期、控制器与迁移合同定向测试14/14通过。当前仅`LOCAL_PASS`，未推送、未部署、未执行DEV数据库迁移，唯一下一动作是发布后单次重测。
+
 ## 2026-08-23 — FN-MP-04 注销申请就绪门禁
 
 - 注销生命周期与认证控制器定向测试13/13通过；申请会立即撤销全部会话、把账号置为`CLOSURE_REQUESTED`并创建PII清理任务，未结交易只阻塞最终关闭，不阻止先禁止重新登录。
