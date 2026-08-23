@@ -6,7 +6,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '../../..')
 const matrixPath = resolve(here, '视觉验收截图矩阵.md')
 const matrix = readFileSync(matrixPath, 'utf8')
-const pages = JSON.parse(readFileSync(resolve(root, 'apps/miniapp/src/pages.json'), 'utf8')).pages.map((page) => page.path)
+const pages = JSON.parse(readFileSync(resolve(root, 'apps/miniapp/src/pages.v1.json'), 'utf8')).pages.map((page) => page.path)
 const adminApp = readFileSync(resolve(root, 'apps/admin-web/src/App.vue'), 'utf8')
 
 const mini = [
@@ -71,7 +71,7 @@ requireUnique(admin.map(([, , , baseline]) => baseline), 'admin baselines')
 
 const businessRoutes = new Set(mini.map(([, , route]) => route))
 const auxiliaryRoutes = pages.filter((route) => !businessRoutes.has(route))
-requireCondition(pages.length === 18, `pages.json must contain 18 routes, got ${pages.length}`)
+requireCondition(pages.length === 18, `pages.v1.json must contain 18 archived routes, got ${pages.length}`)
 requireCondition(auxiliaryRoutes.length === 2 && auxiliaryRoutes.includes('pages/legal/user-agreement') && auxiliaryRoutes.includes('pages/legal/privacy-policy'), 'only the two legal routes may sit outside the 16-page business matrix')
 
 for (const [id, pageId, route, baseline, source] of mini) {

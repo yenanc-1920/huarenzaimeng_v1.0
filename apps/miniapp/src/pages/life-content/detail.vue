@@ -3,7 +3,7 @@ const navigateBack=()=>uni.navigateBack()
 import { ref } from 'vue'
 import { onHide, onLoad, onShow } from '@dcloudio/uni-app'
 import AppHeader from '../../components/AppHeader.vue'
-import { api } from '../../api/client'
+import { v2PublicApi as api } from '../../api/v2-public-client'
 import type { LifeContentCategory, LifeContentDetailItem, LifeContentDetailState } from '../../domain/types'
 import { executeLifeContentDetailRead, revokeLifeContentDetail, type LifeContentDetailPageState, type LifeContentReadTrigger } from '../../domain/life-content-page-executor'
 

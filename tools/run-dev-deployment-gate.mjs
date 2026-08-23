@@ -66,7 +66,7 @@ try {
   run('admin contracts', npm, ['run', 'test:contracts'], join(root, 'apps', 'admin-web'))
   run('admin build', npm, ['run', 'build'], join(root, 'apps', 'admin-web'))
   run('miniapp contracts', npm, ['run', 'test:frontend-contracts'], join(root, 'apps', 'miniapp'))
-  run('miniapp build', npm, ['run', 'build:mp-weixin:dev'], join(root, 'apps', 'miniapp'))
+  run('V2 H5 contracts and build', npm, ['run', 'build:h5:v2'], join(root, 'apps', 'miniapp'))
   removeGeneratedTarget(join(root, 'modules', 'core', 'target'))
   removeGeneratedTarget(join(root, 'apps', 'api', 'target'))
   run('backend full test', mvn, [...mavenBase, '-pl', 'apps/api', '-am', 'clean', 'test'])

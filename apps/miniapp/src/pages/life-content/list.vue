@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import AppHeader from '../../components/AppHeader.vue'
 import BottomNav from '../../components/BottomNav.vue'
-import { api } from '../../api/client'
+import { v2PublicApi as api } from '../../api/v2-public-client'
 import type { LifeContentCategory, LifeContentReadState, LifeContentSummary } from '../../domain/types'
 import { executeLifeContentListRead, navigateToLifeContentDetail, type LifeContentListPageState, type LifeContentReadTrigger } from '../../domain/life-content-page-executor'
 

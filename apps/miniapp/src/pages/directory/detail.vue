@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import AppHeader from '../../components/AppHeader.vue'
 import StatusNotice from '../../components/StatusNotice.vue'
-import { api } from '../../api/client'
+import { v2PublicApi as api } from '../../api/v2-public-client'
 import type { DirectoryItem } from '../../domain/types'
 
 const directoryCategoryLabel=(category:string):string=>({LIFE_SERVICE:'生活服务',MEDICAL:'医疗服务'}[category]||'其他服务')

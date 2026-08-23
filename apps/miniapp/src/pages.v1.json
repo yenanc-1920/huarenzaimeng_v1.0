@@ -1,0 +1,22 @@
+{
+  "pages": [
+    {"path":"pages/index/index"},
+    {"path":"pages/profile/index"},
+    {"path":"pages/recharge/select"},
+    {"path":"pages/recharge/products"},
+    {"path":"pages/recharge/quote"},
+    {"path":"pages/order/progress"},
+    {"path":"pages/order/detail"},
+    {"path":"pages/payment/status"},
+    {"path":"pages/refund/status"},
+    {"path":"pages/order/list"},
+    {"path":"pages/auth/expired"},
+    {"path":"pages/legal/user-agreement"},
+    {"path":"pages/legal/privacy-policy"},
+    {"path":"pages/order/recovery"},
+    {"path":"pages/directory/list"},
+    {"path":"pages/directory/detail"},
+    {"path":"pages/life-content/list"},
+    {"path":"pages/life-content/detail"}
+  ]
+}

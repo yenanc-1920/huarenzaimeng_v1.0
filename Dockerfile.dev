@@ -10,6 +10,16 @@ COPY apps/miniapp/src/static/logo.png /workspace/apps/miniapp/src/static/logo.pn
 ENV VITE_ADMIN_DATA_MODE=PROJECT_API_PROXY
 RUN npm run build
 
+FROM node:24-alpine AS v2-h5-build
+WORKDIR /workspace/apps/miniapp
+COPY apps/miniapp/package.json apps/miniapp/package-lock.json ./
+RUN npm ci
+COPY apps/miniapp/index.html apps/miniapp/tsconfig.json apps/miniapp/vite.config.ts ./
+COPY apps/miniapp/src src
+COPY apps/miniapp/scripts scripts
+ENV VITE_H5_BASE=/h5/
+RUN npm run build:h5:v2
+
 FROM maven:3.9.11-eclipse-temurin-17 AS build
 
 WORKDIR /workspace
@@ -27,6 +37,7 @@ COPY modules/core/src modules/core/src
 COPY apps/api/src apps/api/src
 COPY apps/api/manifests/DATA-INTEGRATION-01-readonly-challenge.txt apps/api/manifests/DATA-INTEGRATION-01-readonly-challenge.txt
 COPY --from=admin-web-build /workspace/apps/admin-web/dist apps/api/src/main/resources/static
+COPY --from=v2-h5-build /workspace/apps/miniapp/dist/build/h5 apps/api/src/main/resources/static/h5
 COPY apps/api/Invoke-P021OrderDetailEvidenceFinalRun.ps1 apps/api/Invoke-P021OrderDetailEvidenceFinalRun.ps1
 COPY apps/api/Invoke-P021TestReadonlyIntegrationFinalRun.ps1 apps/api/Invoke-P021TestReadonlyIntegrationFinalRun.ps1
 COPY apps/miniapp/scripts/collect-p021-it-page-actual.ps1 apps/miniapp/scripts/collect-p021-it-page-actual.ps1

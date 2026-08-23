@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import AppHeader from '../../components/AppHeader.vue'
 import BottomNav from '../../components/BottomNav.vue'
-import { api } from '../../api/client'
+import { v2PublicApi as api } from '../../api/v2-public-client'
 import type { DirectoryCity, DirectorySummary } from '../../domain/types'
 
 const directoryCategoryLabel=(category:string):string=>({LIFE_SERVICE:'生活服务',MEDICAL:'医疗服务'}[category]||'其他服务')

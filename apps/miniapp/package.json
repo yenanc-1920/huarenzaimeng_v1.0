@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "dev:h5": "uni -p h5",
+    "build:h5": "uni build -p h5",
+    "build:h5:v2": "npm run test:v2-h5-contracts && uni build -p h5 && node scripts/prune-v2-h5.mjs && node scripts/assert-v2-h5-build.mjs",
+    "test:v2-h5-contracts": "node scripts/assert-v2-h5-contracts.mjs",
     "dev:h5:p021-it": "uni -p h5",
     "build:mp-weixin": "node scripts/build-mp-weixin.mjs prod",
     "build:mp-weixin:dev": "node scripts/build-mp-weixin.mjs dev",
