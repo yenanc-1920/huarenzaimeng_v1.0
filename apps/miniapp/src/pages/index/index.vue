@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, ref } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
-import AppHeader from '../../components/AppHeader.vue'
 import BottomNav from '../../components/BottomNav.vue'
 import { v2PublicApi as api } from '../../api/v2-public-client'
 import type { ClockAuthorityState, ClockViewState, HolidayState, TemporalClock, TemporalHoliday, TemporalOverview, TemporalOverviewReadResponse } from '../../api/temporal-overview-contract'
@@ -142,7 +141,7 @@ async function executeTemporalOverviewRead(state:TemporalOverviewPageState,reade
   }
 }
 
-const HOME_ROUTES = new Set(['/pages/directory/list','/pages/life-content/list','/pages/legal/user-agreement','/pages/legal/privacy-policy','/pages/legal/cooperation'])
+const HOME_ROUTES = new Set(['/pages/legal/user-agreement','/pages/legal/privacy-policy','/pages/legal/cooperation'])
 const WINLA_URL='https://www.95cxmd.com/h5/#/home/view?id=25&source=pcxvaj'
 const temporalState=ref<ClockViewState>('LOADING')
 const temporalOverview=ref<TemporalOverview|null>(null)
@@ -246,7 +245,6 @@ onUnmounted(stopClock)
 
 <template>
   <view class="page" data-page-id="UX-P001" data-page-root="home">
-    <AppHeader/>
     <view class="content">
       <view class="welcome"><text>你好，欢迎来到华人在孟</text><view class="heading" role="heading" aria-level="1">在孟生活，简单了解</view></view>
       <button class="hero" data-external-provider="WINLA" @click="openWinla"><text class="eyebrow">境外话费充值</text><view class="hero-title" role="heading" aria-level="2">前往小啦全球充</view><text class="hero-copy">点击进入第三方充值平台</text><text class="hero-action">前往小啦全球充</text><text class="hero-responsibility">充值、订单、退款及售后服务由小啦全球充提供。</text></button>
@@ -266,7 +264,6 @@ onUnmounted(stopClock)
         <text class="temporal-note">时间与今日状态仅供生活信息参考。</text>
       </view>
 
-      <view class="entries"><button class="card nav" @click="go('/pages/directory/list')"><text class="entry-icon orange">页</text><view><text class="card-title">孟加拉黄页</text><text class="copy">按城市查找电话与生活服务</text></view><text class="arrow">›</text></button><button class="card nav" @click="go('/pages/life-content/list')"><text class="entry-icon warm">阅</text><view><text class="card-title">生活资讯</text><text class="copy">查看生活提醒与节假日说明</text></view><text class="arrow">›</text></button></view>
       <view class="legal-links"><button @click="go('/pages/legal/user-agreement')">用户协议</button><button @click="go('/pages/legal/privacy-policy')">隐私政策</button><button @click="go('/pages/legal/cooperation')">合作说明</button></view>
     </view>
     <BottomNav active="home"/>
@@ -277,6 +274,7 @@ onUnmounted(stopClock)
 <style scoped>
 .welcome{width:100%;overflow:visible}.welcome>text{color:var(--muted);font-size:28rpx}.welcome .heading{width:100%;font-size:52rpx;line-height:1.35;min-height:70rpx;margin-top:10rpx;white-space:normal;word-break:normal}.hero{display:block;width:100%;min-width:0;margin-top:36rpx;padding:48rpx;border-radius:40rpx;background:var(--brand);color:#fff;text-align:left;box-shadow:0 20rpx 56rpx rgba(35,87,165,.22)}.eyebrow,.hero-copy,.hero-action{display:block}.eyebrow{font-size:24rpx;opacity:.82}.hero-title{font-size:44rpx;line-height:1.35;font-weight:900;margin-top:16rpx}.hero-copy{font-size:26rpx;line-height:1.5;margin-top:10rpx;opacity:.9}.hero-action{display:inline-block;width:auto;min-width:192rpx;min-height:72rpx;margin-top:44rpx;padding:16rpx 40rpx;border-radius:24rpx;background:#fff;color:var(--brand);text-align:center;font-weight:800;white-space:nowrap}
 .temporal-card{margin-top:32rpx;padding:28rpx;border:1rpx solid var(--line);border-radius:32rpx;background:#fff}.temporal-heading{display:flex;align-items:center;justify-content:space-between;gap:20rpx}.temporal-heading>view{min-width:0}.temporal-eyebrow,.temporal-title,.temporal-status,.temporal-updated,.clock-city,.clock-time,.not-current,.holiday-copy,.holiday-meta,.temporal-note{display:block}.temporal-eyebrow{color:#8a4a17;font-size:20rpx;font-weight:800}.temporal-title{margin-top:4rpx;font-size:31rpx;font-weight:900}.temporal-refresh{flex:none;min-width:96rpx;min-height:44px;padding:10rpx 22rpx;display:flex;align-items:center;justify-content:center;box-sizing:border-box;border:1rpx solid var(--line);border-radius:999rpx;background:#fff;color:var(--brand);font-size:22rpx;font-weight:800;line-height:1}.temporal-refresh[disabled]{color:#9aa4b1;background:#f3f5f8}.temporal-status{margin-top:18rpx;color:var(--muted);font-size:22rpx}.clock-grid{display:grid;grid-template-columns:1fr 1fr;gap:16rpx;margin-top:14rpx}.clock-cell{min-width:0;padding:20rpx;border-radius:24rpx;background:#f5f8fc}.clock-city{color:var(--muted);font-size:22rpx}.clock-time{margin-top:4rpx;font-size:40rpx;line-height:1.25;font-weight:900;letter-spacing:1rpx}.not-current{margin-top:4rpx;color:#9a531d;font-size:20rpx}.temporal-updated{margin-top:12rpx;color:var(--muted);font-size:19rpx}.holiday-list{margin-top:18rpx;border-top:1rpx solid var(--line)}.holiday-row{padding:18rpx 0}.holiday-row+.holiday-row{border-top:1rpx solid var(--line)}.holiday-copy{font-size:24rpx;line-height:1.45;font-weight:750}.holiday-meta{margin-top:6rpx;color:var(--muted);font-size:19rpx;line-height:1.45}.temporal-note{margin-top:8rpx;color:var(--muted);font-size:20rpx;line-height:1.5}
-.entries{margin-top:32rpx;border-radius:32rpx;overflow:hidden}.nav{width:100%;min-height:148rpx;margin:0;padding:36rpx;border-radius:0;display:flex;align-items:center;text-align:left}.nav+.nav{border-top:1rpx solid var(--line)}.entry-icon{width:76rpx;height:76rpx;line-height:76rpx;border-radius:24rpx;color:#fff;text-align:center;font-weight:800;flex:none;margin-right:24rpx}.blue{background:var(--brand)}.orange{background:#f5a623}.warm{background:#d97832}.nav view{flex:1;min-width:0}.nav .card-title{width:100%;white-space:nowrap}.nav .copy{width:100%;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;word-break:normal}.arrow{font-size:48rpx;color:#8792a2;margin-left:20rpx;flex:none}.test-badge{display:block;width:108rpx;margin:32rpx auto 0;padding:10rpx 18rpx;border-radius:999rpx;background:#eaedf2;color:#737e8d;text-align:center;font-size:22rpx;white-space:nowrap}
 .hero-responsibility{display:block;margin-top:22rpx;font-size:21rpx;line-height:1.55;opacity:.82}.legal-links{display:flex;justify-content:center;gap:8rpx;margin:30rpx 0 12rpx}.legal-links button{padding:12rpx;color:var(--muted);font-size:21rpx}.legal-links button+button{border-left:1rpx solid var(--line)}
+@media (max-height:740px){.content{padding:22rpx 32rpx 24rpx}.welcome .heading{font-size:44rpx;min-height:0;margin-top:4rpx}.hero{margin-top:20rpx;padding:30rpx 36rpx;border-radius:32rpx}.hero-title{font-size:38rpx;margin-top:8rpx}.hero-action{min-height:64rpx;margin-top:24rpx;padding:12rpx 32rpx}.hero-responsibility{margin-top:14rpx}.temporal-card{margin-top:20rpx;padding:22rpx}.temporal-status{margin-top:10rpx}.clock-grid{margin-top:10rpx}.clock-cell{padding:14rpx 18rpx}.holiday-list{margin-top:12rpx}.holiday-row{padding:12rpx 0}.legal-links{margin:16rpx 0 4rpx}}
+@media (max-width:360px){.content{padding-left:28rpx;padding-right:28rpx}.hero{padding-left:30rpx;padding-right:30rpx}.clock-time{font-size:36rpx}.legal-links{gap:0}.legal-links button{font-size:19rpx;padding:10rpx}}
 </style>

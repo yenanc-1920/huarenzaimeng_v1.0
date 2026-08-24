@@ -18,6 +18,8 @@ assert.equal(home.split(winla).length-1,1,'WINLA URL must be one exact constant'
 assert.match(home,/充值、订单、退款及售后服务由小啦全球充提供。/)
 assert.match(home,/@click="openWinla"/)
 assert.match(home,/第三方服务暂时无法打开，请稍后再试/)
+assert.equal(home.includes('AppHeader'),false,'Home must not duplicate the browser title bar')
+for(const removedHomePreview of ['孟加拉黄页','生活资讯','class="entries"'])assert.equal(home.includes(removedHomePreview),false,`Home contains removed preview: ${removedHomePreview}`)
 for(const forbidden of ['<iframe','/pages/recharge/','api/client'])assert.equal(home.includes(forbidden),false,`Home contains ${forbidden}`)
 assert.match(home,/setInterval\(tickClocks,60000\)/)
 assert.match(home,/onHide\(stopClock\)/)
