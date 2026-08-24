@@ -23,3 +23,13 @@ export async function initializationStatus(): Promise<'AVAILABLE' | 'CLOSED'> {
 
 export const initializeAdmin = (username: string, displayName: string, password: string, bootstrapToken: string) =>
   jsonRequest('/bootstrap', { username, displayName, password }, { 'X-Admin-Bootstrap-Token': bootstrapToken })
+
+export async function recoveryStatus(): Promise<'AVAILABLE' | 'CLOSED'> {
+  const response = await fetch(`${ADMIN_AUTH_PATH}/recovery`, { credentials: 'include', headers: { Accept: 'application/json' } })
+  if (!response.ok) return 'CLOSED'
+  const payload = await response.json() as { status?: unknown }
+  return payload.status === 'AVAILABLE' ? 'AVAILABLE' : 'CLOSED'
+}
+
+export const recoverAdmin = (username: string, password: string, recoveryToken: string) =>
+  jsonRequest('/recovery', { username, password }, { 'X-Admin-Recovery-Token': recoveryToken })

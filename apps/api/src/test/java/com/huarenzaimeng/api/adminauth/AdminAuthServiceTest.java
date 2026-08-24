@@ -59,4 +59,17 @@ class AdminAuthServiceTest {
         assertThatThrownBy(() -> auth.login("yenanc", "Correct-Horse-2026!Battery".toCharArray(), "REQ-LOCKED"))
                 .isInstanceOf(AdminAuthService.AuthFailure.class).hasMessage("INVALID_CREDENTIALS");
     }
+
+    @Test void timeBoundRecoveryResetsPasswordUnlocksAndRevokesSessions() {
+        InMemoryAdminAuthStore store = new InMemoryAdminAuthStore();
+        AdminAuthService auth = new AdminAuthService(store, true, "bootstrap", true, "recovery-code",
+                Instant.parse("2026-08-09T13:00:00Z"), 8, CLOCK);
+        auth.bootstrap("bootstrap", "yenanc", "南哥", "Correct-Horse-2026!Battery".toCharArray(), "REQ-1");
+        AdminAuthService.LoginResult old = auth.login("yenanc", "Correct-Horse-2026!Battery".toCharArray(), "REQ-2");
+        assertThat(auth.recoveryAvailable()).isTrue();
+        auth.recover("recovery-code", "yenanc", "Changed-Horse-2026!Password".toCharArray(), "REQ-3");
+        assertThat(auth.authenticate(old.token())).isEmpty();
+        assertThatThrownBy(() -> auth.login("yenanc", "Correct-Horse-2026!Battery".toCharArray(), "REQ-4")).hasMessage("INVALID_CREDENTIALS");
+        assertThat(auth.login("yenanc", "Changed-Horse-2026!Password".toCharArray(), "REQ-5").user().roleCode()).isEqualTo("SUPER_ADMIN");
+    }
 }

@@ -22,6 +22,10 @@ final class AdminAuthController {
         return Map.of("status", auth.initializationAvailable() ? "AVAILABLE" : "CLOSED");
     }
 
+    @GetMapping("/recovery") Map<String, Object> recovery() {
+        return Map.of("status", auth.recoveryAvailable() ? "AVAILABLE" : "CLOSED");
+    }
+
     @PostMapping("/bootstrap") ResponseEntity<?> bootstrap(@RequestHeader("X-Admin-Bootstrap-Token") String token,
                                                             @Valid @RequestBody BootstrapRequest body,
                                                             HttpServletRequest request) {
@@ -39,6 +43,13 @@ final class AdminAuthController {
         return Map.of("status", "AUTHENTICATED", "user", Map.of("displayName", result.user().displayName(), "role", result.user().roleCode()));
     }
 
+    @PostMapping("/recovery") Map<String, Object> recovery(@RequestHeader("X-Admin-Recovery-Token") String token,
+                                                           @Valid @RequestBody RecoveryRequest body,
+                                                           HttpServletRequest request) {
+        auth.recover(token, body.username(), body.password().toCharArray(), request.getHeader("X-Request-Id"));
+        return Map.of("status", "PASSWORD_RESET");
+    }
+
     @PostMapping("/logout") ResponseEntity<Void> logout(@CookieValue(name = COOKIE, required = false) String token,
                                                          HttpServletRequest request, HttpServletResponse response) {
         auth.logout(token, request.getHeader("X-Request-Id"));
@@ -54,4 +65,5 @@ final class AdminAuthController {
 
     record BootstrapRequest(@NotBlank String username, @NotBlank String displayName, @NotBlank String password) {}
     record LoginRequest(@NotBlank String username, @NotBlank String password) {}
+    record RecoveryRequest(@NotBlank String username, @NotBlank String password) {}
 }

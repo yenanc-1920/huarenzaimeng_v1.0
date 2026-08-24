@@ -7,6 +7,7 @@ import { createAdminReadController } from './api/admin-read-controller'
 import AccessDenied from './components/AccessDenied.vue'
 import AdminWorkspace from './components/AdminWorkspace.vue'
 import AdminInitialization from './components/AdminInitialization.vue'
+import AdminRecovery from './components/AdminRecovery.vue'
 import LoginRequired from './components/LoginRequired.vue'
 import ReadUnavailable from './components/ReadUnavailable.vue'
 import AdminOrderDetail from './components/AdminOrderDetail.vue'
@@ -18,6 +19,7 @@ const allViews: ViewId[] = ['B002', 'A100', 'A110', 'A120', 'A121', 'A122', 'A13
 const hashView = () => { const candidate = window.location.hash.replace(/^#\/?/, '') as ViewId; return allViews.includes(candidate) ? candidate : 'B002' }
 const activePage = ref<ViewId>(hashView())
 const isInitializationRoute = window.location.pathname.replace(/\/+$/, '') === '/admin/initialize'
+const isRecoveryRoute = window.location.pathname.replace(/\/+$/, '') === '/admin/recover'
 const resolvedMode = resolveAdminDataMode(import.meta.env.VITE_ADMIN_DATA_MODE)
 const readState = ref<AdminReadState>({ status: 'LOADING', data: null, message: '正在读取只读数据' })
 const authResolved = ref(false)
@@ -81,6 +83,7 @@ watch(activePage, view => { const next = `#/${view}`; if (window.location.hash !
 
 <template>
   <AdminInitialization v-if="isInitializationRoute" />
+  <AdminRecovery v-else-if="isRecoveryRoute" />
   <LoginRequired v-else-if="!authResolved && readState.status === 'UNAUTHENTICATED'" class="standalone-login" @authenticated="authenticated" />
   <main v-else-if="!authResolved" class="auth-check" data-read-state="AUTH_CHECK" role="status" aria-live="polite"><img :src="logoUrl" alt="华人在孟"><div class="loading-mark" aria-hidden="true"></div><h1>正在确认登录状态</h1><p>确认完成前不会显示后台菜单或业务数据。</p></main>
   <div v-else class="admin-app">

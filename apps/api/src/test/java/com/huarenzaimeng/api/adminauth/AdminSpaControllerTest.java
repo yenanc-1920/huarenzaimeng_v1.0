@@ -11,5 +11,6 @@ class AdminSpaControllerTest {
     void servesIndependentLoginAndInitializationRoutesFromTheSpa() {
         assertEquals("forward:/index.html", controller.loginPage());
         assertEquals("forward:/index.html", controller.initializationPage());
+        assertEquals("forward:/index.html", controller.recoveryPage());
     }
 }

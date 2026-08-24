@@ -52,6 +52,13 @@ class JdbcAdminAuthStore implements AdminAuthStore {
         appendAudit(audit);
     }
 
+    @Override @Transactional public void resetPassword(String userId, String passwordHash, Instant changedAt, Audit audit) {
+        jdbc.update("UPDATE admin_user SET password_hash=?,failed_login_count=0,locked_until=NULL,password_changed_at=?,updated_at=? WHERE user_id=? AND status_code='ACTIVE'",
+                passwordHash, ts(changedAt), ts(changedAt), userId);
+        jdbc.update("UPDATE admin_session SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL", ts(changedAt), userId);
+        appendAudit(audit);
+    }
+
     @Override @Transactional public void createSession(Session session, Audit audit) {
         jdbc.update("INSERT INTO admin_session (session_id,user_id,token_digest,created_at,last_seen_at,expires_at,revoked_at) VALUES (?,?,?,?,?,?,NULL)",
                 session.sessionId(), session.userId(), session.tokenDigest(), ts(session.createdAt()), ts(session.createdAt()), ts(session.expiresAt()));

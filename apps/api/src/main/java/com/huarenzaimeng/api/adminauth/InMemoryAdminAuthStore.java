@@ -35,6 +35,12 @@ class InMemoryAdminAuthStore implements AdminAuthStore {
                 ? new User(user.userId(), user.username(), user.displayName(), user.passwordHash(), user.roleCode(), user.statusCode(), 0, null, audit.occurredAt()) : user);
         audits.add(audit);
     }
+    @Override public synchronized void resetPassword(String userId, String passwordHash, Instant changedAt, Audit audit) {
+        users.replaceAll((username, user) -> user.userId().equals(userId)
+                ? new User(user.userId(), user.username(), user.displayName(), passwordHash, user.roleCode(), user.statusCode(), 0, null, changedAt) : user);
+        sessions.entrySet().removeIf(entry -> entry.getValue().userId().equals(userId));
+        audits.add(audit);
+    }
     @Override public synchronized void createSession(Session session, Audit audit) {
         sessions.put(session.tokenDigest(), session); audits.add(audit);
     }

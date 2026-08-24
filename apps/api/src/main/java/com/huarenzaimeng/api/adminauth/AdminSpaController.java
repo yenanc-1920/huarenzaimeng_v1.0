@@ -12,4 +12,8 @@ final class AdminSpaController {
     @GetMapping("/admin/initialize") String initializationPage() {
         return "forward:/index.html";
     }
+
+    @GetMapping("/admin/recover") String recoveryPage() {
+        return "forward:/index.html";
+    }
 }

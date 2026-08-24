@@ -29,6 +29,9 @@ hz:
   admin-auth:
     bootstrap-enabled: ${HZ_ADMIN_BOOTSTRAP_ENABLED:false}
     bootstrap-token: ${HZ_ADMIN_BOOTSTRAP_TOKEN:}
+    recovery-enabled: ${HZ_ADMIN_RECOVERY_ENABLED:false}
+    recovery-token: ${HZ_ADMIN_RECOVERY_TOKEN:}
+    recovery-until: ${HZ_ADMIN_RECOVERY_UNTIL:}
     session-hours: ${HZ_ADMIN_SESSION_HOURS:8}
   admin:
     self-approval:

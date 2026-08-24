@@ -25,6 +25,9 @@ final class AdminAuthService {
     private final Clock clock;
     private final byte[] bootstrapDigest;
     private final boolean bootstrapEnabled;
+    private final byte[] recoveryDigest;
+    private final boolean recoveryEnabled;
+    private final Instant recoveryUntil;
     private final Duration sessionTtl;
     private final String dummyPasswordHash = new BCryptPasswordEncoder(12).encode("not-a-real-password-value");
 
@@ -32,19 +35,31 @@ final class AdminAuthService {
     AdminAuthService(AdminAuthStore store,
                      @Value("${hz.admin-auth.bootstrap-enabled:false}") boolean bootstrapEnabled,
                      @Value("${hz.admin-auth.bootstrap-token:}") String bootstrapToken,
+                     @Value("${hz.admin-auth.recovery-enabled:false}") boolean recoveryEnabled,
+                     @Value("${hz.admin-auth.recovery-token:}") String recoveryToken,
+                     @Value("${hz.admin-auth.recovery-until:}") String recoveryUntil,
                      @Value("${hz.admin-auth.session-hours:8}") long sessionHours) {
-        this(store, bootstrapEnabled, bootstrapToken, sessionHours, Clock.systemUTC());
+        this(store, bootstrapEnabled, bootstrapToken, recoveryEnabled, recoveryToken, parseInstant(recoveryUntil), sessionHours, Clock.systemUTC());
     }
 
     AdminAuthService(AdminAuthStore store, boolean bootstrapEnabled, String bootstrapToken, long sessionHours, Clock clock) {
+        this(store, bootstrapEnabled, bootstrapToken, false, "", Instant.EPOCH, sessionHours, clock);
+    }
+
+    AdminAuthService(AdminAuthStore store, boolean bootstrapEnabled, String bootstrapToken, boolean recoveryEnabled,
+                     String recoveryToken, Instant recoveryUntil, long sessionHours, Clock clock) {
         this.store = store;
         this.bootstrapEnabled = bootstrapEnabled;
         this.bootstrapDigest = bootstrapToken.isBlank() ? null : sha256Bytes(bootstrapToken);
+        this.recoveryEnabled = recoveryEnabled;
+        this.recoveryDigest = recoveryToken.isBlank() ? null : sha256Bytes(recoveryToken);
+        this.recoveryUntil = recoveryUntil;
         this.sessionTtl = Duration.ofHours(Math.max(1, Math.min(sessionHours, 24)));
         this.clock = clock;
     }
 
     boolean initializationAvailable() { return bootstrapEnabled && bootstrapDigest != null && store.userCount() == 0; }
+    boolean recoveryAvailable() { return recoveryEnabled && recoveryDigest != null && recoveryUntil.isAfter(clock.instant()) && store.userCount() > 0; }
 
     void bootstrap(String suppliedToken, String username, String displayName, char[] password, String requestId) {
         Instant now = clock.instant();
@@ -100,6 +115,22 @@ final class AdminAuthService {
         return new LoginResult(token, expiresAt, new AdminAuthStore.AuthenticatedUser(user.userId(), user.username(), user.displayName(), user.roleCode()));
     }
 
+    void recover(String suppliedToken, String username, char[] password, String requestId) {
+        Instant now = clock.instant();
+        String normalized = normalizeUsername(username);
+        Optional<AdminAuthStore.User> candidate = store.findActiveUser(normalized);
+        if (!recoveryAvailable() || suppliedToken == null || !MessageDigest.isEqual(recoveryDigest, sha256Bytes(suppliedToken)) || candidate.isEmpty()) {
+            store.appendAudit(audit("ADMIN_PASSWORD_RECOVERY", candidate.map(AdminAuthStore.User::userId).orElse(null), normalized, "REJECTED", requestId, now));
+            java.util.Arrays.fill(password, '\0');
+            throw new AuthFailure("RECOVERY_UNAVAILABLE");
+        }
+        try {
+            validatePassword(password, normalized);
+            store.resetPassword(candidate.get().userId(), passwords.encode(new String(password)), now,
+                    audit("ADMIN_PASSWORD_RECOVERY", candidate.get().userId(), normalized, "SUCCEEDED", requestId, now));
+        } finally { java.util.Arrays.fill(password, '\0'); }
+    }
+
     Optional<AdminAuthStore.AuthenticatedUser> authenticate(String token) {
         return token == null || token.isBlank() ? Optional.empty() : store.findSession(sha256Hex(token), clock.instant());
     }
@@ -131,6 +162,10 @@ final class AdminAuthService {
     private static byte[] sha256Bytes(String value) {
         try { return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)); }
         catch (NoSuchAlgorithmException error) { throw new IllegalStateException(error); }
+    }
+    private static Instant parseInstant(String value) {
+        try { return value == null || value.isBlank() ? Instant.EPOCH : Instant.parse(value.trim()); }
+        catch (RuntimeException ignored) { return Instant.EPOCH; }
     }
     private static String sha256Hex(String value) { return java.util.HexFormat.of().formatHex(sha256Bytes(value)); }
 

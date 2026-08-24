@@ -36,6 +36,7 @@ async function submit() {
         <button class="primary" type="submit" :disabled="submitting">{{ submitting ? '登录中' : '登录' }}</button>
       </form>
       <p class="login-note">后台不开放自行注册，也不能在页面中选择或扩大账号职责。</p>
+      <a href="/admin/recover">忘记密码</a>
     </div>
   </section>
 </template>

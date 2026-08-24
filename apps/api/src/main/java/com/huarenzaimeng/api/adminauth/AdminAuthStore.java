@@ -9,6 +9,7 @@ interface AdminAuthStore {
     Optional<User> findActiveUser(String normalizedUsername);
     void recordLoginFailure(String userId, int failedCount, Instant lockedUntil, Audit audit);
     void recordLoginSuccess(String userId, Audit audit);
+    void resetPassword(String userId, String passwordHash, Instant changedAt, Audit audit);
     void createSession(Session session, Audit audit);
     Optional<AuthenticatedUser> findSession(String tokenDigest, Instant now);
     void revokeSession(String tokenDigest, Instant now, Audit audit);
