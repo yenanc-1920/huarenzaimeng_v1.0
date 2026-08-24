@@ -37,4 +37,5 @@ button::after { border: 0; }
 .side.right { justify-content: flex-end; }
 .city-filter, .item, .order, .product-card, .story-card, .service-row, .support-card { align-items: center; }
 .operator-logo { width: 96rpx; height: 96rpx; margin-right: 24rpx; flex: none; border-radius: 22rpx; background: #fff; }
+.life-page > .header, .directory-page > .header { display: none; }
 </style>

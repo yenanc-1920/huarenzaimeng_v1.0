@@ -9,6 +9,8 @@ const expected=['pages/index/index','pages/legal/user-agreement','pages/legal/pr
 assert.deepEqual(pages,expected,'V2 routes must be the fixed public H5 route set')
 
 const nav=read('src/components/BottomNav.vue')
+const app=read('src/App.vue')
+assert.match(app,/\.life-page > \.header, \.directory-page > \.header \{ display: none; \}/)
 for(const label of ['首页','资讯','黄页'])assert.match(nav,new RegExp(`>${label}<`))
 for(const forbidden of ['我的','/pages/profile','/pages/recharge','/pages/order','/pages/payment','/pages/refund'])assert.equal(nav.includes(forbidden),false,`BottomNav contains ${forbidden}`)
 
