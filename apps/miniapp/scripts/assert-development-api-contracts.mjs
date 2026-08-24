@@ -52,7 +52,7 @@ assert.doesNotMatch(payment,/微信五项|预支付参数|配置工程词/)
 assert.doesNotMatch(payment,/\{\{projection\.orderState\}\}/)
 
 assert.doesNotMatch(home,/我的订单|开发样例|目录快照|无登记节假日/)
-assert.match(home,/孟加拉黄页/)
+assert.doesNotMatch(home,/孟加拉黄页|生活资讯/)
 for(const label of ['节假日','休息日','工作日'])assert.ok(home.includes(label))
 for(const label of ['余额','流量','套餐'])assert.ok(products.includes(label))
 assert.match(recharge,/getSupportedOperators/)
