@@ -22,6 +22,28 @@ class ReleaseSecretBoundaryValidatorTest {
                 .doesNotThrowAnyException();
     }
 
+    @Test void acceptsBootstrapOnlyInIsolatedDevelopmentWithToken() {
+        MockEnvironment environment = releaseEnvironment()
+                .withProperty("hz.environment.name", "dev")
+                .withProperty("hz.environment.migration-enabled", "true")
+                .withProperty("hz.v1-dev-data.enabled", "true")
+                .withProperty("hz.admin-auth.bootstrap-enabled", "true")
+                .withProperty("hz.admin-auth.bootstrap-token", "short-lived-dev-token");
+        environment.setActiveProfiles("release-mysql", "local-mysql");
+        assertThatCode(() -> new ReleaseSecretBoundaryValidator(environment))
+                .doesNotThrowAnyException();
+    }
+
+    @Test void rejectsIsolatedDevelopmentBootstrapWithoutToken() {
+        MockEnvironment environment = releaseEnvironment()
+                .withProperty("hz.environment.name", "dev")
+                .withProperty("hz.environment.migration-enabled", "true")
+                .withProperty("hz.v1-dev-data.enabled", "true")
+                .withProperty("hz.admin-auth.bootstrap-enabled", "true");
+        environment.setActiveProfiles("release-mysql", "local-mysql");
+        assertRejected(environment, "hz.admin-auth.bootstrap-token", "REQUIRED_FOR_BOUNDED_DEV_BOOTSTRAP");
+    }
+
     @Test void rejectsDevelopmentProfilePairWithoutBothDevelopmentGates() {
         MockEnvironment environment = releaseEnvironment()
                 .withProperty("hz.environment.name", "dev")

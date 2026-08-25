@@ -27,7 +27,7 @@ final class ReleaseSecretBoundaryValidator {
             "hz.it-session.buyer-authorized-order-refs");
 
     ReleaseSecretBoundaryValidator(Environment environment) {
-        requireApprovedReleaseProfiles(environment);
+        boolean isolatedDevelopment = requireApprovedReleaseProfiles(environment);
         requireValue(environment, "hz.persistence.mode", "mysql");
         requireValue(environment, "hz.p014.mode", "disabled");
         requireValue(environment, "hz.p014.fixture-mode", "no-default");
@@ -36,13 +36,18 @@ final class ReleaseSecretBoundaryValidator {
         requireValue(environment, "hz.a110.mode", "disabled");
         requireValue(environment, "hz.life-content.mode", "disabled");
         requireValue(environment, "hz.temporal-overview.mode", "disabled");
-        requireValue(environment, "hz.admin-auth.bootstrap-enabled", "false");
+        boolean bootstrapEnabled = environment.getProperty("hz.admin-auth.bootstrap-enabled", Boolean.class, false);
+        if (bootstrapEnabled) {
+            if (!isolatedDevelopment) throw invalid("hz.admin-auth.bootstrap-enabled", "RELEASE_CAPABILITY_FORBIDDEN");
+            requirePresent("hz.admin-auth.bootstrap-token", environment.getProperty("hz.admin-auth.bootstrap-token"));
+        } else {
+            requireAbsent("hz.admin-auth.bootstrap-token", environment.getProperty("hz.admin-auth.bootstrap-token"));
+        }
         requireValue(environment, "hz.it-session.buyer-session-version", "0");
-        requireAbsent("hz.admin-auth.bootstrap-token", environment.getProperty("hz.admin-auth.bootstrap-token"));
         TEST_IDENTITY_PROPERTIES.forEach(property -> requireAbsent(property, environment.getProperty(property)));
     }
 
-    private static void requireApprovedReleaseProfiles(Environment environment) {
+    private static boolean requireApprovedReleaseProfiles(Environment environment) {
         String[] activeProfiles = environment.getActiveProfiles();
         List<String> profiles = Arrays.stream(activeProfiles).map(String::trim).filter(value -> !value.isEmpty()).toList();
         Set<String> profileSet = Set.copyOf(profiles);
@@ -70,6 +75,7 @@ final class ReleaseSecretBoundaryValidator {
         if (!releaseOnly && !isolatedDevelopment && !isolatedTest && !isolatedStage && !isolatedProd) {
             throw invalid("spring.profiles.active", "RELEASE_PROFILE_MUST_NOT_MIX_WITH_TEST_PROFILES");
         }
+        return isolatedDevelopment;
     }
 
     private static void requireValue(Environment environment, String propertyName, String expected) {
@@ -81,6 +87,10 @@ final class ReleaseSecretBoundaryValidator {
 
     private static void requireAbsent(String propertyName, String value) {
         if (value != null && !value.isBlank()) throw invalid(propertyName, "TEST_SECRET_FORBIDDEN_IN_RELEASE");
+    }
+
+    private static void requirePresent(String propertyName, String value) {
+        if (value == null || value.isBlank()) throw invalid(propertyName, "REQUIRED_FOR_BOUNDED_DEV_BOOTSTRAP");
     }
 
     private static IllegalStateException invalid(String propertyNames, String reason) {
