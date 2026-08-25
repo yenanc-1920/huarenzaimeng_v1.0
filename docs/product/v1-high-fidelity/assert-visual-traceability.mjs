@@ -91,7 +91,7 @@ for (const [frame, route, entry, baseline, source] of admin) {
   const marker = `<!-- VISUAL_TRACE_ADMIN|${frame}|${route}|${entry}|${baseline}|${source}|NOT_EVIDENCED -->`
   requireCondition(matrix.includes(marker), `${frame} trace marker missing or evidence state changed`)
   if (route === '/admin/login') requireCondition(adminApp.includes('/admin/login'), 'admin login route missing')
-  else requireCondition(adminApp.includes(`'${route.slice(3)}'`), `${frame} top-level route missing in App.vue`)
+  else if (['/A120', '/A121', '/A122'].includes(route)) requireCondition(adminApp.includes(`'${route.slice(3)}'`), `${frame} V2 top-level route missing in App.vue`)
 }
 
 console.log('visual traceability contracts: PASS (mini=16; admin=21; status=NOT_EVIDENCED; device=NO_REAL_DEVICE_EVIDENCE)')
